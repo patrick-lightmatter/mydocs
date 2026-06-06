@@ -282,8 +282,7 @@ errors are observed in the finite-length simulation run.
 **Caveat:** The Gaussian assumption underestimates BER when the noise has heavy
 tails (e.g., from pattern-dependent ISI residual, burst errors, or non-linear
 crosstalk). The extrapolated BER should be read as a lower-bound estimate of the
-true BER; the SNPS reference simulation (which accumulates ~2 million symbols)
-provides a direct count-based measurement for comparison.
+true BER.
 
 ### 3.5 Raw BER from frozen-pass decisions
 
@@ -447,9 +446,7 @@ Key observations:
   (approximately 0.4–0.9 dB SNR improvement), suggesting the higher VGA gain
   better matches the signal swing to the ADC input range.
 - **Zero raw errors** across all variants. With 43k symbols per run, the
-  Clopper-Pearson 95% upper bound on raw BER is approximately 7 × 10⁻⁵,
-  consistent with the SNPS reference measurement of 6.46 × 10⁻⁵ for
-  OMA_100uW_VGA1_0 (which used ~2M symbols to directly observe 128 errors).
+  Clopper-Pearson 95% upper bound on raw BER is approximately 7 × 10⁻⁵.
 - **Extrapolated BER spans nine decades** from 3.98 × 10⁻⁹ to 3.82 × 10⁻¹⁸
   across the OMA range, indicating substantial sensitivity to optical power
   in this receiver configuration.
@@ -458,40 +455,12 @@ Key observations:
 
 ![OMA vs BER](figures/oma_vs_ber.png)
 
-*Figure 9. OMA (µW) vs extrapolated BER for both VGA settings, overlaid with
-SNPS AMI reference measurements (raw BER and interpolated BER from 2M-symbol
-runs). Our extrapolated BER (Gaussian-Q from eye SNR) and the SNPS interpolated
-BER show consistent trends, with the Python receiver demonstrating competitive
-equalization performance across the full OMA range.*
+*Figure 9. OMA (µW) vs extrapolated BER for both VGA settings. Extrapolated
+BER is derived from Gaussian-Q applied to the frozen-pass eye SNR.*
 
 ---
 
-## 6. Comparison with SNPS AMI Reference
-
-The SNPS AMI simulation ran on the same waveforms using the SNPS SerDes AMI
-model, which includes an analog front-end (ATT/BOOST/VGA), a 26-tap FFE, a
-1-tap DFE, and 3 floating far-cursor FFE taps. The key comparison point is
-**OMA_100uW_VGA1_0**, the lowest-OMA, most-stressed waveform:
-
-| Metric | SNPS AMI | Python Rx |
-|--------|----------|-----------|
-| FFE taps | 26 fixed + 3 floating | 20 (5+1+14) |
-| DFE | 1 tap | None |
-| Run length (symbols) | 1,980,000 | 43,468 (frozen) |
-| Raw BER | 6.46 × 10⁻⁵ | 0 (< 7 × 10⁻⁵ at 95% CI) |
-| SNR (dB) | 15.53 (from SNPS SNR output) | 15.22 |
-| Extrap. BER | 2.48 × 10⁻⁹ (SNPS interp.) | 3.98 × 10⁻⁹ |
-
-The Python receiver achieves comparable extrapolated BER to the SNPS reference
-(within 2×), despite using 6 fewer fixed FFE taps and no DFE. The 0.3 dB SNR
-difference is consistent with the reduced tap budget. The raw BER count is
-statistically consistent between the two simulations; the SNPS figure is lower
-because their 2M-symbol run directly resolves the BER with a meaningful error
-count, while our 43k-symbol run can only place an upper bound.
-
----
-
-## 7. Receiver Configuration Reference
+## 6. Receiver Configuration Reference
 
 ```json
 {
