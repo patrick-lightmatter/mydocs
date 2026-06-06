@@ -1,8 +1,7 @@
 # Confidence BER — Method and Derivation
 @Patrick Satarzadeh
 
-**Reference:** Synopsys SIPI, *Confidence BER (conf BER) Algorithm*, E224, 2026
-(`/home/patrick/mydocs/references/Conf BER Algorithm_E224.pdf`)
+**Reference:** Synopsys SIPI, *Confidence BER (conf BER) Algorithm*, E224, 2026 — [PDF](../../references/Conf%20BER%20Algorithm_E224.pdf)
 
 **Implementation:** `optical_serdes.analysis.conf_ber`
 
@@ -54,7 +53,7 @@ not directly tell you whether the link meets a BER target of $10^{-12}$.
 Projecting from the simulation SNR to the specification SNR requires a noise
 model.
 
-The Confidence BER algorithm addresses both issues in sequence:
+The Confidence BER algorithm addresses both issues in sequence \[1\]:
 
 1. **Stage 1** — model-free: replace $\hat{p}$ with a Poisson upper confidence
    bound $p_U$, so that the true BER is below $p_U$ with probability $1-\alpha$.
@@ -97,7 +96,7 @@ $$K \sim \text{Poisson}(\lambda), \quad \lambda = Np$$
 
 This is exact in the limit $N \to \infty$, $p \to 0$ with $\lambda$ fixed, which
 holds for all BER targets of practical interest ($p < 10^{-3}$,
-$N \sim 10^6$–$10^9$).
+$N \sim 10^6$–$10^9$) \[2\].
 
 ### 3.2 Confidence interval via the Poisson CDF
 
@@ -122,7 +121,7 @@ to the chi-squared distribution (Section 3.3).
 ### 3.3 Chi-squared equivalence (closed form)
 
 The Poisson CDF is related to the regularised incomplete gamma function, which is
-in turn the CDF of the chi-squared distribution.  Specifically, equation (1) is
+in turn the CDF of the chi-squared distribution \[2\].  Specifically, equation (1) is
 equivalent to:
 
 $$p_U = \frac{\chi^2_{1-\alpha,\; 2(k+1)}}{2N} \tag{2}$$
@@ -141,7 +140,7 @@ by `scipy.stats.chi2.ppf`.
 
 ### 3.4 The zero-error case and the calibration reference
 
-The Synopsys algorithm defines a **calibration reference** $p_\text{sim}$: the
+The Synopsys algorithm defines a **calibration reference** \[1\] $p_\text{sim}$: the
 95 % upper bound when zero errors are observed in $N_\text{ref} = 3\times10^6$
 bits:
 
@@ -161,27 +160,27 @@ variable with standard deviation $\sigma$.  The BER depends on the normalised ey
 margin $\mu = V/\sigma$, where $V$ is the half eye opening (distance from the
 decision threshold to the nearest signal level):
 
-$$\text{BER} = s_f \cdot \operatorname{erfc}\!\left(\frac{\mu}{\sqrt{2}}\right) \tag{4}$$
+$$\text{BER} = s_f \cdot \mathrm{erfc}\!\left(\frac{\mu}{\sqrt{2}}\right) \tag{4}$$
 
 where $s_f$ is a modulation-dependent scaling factor (see Section 5) and
-$\operatorname{erfc}$ is the complementary error function
-$\operatorname{erfc}(x) = \frac{2}{\sqrt{\pi}}\int_x^\infty e^{-t^2}\,dt$.
+$\mathrm{erfc}$ is the complementary error function
+$\mathrm{erfc}(x) = \frac{2}{\sqrt{\pi}}\int_x^\infty e^{-t^2}\,dt$.
 
 Inverting (4):
 
-$$\mu = \sqrt{2}\,\operatorname{erfc}^{-1}\!\!\left(\frac{\text{BER}}{s_f}\right) \tag{5}$$
+$$\mu = \sqrt{2}\,\mathrm{erfc}^{-1}\!\!\left(\frac{\text{BER}}{s_f}\right) \tag{5}$$
 
 ### 4.2 BER–margin relationship
 
 Define the coefficient $C = 1/s_f$.  Equation (5) becomes:
 
-$$\mu(\text{BER}) = \sqrt{2}\,\operatorname{erfc}^{-1}(C \cdot \text{BER}) \tag{6}$$
+$$\mu(\text{BER}) = \sqrt{2}\,\mathrm{erfc}^{-1}(C \cdot \text{BER}) \tag{6}$$
 
 Under the Gaussian model, $\sigma$ is fixed: $\mu$ scales linearly with $V$, and
 $V$ scales with the signal-to-noise ratio.  The ratio of margins at two BER
 values $p_1$ and $p_2$ is therefore:
 
-$$\frac{\mu(p_1)}{\mu(p_2)} = \frac{\operatorname{erfc}^{-1}(C\,p_1)}{\operatorname{erfc}^{-1}(C\,p_2)} \tag{7}$$
+$$\frac{\mu(p_1)}{\mu(p_2)} = \frac{\mathrm{erfc}^{-1}(C\,p_1)}{\mathrm{erfc}^{-1}(C\,p_2)} \tag{7}$$
 
 This ratio is a pure function of the two BER values and the modulation format; it
 does not depend on $\sigma$.
@@ -191,7 +190,7 @@ does not depend on $\sigma$.
 The Q-function scale factor $r$ is defined as the ratio of the margin at the
 target BER to the margin at the calibration reference $p_\text{sim}$:
 
-$$r = \frac{\mu(p_\text{target})}{\mu(p_\text{sim})} = \frac{\operatorname{erfc}^{-1}(C\,p_\text{target})}{\operatorname{erfc}^{-1}(C\,p_\text{sim})} \tag{8}$$
+$$r = \frac{\mu(p_\text{target})}{\mu(p_\text{sim})} = \frac{\mathrm{erfc}^{-1}(C\,p_\text{target})}{\mathrm{erfc}^{-1}(C\,p_\text{sim})} \tag{8}$$
 
 Physically, $r$ answers: *"by what factor must the normalised eye margin increase
 to move from $p_\text{sim}$ to $p_\text{target}$?"*  For $p_\text{target} < p_\text{sim}$
@@ -202,13 +201,13 @@ to move from $p_\text{sim}$ to $p_\text{target}$?"*  For $p_\text{target} < p_\t
 Starting from the Poisson upper bound $p_U$, compute its corresponding normalised
 margin, scale it by $r$, and invert via the erfc to obtain $p_\text{conf}$:
 
-$$\mu_U = \sqrt{2}\,\operatorname{erfc}^{-1}(C\,p_U)$$
+$$\mu_U = \sqrt{2}\,\mathrm{erfc}^{-1}(C\,p_U)$$
 $$\mu_\text{conf} = \mu_U \cdot r$$
-$$p_\text{conf} = s_f \cdot \operatorname{erfc}\!\left(\frac{\mu_\text{conf}}{\sqrt{2}}\right) = s_f \cdot \operatorname{erfc}\!\left(\operatorname{erfc}^{-1}(C\,p_U) \cdot r\right)$$
+$$p_\text{conf} = s_f \cdot \mathrm{erfc}\!\left(\frac{\mu_\text{conf}}{\sqrt{2}}\right) = s_f \cdot \mathrm{erfc}\!\left(\mathrm{erfc}^{-1}(C\,p_U) \cdot r\right)$$
 
 Substituting the definition of $r$:
 
-$$\boxed{p_\text{conf} = s_f \cdot \operatorname{erfc}\!\!\left(\operatorname{erfc}^{-1}(C\,p_U)\cdot \frac{\operatorname{erfc}^{-1}(C\,p_\text{target})}{\operatorname{erfc}^{-1}(C\,p_\text{sim})}\right)} \tag{9}$$
+$$\boxed{p_\text{conf} = s_f \cdot \mathrm{erfc}\!\!\left(\mathrm{erfc}^{-1}(C\,p_U)\cdot \frac{\mathrm{erfc}^{-1}(C\,p_\text{target})}{\mathrm{erfc}^{-1}(C\,p_\text{sim})}\right)} \tag{9}$$
 
 where:
 - $p_U$ — Poisson 95 % upper bound (equation 2)
@@ -221,7 +220,7 @@ where:
 When the simulation achieves zero errors in $N_\text{ref}$ bits, the Poisson
 bound gives $p_U = p_\text{sim}$ exactly.  Substituting into (9):
 
-$$p_\text{conf} = s_f \cdot \operatorname{erfc}\!\left(\operatorname{erfc}^{-1}(C\,p_\text{sim})\cdot\frac{\operatorname{erfc}^{-1}(C\,p_\text{target})}{\operatorname{erfc}^{-1}(C\,p_\text{sim})}\right) = s_f \cdot \operatorname{erfc}\!\left(\operatorname{erfc}^{-1}(C\,p_\text{target})\right) = s_f \cdot C\,p_\text{target} = p_\text{target}$$
+$$p_\text{conf} = s_f \cdot \mathrm{erfc}\!\left(\mathrm{erfc}^{-1}(C\,p_\text{sim})\cdot\frac{\mathrm{erfc}^{-1}(C\,p_\text{target})}{\mathrm{erfc}^{-1}(C\,p_\text{sim})}\right) = s_f \cdot \mathrm{erfc}\!\left(\mathrm{erfc}^{-1}(C\,p_\text{target})\right) = s_f \cdot C\,p_\text{target} = p_\text{target}$$
 
 So $p_\text{conf} = p_\text{target}$ identically.  This is the defining calibration
 property: the reference run achieves exactly the target BER at 95 % confidence.
@@ -235,29 +234,29 @@ property: the reference run achieves exactly the target BER at 95 % confidence.
 For binary NRZ with a single threshold at the mid-point between the two levels,
 the BER under AWGN is exactly:
 
-$$\text{BER}_\text{NRZ} = Q\!\left(\frac{V}{\sigma}\right) = \frac{1}{2}\operatorname{erfc}\!\left(\frac{V}{\sigma\sqrt{2}}\right)$$
+$$\text{BER}_\text{NRZ} = Q\!\left(\frac{V}{\sigma}\right) = \frac{1}{2}\mathrm{erfc}\!\left(\frac{V}{\sigma\sqrt{2}}\right)$$
 
 Comparing with (4): $s_f = 1/2$, $C = 2$.
 
-$$\operatorname{erfc}^{-1}(2\,\text{BER}) = \frac{V}{\sigma\sqrt{2}} \tag{10}$$
+$$\mathrm{erfc}^{-1}(2\,\text{BER}) = \frac{V}{\sigma\sqrt{2}} \tag{10}$$
 
-The argument to $\operatorname{erfc}^{-1}$ is the normalised margin in units of
+The argument to $\mathrm{erfc}^{-1}$ is the normalised margin in units of
 $1/\sqrt{2}$ sigma, i.e. $Q^{-1}(\text{BER})/\sqrt{2}$.
 
 ### 5.2 PAM4
 
 For symmetric 4-level PAM with three inner and two outer eye openings, the
-outer eye openings dominate the SER.  For equal level spacing $2V$ between
+outer eye openings dominate the SER \[3\].  For equal level spacing $2V$ between
 adjacent levels and the same noise standard deviation $\sigma$ on all levels:
 
-$$\text{SER}_\text{PAM4} \approx \frac{3}{2}\operatorname{erfc}\!\left(\frac{V}{\sigma\sqrt{2}}\right)$$
+$$\text{SER}_\text{PAM4} \approx \frac{3}{2}\mathrm{erfc}\!\left(\frac{V}{\sigma\sqrt{2}}\right)$$
 
 With Gray coding (1 bit error per symbol error on average for near-outer eyes)
 and $\log_2(4) = 2$ bits per symbol:
 
-$$\text{BER}_\text{PAM4} \approx \frac{3}{4}\operatorname{erfc}\!\left(\frac{V}{\sigma\sqrt{2}}\right)$$
+$$\text{BER}_\text{PAM4} \approx \frac{3}{4}\mathrm{erfc}\!\left(\frac{V}{\sigma\sqrt{2}}\right)$$
 
-However, the Synopsys definition uses a normalised form that accounts for the
+However, the Synopsys definition \[1\] uses a normalised form that accounts for the
 effective number of bits and outer eye fractions, yielding:
 
 $$s_f = \frac{M-1}{M}\cdot\frac{10}{\lfloor 10\log_2 M\rfloor} = \frac{3}{4}\cdot\frac{10}{20} = \frac{3}{8} = 0.375, \quad C = \frac{8}{3}$$
@@ -286,12 +285,12 @@ $$p_U = \frac{\chi^2_{1-\alpha,\; 2(k+1)}}{2N}$$
 $$p_\text{sim} = \frac{\chi^2_{1-\alpha,\; 2}}{2 N_\text{ref}} = \frac{-\ln\alpha}{N_\text{ref}}, \quad N_\text{ref} = 3\times10^6$$
 
 **Step 4.** Compute the Q-function scale factor:
-$$r = \frac{\operatorname{erfc}^{-1}(C\,p_\text{target})}{\operatorname{erfc}^{-1}(C\,p_\text{sim})}$$
+$$r = \frac{\mathrm{erfc}^{-1}(C\,p_\text{target})}{\mathrm{erfc}^{-1}(C\,p_\text{sim})}$$
 
 **Step 5.** Project to the target SNR:
-$$p_\text{conf} = s_f \cdot \operatorname{erfc}\!\left(\operatorname{erfc}^{-1}(C\,p_U)\cdot r\right)$$
+$$p_\text{conf} = s_f \cdot \mathrm{erfc}\!\left(\mathrm{erfc}^{-1}(C\,p_U)\cdot r\right)$$
 
-**Pass criterion (Synopsys):** $p_\text{conf} < 10^{-6}$ for MLSD receiver.
+**Pass criterion (Synopsys \[1\]):** $p_\text{conf} < 10^{-6}$ for MLSD receiver.
 Our toolbox uses $p_\text{conf} < p_\text{target}$ as the natural criterion.
 
 ---
@@ -318,7 +317,7 @@ which is algebraically identical and computationally superior.
 
 The `ber_scale` formula in the PDF uses `sqrt(2)*erfcinv(...)` in both numerator
 and denominator — the `sqrt(2)` cancels, confirming it is the ratio of
-$\operatorname{erfc}^{-1}$ values as in equation (8).  The argument
+$\mathrm{erfc}^{-1}$ values as in equation (8).  The argument
 `sig_lvls * log2(sig_lvls)^(sig_lvls/(sig_lvls-1))` in the PDF resolves to
 $C = 1/s_f$ for both NRZ and PAM4, consistent with equation (11).
 
@@ -388,7 +387,7 @@ Common values:
 
 $$p_\text{sim} = \frac{-\ln 0.05}{3\times10^6} = 9.986\times10^{-7}$$
 
-$$r = \frac{\operatorname{erfc}^{-1}(2\times10^{-12})}{\operatorname{erfc}^{-1}(2\times9.986\times10^{-7})} = \frac{\operatorname{erfc}^{-1}(2\times10^{-12})}{\operatorname{erfc}^{-1}(1.997\times10^{-6})} \approx \frac{5.065}{3.423} = 1.480$$
+$$r = \frac{\mathrm{erfc}^{-1}(2\times10^{-12})}{\mathrm{erfc}^{-1}(2\times9.986\times10^{-7})} = \frac{\mathrm{erfc}^{-1}(2\times10^{-12})}{\mathrm{erfc}^{-1}(1.997\times10^{-6})} \approx \frac{5.065}{3.423} = 1.480$$
 
 | Variant | $k$ | $N$ | $\hat{p}$ | $p_U$ (95%) | $p_\text{conf}$ |
 |---|---|---|---|---|---|
@@ -409,10 +408,10 @@ better than 100 µW variants, consistent with the expected SNR improvement.
 
 $$p_U = \frac{\chi^2_{0.95,\; 258}}{2\times1{,}979{,}998} = \frac{305.78}{3{,}959{,}996} = 7.49\times10^{-5}$$
 
-$$p_\text{conf} = 0.5 \times \operatorname{erfc}\!\left(\operatorname{erfc}^{-1}(2\times7.49\times10^{-5})\times1.480\right)$$
-$$= 0.5 \times \operatorname{erfc}\!\left(\operatorname{erfc}^{-1}(1.497\times10^{-4})\times1.480\right)$$
-$$= 0.5 \times \operatorname{erfc}(2.211\times1.480)$$
-$$= 0.5 \times \operatorname{erfc}(3.272) = 1.01\times10^{-8}$$
+$$p_\text{conf} = 0.5 \times \mathrm{erfc}\!\left(\mathrm{erfc}^{-1}(2\times7.49\times10^{-5})\times1.480\right)$$
+$$= 0.5 \times \mathrm{erfc}\!\left(\mathrm{erfc}^{-1}(1.497\times10^{-4})\times1.480\right)$$
+$$= 0.5 \times \mathrm{erfc}(2.211\times1.480)$$
+$$= 0.5 \times \mathrm{erfc}(3.272) = 1.01\times10^{-8}$$
 
 ### 9.2 PAM4 cross-check against Synopsys reference
 
@@ -424,7 +423,7 @@ Using our formula with $C = 8/3$:
 
 $$p_\text{sim} = \frac{-\ln 0.05}{3\times10^6} = 9.986\times10^{-7} \quad \checkmark$$
 
-$$r = \frac{\operatorname{erfc}^{-1}((8/3)\times10^{-11})}{\operatorname{erfc}^{-1}((8/3)\times9.986\times10^{-7})} = \frac{\operatorname{erfc}^{-1}(2.667\times10^{-11})}{\operatorname{erfc}^{-1}(2.663\times10^{-6})}$$
+$$r = \frac{\mathrm{erfc}^{-1}((8/3)\times10^{-11})}{\mathrm{erfc}^{-1}((8/3)\times9.986\times10^{-7})} = \frac{\mathrm{erfc}^{-1}(2.667\times10^{-11})}{\mathrm{erfc}^{-1}(2.663\times10^{-6})}$$
 
 Evaluating numerically: $r = 1.4193$ $\checkmark$
 
@@ -469,17 +468,19 @@ can be inspected independently.
 
 ## References
 
-1. Synopsys SIPI Team, *Confidence BER (conf BER) Algorithm*, internal
-   presentation E224, 2026.
-   Path: `/home/patrick/mydocs/references/Conf BER Algorithm_E224.pdf`
+\[1\] Synopsys SIPI Team, *Confidence BER (conf BER) Algorithm*, internal
+presentation E224, 2026 — [PDF](../../references/Conf%20BER%20Algorithm_E224.pdf).
+*Cited in: §1 (algorithm structure), §3.4 (calibration reference), §5.2 (PAM4 scaling), §6 (pass criterion), §7 (symbol correspondence).*
 
-2. Garwood, M. & Haskins, C., *Confidence intervals for the Poisson mean*,
-   in the context of binomial and Poisson confidence bounds; chi-squared
-   equivalence is standard in survival analysis literature (e.g. Nelson, 1982).
+\[2\] The chi-squared / Poisson CDF equivalence is a standard result in reliability
+statistics; see e.g. Nelson, W., *Applied Life Data Analysis*, Wiley, 1982, §A5.
+*Cited in: §3.1 (Poisson model), §3.3 (closed-form chi-squared bound).*
 
-3. Proakis, J. G. & Salehi, M., *Digital Communications*, 5th ed.,
-   McGraw-Hill, 2007. §5.2 BER for M-ary PAM.
+\[3\] Proakis, J. G. & Salehi, M., *Digital Communications*, 5th ed.,
+McGraw-Hill, 2007, §5.4 (M-ary PAM BER under AWGN).
+*Cited in: §5.2 (PAM4 SER derivation).*
 
-4. IEEE Std 802.3df, *Amendment: Physical Layer Specifications and Management
-   Parameters for 200 Gb/s, 400 Gb/s, 800 Gb/s, and 1.6 Tb/s*. BER floor
-   definitions and pre-FEC targets.
+\[4\] IEEE Std 802.3df-2024, *Physical Layer Specifications and Management
+Parameters for 200 Gb/s, 400 Gb/s, 800 Gb/s, and 1.6 Tb/s Ethernet*.
+Pre-FEC BER floor definitions.
+*Context only; not directly cited in the derivation.*
