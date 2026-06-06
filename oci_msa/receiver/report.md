@@ -454,6 +454,46 @@ discrepancy appears at offset −1 (pre-cursor), where SNPS places a larger
 fraction of the pre-cursor correction; this reflects the additional 6-tap DFE
 feedback in the SNPS model partially relieving the FFE pre-cursor burden.*
 
+#### Per-variant comparison: impulse response, magnitude, and group delay
+
+Each figure below shows, for a single OCI-Gen2 variant, the full FFE
+characterisation in three panels: (1) impulse response (normalised tap weights
+as a stem plot); (2) magnitude response; (3) group delay. Python Rx is shown as
+a solid blue line; SNPS AMI as a dashed red line. Both are normalised to unity
+main cursor.
+
+![FFE comparison OMA_100uW_VGA1_0](figures/ffe_comparison_OMA_100uW_VGA1_0.png)
+
+*Figure 6d. OMA 100 µW, VGA setting 0.*
+
+![FFE comparison OMA_100uW_VGA1_2](figures/ffe_comparison_OMA_100uW_VGA1_2.png)
+
+*Figure 6e. OMA 100 µW, VGA setting 2.*
+
+![FFE comparison OMA_150uW_VGA1_0](figures/ffe_comparison_OMA_150uW_VGA1_0.png)
+
+*Figure 6f. OMA 150 µW, VGA setting 0.*
+
+![FFE comparison OMA_150uW_VGA1_2](figures/ffe_comparison_OMA_150uW_VGA1_2.png)
+
+*Figure 6g. OMA 150 µW, VGA setting 2.*
+
+![FFE comparison OMA_200uW_VGA1_0](figures/ffe_comparison_OMA_200uW_VGA1_0.png)
+
+*Figure 6h. OMA 200 µW, VGA setting 0.*
+
+![FFE comparison OMA_200uW_VGA1_2](figures/ffe_comparison_OMA_200uW_VGA1_2.png)
+
+*Figure 6i. OMA 200 µW, VGA setting 2.*
+
+The per-variant panels confirm that both solvers converge to essentially the
+same equaliser shape across all operating points: the impulse response
+discrepancies are limited to the pre-cursor region (offsets −1 to −5) and
+to far post-cursor taps beyond +14 where SNPS has additional degrees of
+freedom. The magnitude and group-delay curves are nearly indistinguishable
+within the passband, indicating that the channel inversion is well captured
+by the 20-tap Python FFE.
+
 ### 4.7 CDR phase trajectory
 
 The phase interpolator (PI) code as a function of symbol index across the full
