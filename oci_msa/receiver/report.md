@@ -298,6 +298,88 @@ pass), zero bit errors were observed. This is consistent with the extrapolated
 BER values (≤ 4 × 10⁻⁹ at 100 µW OMA), since the expected number of errors in
 43k symbols at that BER is less than 0.0002.
 
+### 3.6 Rolling SNR during adaptation
+
+The rolling SNR tracks equaliser quality across the adaptive run without
+requiring a separate frozen pass. A sliding window of width `W` symbols is
+advanced in steps of `S` symbols. Within each window, the equalised baud-rate
+samples `y[n]` are split by the NRZ threshold and the same σ_intra / A_eye
+formulation (sections 3.1–3.3) is applied locally:
+
+```
+for window [n₀, n₀ + W):
+
+    S+ = { y[n] : y[n] > 0,  n ∈ window }
+    S− = { y[n] : y[n] ≤ 0,  n ∈ window }
+
+    μ+, σ+  = mean, std of S+
+    μ−, σ−  = mean, std of S−
+
+    σ_w   = (σ+ + σ−) / 2
+    A_w   = (μ+ − μ−) / 2
+    SNR_w = 20 · log₁₀( A_w / σ_w )   [dB]
+```
+
+The result is a time-resolved SNR trajectory that reveals the convergence
+transient: during early adaptation the FFE taps are far from their optimal
+values and σ_w is large; once the LMS loop converges A_w / σ_w stabilises at
+its steady-state value.
+
+**Boundary exclusion.** The adaptive waveform is formed by tiling the single
+CSV capture three times. At each tile boundary a short zero-preamble region
+(≈ 150 symbols) is present before the CDR and FFE re-lock to the new tile.
+Windows that overlap this preamble produce artificially low SNR estimates and
+are excluded:
+
+```
+A window [n₀, n₀ + W) is excluded if there exists any tile boundary b
+such that  n₀ < b + G  and  n₀ + W > b,
+where G = 200 symbols (guard).
+```
+
+In Python (from `_plot_adaptation_dashboard` in
+`examples/caribou_oci_gen2_nrz_results.py`):
+
+```python
+WIN          = 1000          # window width (symbols)
+STEP         = 50            # advance per window (symbols)
+_PREAMBLE_GUARD = 200        # samples after boundary to exclude
+
+eq_out  = result.equalized_samples     # baud-rate FFE output, all adaptive symbols
+n_ui    = len(eq_out)
+
+# locate tile boundaries
+boundaries: list[int] = []
+if n_period_sym is not None and n_period_sym < n_ui:
+    k = n_period_sym
+    while k < n_ui:
+        boundaries.append(k)
+        k += n_period_sym
+
+snr_t, snr_v = [], []
+for start in range(0, n_ui - WIN, STEP):
+    end = start + WIN
+    # skip any window overlapping the preamble after a boundary
+    if any(start < b + _PREAMBLE_GUARD and end > b for b in boundaries):
+        continue
+    w = eq_out[start:end]
+    pos, neg = w[w > 0], w[w <= 0]
+    if len(pos) < 10 or len(neg) < 10:
+        continue
+    sig  = (pos.mean() - neg.mean()) / 2.0
+    nois = (pos.std()  + neg.std())  / 2.0
+    if nois > 0:
+        snr_t.append((start + end) / 2)
+        snr_v.append(20.0 * np.log10(sig / nois))
+```
+
+This produces the bottom-left panel of the adaptation dashboard (Figure 8).
+The window width W = 1000 symbols (≈ 9.4 ns at 106.25 GBaud) is a compromise
+between temporal resolution (shorter window → faster tracking) and statistical
+stability (shorter window → noisier SNR estimate). At W = 1000 symbols the
+95% confidence interval on σ_w is approximately ±3% (from χ² sampling
+theory), corresponding to a ±0.27 dB uncertainty on the reported SNR.
+
 ---
 
 ## 4. Simulation Results — OMA 100 µW, VGA Setting 0
@@ -551,13 +633,6 @@ Key observations:
 - **Extrapolated BER spans nine decades** from 3.98 × 10⁻⁹ to 3.82 × 10⁻¹⁸
   across the OMA range, indicating substantial sensitivity to optical power
   in this receiver configuration.
-
-### 5.2 OMA vs BER
-
-![OMA vs BER](figures/oma_vs_ber.png)
-
-*Figure 9. OMA (µW) vs extrapolated BER for both VGA settings. Extrapolated
-BER is derived from Gaussian-Q applied to the frozen-pass eye SNR.*
 
 ---
 
