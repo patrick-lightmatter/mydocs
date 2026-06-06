@@ -380,6 +380,147 @@ stability (shorter window → noisier SNR estimate). At W = 1000 symbols the
 95% confidence interval on σ_w is approximately ±3% (from χ² sampling
 theory), corresponding to a ±0.27 dB uncertainty on the reported SNR.
 
+### 3.7 Confidence BER
+
+#### Motivation
+
+The raw BER (section 3.5) is identically zero for all six variants. A statement
+of "BER = 0" is statistically vacuous: it carries no information about *how
+small* the true error rate is, and it cannot be directly compared against a
+link target such as 10⁻¹². The Confidence BER algorithm, adopted from
+Synopsys SIPI [E224], converts the finite-run error count into a projected BER
+at the link specification point with explicit statistical rigour.
+
+**Reference:** `src/optical_serdes/analysis/conf_ber.py`  
+**Full derivation:** [nuggets/confidence\_ber/README.md](../../nuggets/confidence_ber/README.md)
+
+#### Algorithm — two stages
+
+**Stage 1 — Poisson upper confidence bound (model-free)**
+
+Errors are modelled as independent Poisson arrivals at rate λ = Np, where
+N is the number of compared bits and p is the true BER. Given k observed errors
+in N bits, the (1 − α) one-sided upper confidence limit on p is obtained by
+inverting the Poisson CDF, which is equivalent to the chi-squared quantile:
+
+```
+p_U = χ²_{1−α, 2(k+1)} / (2N)
+```
+
+where χ²_{q,ν} is the q-th quantile of the chi-squared distribution with ν
+degrees of freedom. For k = 0 this reduces to:
+
+```
+p_U = −ln(α) / N
+```
+
+This bound makes no noise-shape assumption: it is exact for independent errors
+and conservative (i.e. a valid upper bound) even for mildly correlated errors.
+
+**Calibration reference.** The algorithm anchors the Q-function projection to
+a fixed reference point: the 95% Poisson bound for zero errors in N_ref = 3×10⁶
+bits:
+
+```
+p_sim = χ²_{0.95, 2} / (2 × 3 × 10⁶) = −ln(0.05) / 3×10⁶ ≈ 9.986 × 10⁻⁷
+```
+
+**Stage 2 — Q-function projection to target BER (Gaussian model)**
+
+Under the assumption that amplitude noise is Gaussian, the BER depends on the
+normalised eye margin μ = V/σ through:
+
+```
+BER = s_f · erfc(erfc⁻¹(C · BER_1) · r)
+```
+
+where s_f = 1/2 for NRZ (C = 2), and r is the ratio of Q-function arguments
+at the target BER and the calibration reference:
+
+```
+r = erfc⁻¹(C · p_target) / erfc⁻¹(C · p_sim)
+```
+
+Physically, r is the factor by which the normalised eye margin must increase
+to move from the simulation operating point (p_sim) to the specification
+operating point (p_target). For p_target = 10⁻¹², p_sim ≈ 10⁻⁶, the
+projection spans six decades.
+
+Combining Stages 1 and 2, the full closed-form expression is:
+
+```
+p_conf = s_f · erfc( erfc⁻¹(C · p_U) · r )
+```
+
+**Sanity check.** Substituting k = 0, N = N_ref into Stage 1 gives p_U = p_sim
+exactly. Substituting into the Stage 2 expression:
+
+```
+p_conf = s_f · erfc( erfc⁻¹(C · p_sim) · erfc⁻¹(C · p_target) / erfc⁻¹(C · p_sim) )
+       = s_f · erfc( erfc⁻¹(C · p_target) )
+       = s_f · C · p_target = p_target  ✓
+```
+
+Zero errors in 3M bits projects exactly to the target BER — the defining
+calibration property.
+
+#### Results for this study
+
+Parameters: k = 0 errors (all variants), N = 43,468 symbols, target = 10⁻¹².
+
+```python
+from optical_serdes.analysis.conf_ber import conf_ber_nrz
+
+result = conf_ber_nrz(n_errors=0, n_bits=43_468, target_ber=1e-12)
+# Conf BER Summary (NRZ, target=1e-12, 95% CI)
+#   Errors / bits:      0 / 43,468
+#   Raw BER:            0.0000e+00
+#   Poisson upper:      6.8918e-05
+#   ber_scale:          1.4798
+#   Conf BER:           8.4543e-09
+```
+
+Since all six variants have zero errors in the same N = 43,468 symbol frozen
+pass, the conf_ber is identical across variants:
+
+| Variant | k | N | p_U (95%) | r | p_conf |
+|---------|---|---|-----------|---|--------|
+| OMA_100uW_VGA1_0 | 0 | 43,468 | 6.89 × 10⁻⁵ | 1.480 | 8.45 × 10⁻⁹ |
+| OMA_100uW_VGA1_2 | 0 | 43,468 | 6.89 × 10⁻⁵ | 1.480 | 8.45 × 10⁻⁹ |
+| OMA_150uW_VGA1_0 | 0 | 43,468 | 6.89 × 10⁻⁵ | 1.480 | 8.45 × 10⁻⁹ |
+| OMA_150uW_VGA1_2 | 0 | 43,468 | 6.89 × 10⁻⁵ | 1.480 | 8.45 × 10⁻⁹ |
+| OMA_200uW_VGA1_0 | 0 | 43,468 | 6.89 × 10⁻⁵ | 1.480 | 8.45 × 10⁻⁹ |
+| OMA_200uW_VGA1_2 | 0 | 43,468 | 6.89 × 10⁻⁵ | 1.480 | 8.45 × 10⁻⁹ |
+
+The conf_ber = 8.45 × 10⁻⁹ is the 95% upper confidence bound on the true BER,
+projected to the 10⁻¹² operating point under Gaussian noise.
+
+The Poisson upper bound p_U = 6.89 × 10⁻⁵ reflects the short run length: with
+only 43k symbols, even a zero-error outcome is consistent with true BERs up to
+~7 × 10⁻⁵ at 95% confidence. The Q-function projection then scales this
+confidence margin by r = 1.48 (the ratio of eye margins at 10⁻¹² vs. 10⁻⁶)
+to obtain p_conf. To certify p_conf ≤ 10⁻¹² with this algorithm, zero errors
+would need to be observed in N ≥ N_ref = 3 × 10⁶ symbols — approximately
+69× more than the current frozen-pass run length.
+
+#### Caveats
+
+- **Poisson independence.** The bound is exact for independent errors. Periodic
+  waveform tiling (our 3× repetition) means rare noise excursions not present
+  in the single CSV tile are never sampled, making p_U optimistic for the truly
+  rare events that determine BER at 10⁻¹².
+
+- **Gaussian projection.** The erfc extrapolation from 10⁻⁵ to 10⁻¹² spans
+  seven decades. Non-Gaussian noise tails (jitter spurs, deterministic ISI
+  residual) are not captured; the actual BER at 10⁻¹² operating SNR may exceed
+  p_conf.
+
+- **No input-referred noise model.** This simulation replays a hardware waveform
+  capture under ideal ADC conditions with no added noise. The conf_ber reflects
+  the channel ISI floor only; thermal noise and jitter contributions that a
+  real transceiver would add are absent. A direct comparison with SNPS conf_ber
+  (which simulates noise injection) would be misleading.
+
 ---
 
 ## 4. Simulation Results — All Six Variants
@@ -770,14 +911,18 @@ tracking the SNR improvement in the summary table.
 
 ### 5.1 Summary table
 
-| Waveform | OMA (µW) | VGA | SNR (dB) | σ_intra | Extrap. BER | Raw BER | Errors / Symbols |
-|----------|----------|-----|----------|---------|-------------|---------|-----------------|
-| OMA_100uW_VGA1_0 | 100 | 0 | 15.22 | 0.169 | 3.98 × 10⁻⁹ | 0 | 0 / 43,468 |
-| OMA_100uW_VGA1_2 | 100 | 2 | 16.13 | 0.154 | 7.58 × 10⁻¹¹ | 0 | 0 / 43,468 |
-| OMA_150uW_VGA1_0 | 150 | 0 | 17.27 | 0.135 | 1.38 × 10⁻¹³ | 0 | 0 / 43,468 |
-| OMA_150uW_VGA1_2 | 150 | 2 | 17.89 | 0.127 | 2.14 × 10⁻¹⁵ | 0 | 0 / 43,468 |
-| OMA_200uW_VGA1_0 | 200 | 0 | 18.31 | 0.121 | 9.16 × 10⁻¹⁷ | 0 | 0 / 43,468 |
-| OMA_200uW_VGA1_2 | 200 | 2 | 18.69 | 0.116 | 3.82 × 10⁻¹⁸ | 0 | 0 / 43,468 |
+| Waveform | OMA (µW) | VGA | SNR (dB) | σ_intra | Extrap. BER | Raw BER | Errors / Symbols | Conf BER (95%, 10⁻¹²) |
+|----------|----------|-----|----------|---------|-------------|---------|-----------------|----------------------|
+| OMA_100uW_VGA1_0 | 100 | 0 | 15.22 | 0.169 | 3.98 × 10⁻⁹ | 0 | 0 / 43,468 | 8.45 × 10⁻⁹ |
+| OMA_100uW_VGA1_2 | 100 | 2 | 16.13 | 0.154 | 7.58 × 10⁻¹¹ | 0 | 0 / 43,468 | 8.45 × 10⁻⁹ |
+| OMA_150uW_VGA1_0 | 150 | 0 | 17.27 | 0.135 | 1.38 × 10⁻¹³ | 0 | 0 / 43,468 | 8.45 × 10⁻⁹ |
+| OMA_150uW_VGA1_2 | 150 | 2 | 17.89 | 0.127 | 2.14 × 10⁻¹⁵ | 0 | 0 / 43,468 | 8.45 × 10⁻⁹ |
+| OMA_200uW_VGA1_0 | 200 | 0 | 18.31 | 0.121 | 9.16 × 10⁻¹⁷ | 0 | 0 / 43,468 | 8.45 × 10⁻⁹ |
+| OMA_200uW_VGA1_2 | 200 | 2 | 18.69 | 0.116 | 3.82 × 10⁻¹⁸ | 0 | 0 / 43,468 | 8.45 × 10⁻⁹ |
+
+*Conf BER: 95% upper confidence bound on the true BER, projected to a 10⁻¹² target under
+Gaussian noise — see section 3.7 and [nuggets/confidence\_ber/README.md](../../nuggets/confidence_ber/README.md).
+Identical across all variants because all have k = 0 errors in the same N = 43,468 symbol frozen pass.*
 
 Key observations:
 
@@ -786,11 +931,17 @@ Key observations:
 - **VGA setting 2 consistently outperforms VGA setting 0** at the same OMA
   (approximately 0.4–0.9 dB SNR improvement), suggesting the higher VGA gain
   better matches the signal swing to the ADC input range.
-- **Zero raw errors** across all variants. With 43k symbols per run, the
-  Clopper-Pearson 95% upper bound on raw BER is approximately 7 × 10⁻⁵.
-- **Extrapolated BER spans nine decades** from 3.98 × 10⁻⁹ to 3.82 × 10⁻¹⁸
-  across the OMA range, indicating substantial sensitivity to optical power
-  in this receiver configuration.
+- **Zero raw errors** across all variants. The Poisson 95% upper bound on the
+  true BER is p_U = 6.89 × 10⁻⁵ (from −ln(0.05) / 43,468), confirming the
+  simulation is consistent with true BERs well below 10⁻⁴.
+- **Conf BER = 8.45 × 10⁻⁹** (all variants). This is the statistically
+  rigorous projected BER at the 10⁻¹² operating point, bounded at 95%
+  confidence. The uniform value reflects run-length saturation: with only 43k
+  symbols the Poisson stage is the dominant uncertainty, masking the per-variant
+  SNR differences visible in the extrapolated BER column.
+- **Extrapolated BER spans nine decades** from 3.98 × 10⁻⁹ to 3.82 × 10⁻¹⁸.
+  This Gaussian-Q projection from the frozen-pass σ_intra differentiates the
+  variants but does not carry the Poisson confidence accounting of conf_ber.
 
 ---
 
