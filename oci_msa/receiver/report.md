@@ -380,18 +380,79 @@ Two well-separated Gaussian clusters at approximately ±1. The near-zero density
 between them confirms a clean decision margin. The intra-level std σ_intra =
 0.169 for this OMA.*
 
-### 4.6 FFE final tap weights
+### 4.6 FFE final tap weights and frequency response
 
-The converged FFE tap vector after the adaptive pass, displayed as a bar chart
-with the main cursor at offset 0 (red), pre-cursor taps at positive offsets, and
-post-cursor taps at negative offsets.
+#### Tap weights — stem plot (OMA 100 µW, VGA0)
 
-![FFE final taps](figures/ffe_taps_final.png)
+The converged FFE tap vector shown as a stem plot. The main cursor (red) sits at
+offset 0. Positive offsets are post-cursor taps (looking back in time, cancelling
+trailing ISI); negative offsets are pre-cursor taps (non-causal, providing phase
+lead).
 
-*Figure 6. Final FFE tap weights (20-tap, 5+1+14 split). The large main tap
-(~3.1) reflects the normalisation: the CTLE output amplitude is below unity
-before the ADC normaliser, so the FFE boosts it. Post-cursor taps T+1 through
-T+4 are significant, cancelling the dominant ISI terms from the channel.*
+![FFE tap weights — stem](figures/ffe_stem.png)
+
+*Figure 6a. Converged FFE tap weights, OMA_100uW_VGA1_0 (5 pre + 1 main +
+14 post = 20 taps). Main cursor weight ≈ 3.1 reflects the CTLE-output
+amplitude being below the ADC normaliser's target of ±1; the FFE must supply
+the missing gain. T+1 (−1.5) and T+2 (+1.4) are the dominant post-cursor ISI
+terms — their alternating sign is characteristic of a dispersive optical
+channel with a bandwidth-limited impulse response.*
+
+#### FFE frequency response — all six variants
+
+The frequency response is computed directly from the converged tap vectors:
+
+```
+H(f) = Σ_k  w[k] · exp(−j · 2π · f · k / f_baud)
+```
+
+where the sum runs over tap index k (positive = post-cursor delay, negative =
+pre-cursor advance) and `f_baud` = 106.25 GHz. The magnitude is
+`20 log₁₀ |H(f)|` and the group delay is `−dφ(f)/dω` expressed in picoseconds.
+
+![FFE frequency response](figures/ffe_freq_response.png)
+
+*Figure 6b. FFE magnitude response (top) and group delay (bottom) for all six
+OCI-Gen2 variants. The six curves are nearly coincident, confirming that the
+converged FFE solution is driven by the channel physics rather than by the
+VGA or OMA setting.*
+
+*Magnitude:* The equaliser has a high-pass characteristic — ~5 dB at DC, a
+trough near 20–22 GHz, then a steep rise to ~20 dB at the Nyquist frequency
+(53.1 GHz). This is the approximate inverse of the optical channel's low-pass
+roll-off: the CTLE removes the majority of the mid-frequency droop, and the
+FFE compensates the residual at higher frequencies.
+
+*Group delay:* At DC the group delay is approximately +7 ps, corresponding
+to the n_post = 14 tap delay inherent in the causal portion of the filter.
+The group delay swings negative (minimum ≈ −7 ps) around 25–30 GHz,
+introduced by the pre-cursor taps (k < 0) which phase-advance the signal in
+that band. The variation between variants is small (< 1 ps across the passband),
+indicating the filter shape is tightly constrained by the channel response
+rather than the noise level.
+
+#### Tap weight comparison: Python Rx vs SNPS AMI — all six variants
+
+Both tap vectors are normalised to unity main cursor (offset 0) before plotting
+so that the shape of the ISI cancellation can be compared independent of the
+gain difference (Python Rx main tap ≈ 3.1 due to signal normalisation; SNPS
+main tap = 1.0 by convention).
+
+The SNPS AMI model uses 26 fixed taps (offsets 0 to +25) plus 6 pre-cursor
+taps (offsets −1 to −6); the Python Rx uses 20 taps (offsets −5 to +14).
+Floating far-cursor taps (SNPS offsets 36, 50, 59) are excluded.
+
+![FFE tap weights comparison](figures/ffe_taps_comparison.png)
+
+*Figure 6c. Normalised FFE tap weights: Python Rx (blue) vs SNPS AMI (red),
+for all six OCI-Gen2 variants. Both receivers converge to the same dominant ISI
+structure — strong activity at offsets −1, 0, +1, +2 — confirming they are
+inverting the same underlying channel response. Beyond offset +14 (the Python
+Rx boundary) the SNPS taps decay to near-zero, indicating that the 14
+post-cursor tap allocation captures the bulk of the ISI energy. The largest
+discrepancy appears at offset −1 (pre-cursor), where SNPS places a larger
+fraction of the pre-cursor correction; this reflects the additional 6-tap DFE
+feedback in the SNPS model partially relieving the FFE pre-cursor burden.*
 
 ### 4.7 CDR phase trajectory
 
