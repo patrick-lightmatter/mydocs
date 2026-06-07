@@ -165,7 +165,59 @@ at a 75 %-of-peak target with step-proportional ripple — and PGT, not L2V, is
 the one that needs `ovr_counter=0` to acquire cleanly at high step. For pure
 thermal-drift bandwidth, L2V wins here.
 
-## 6. Recommendation & caveats
+## 6. Tracking bandwidth across optical power (0.5–8 mW campaign)
+
+The 1 mW study above was repeated across **16 optical powers, 0.5–8 mW in
+0.5 mW steps** (`run_power_campaign.py`), re-characterizing the op-point at each
+power with a fast continuous hill probe and re-running the kstep × drift sweep.
+Full aggregate data: [`data/power_campaign/power_campaign_summary.json`](data/power_campaign/power_campaign_summary.json);
+the per-power time-domain traces are in [`figures/waveforms/`](figures/waveforms/)
+(32 PGT PNGs, one tracked + one lock-loss case per power).
+
+**The headline result is that PGT thermal-tracking bandwidth is essentially
+power-independent.** The slew ceiling is a pure DAC/timing property (step size ÷
+134 µs window) and does not depend on optical power, so the max trackable drift
+rate per kstep barely moves over a 16× power range (Figure 4):
+
+| power | hot peak (V) | drop peak (µA) | dV/dT_amb (mV/K) | k5 max-track | k6 max-track |
+|---|---|---|---|---|---|
+| 0.5 mW | 0.739 | 11.2 | 4.91 | 750 K/s | 1000 K/s |
+| 1.0 mW | 0.739 | 22.3 | 4.59 | 750 K/s | 1000 K/s |
+| 2.0 mW | 0.736 | 44.5 | 4.91 | 750 K/s | 1000 K/s |
+| 4.0 mW | 0.730 | 88.0 | 4.77 | 750 K/s | 1000 K/s |
+| 6.0 mW | 0.725 | 130.5 | 4.93 | 750 K/s | 1000 K/s |
+| 8.0 mW | 0.720 | 171.8 | 4.62 | 750 K/s | 1000 K/s |
+
+Three observations:
+
+1. **`dV/dT_amb` is a power-independent plant constant: 4.6–5.1 mV/K** across the
+   whole range (mean ≈ 4.85). The thermal-to-heater conversion does not change
+   with laser power.
+2. **The hot-side lock point drifts *down* with power** (0.739 V → 0.720 V, about
+   −2.6 mV/mW) from self-heating, and the drop peak scales linearly (11 → 172 µA).
+   The op-point shift is handled by the per-power init; it does not affect
+   tracking bandwidth.
+3. **Max trackable drift is flat in power for every kstep** — k5 holds 750 K/s
+   and k6 holds 1000 K/s at *all* 16 powers; k3/k4 nudge *up* slightly at higher
+   power (k3 100 → 250 K/s above ~2.5 mW) as the sharper resonance gives a touch
+   more lock margin. There is no high-power tracking cliff for PGT (Figure 4).
+
+![Figure 4 — PGT max trackable drift vs optical power, per kstep](figures/power_campaign/pgt_bandwidth_vs_power.png)
+
+### 6.1 Representative time-domain traces (5 mW)
+
+Each trace shows ambient temperature, heater voltage, drop photocurrent, and
+Goertzel energy over the drift phase. **Tracked (k5, 750 K/s, 2.3 % drop loss):**
+the heater ramps to follow the resonance and drop power stays near its peak.
+
+![PGT 5 mW, k5, 750 K/s — tracked](figures/waveforms/pgt_wave_5p0mW_k5_track_750Kps.png)
+
+**Lock-loss (k5, 1000 K/s, 34 % drop loss):** just past the slew ceiling the
+heater can no longer keep up; it lags the resonance and drop power collapses.
+
+![PGT 5 mW, k5, 1000 K/s — lock loss](figures/waveforms/pgt_wave_5p0mW_k5_loss_1000Kps.png)
+
+## 7. Recommendation & caveats
 
 * **Run PGT at 1 mW with `ovr_counter=0`.** At 1 mW the hot-side lock is above
   the warmup voltage, so the force-up override only hurts (acquisition
@@ -182,10 +234,14 @@ thermal-drift bandwidth, L2V wins here.
   bandwidth. Adaptive-kstep (boost on sustained drift) was not run this pass and
   is the obvious next lever to widen margin without sacrificing acquisition.
 
-## 7. Reproduce
+## 8. Reproduce
 
 ```bash
 cd goldens/mrm
+
+# Multi-power campaign (op-point + kstep×drift sweep, 0.5–8 mW):
+scripts/run_tsmc.sh -m src.testbench.run_power_campaign
+python3 -m src.testbench.analyze_power_campaign
 
 # Primary tracking sweep (override OFF — clean lock at all ksteps):
 scripts/run_tsmc.sh -m src.testbench.skadi_mrm_pgt_thermal_drift_sweep \

@@ -1,0 +1,1406 @@
+{
+  "powers_mW": [
+    0.5,
+    1.0,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    3.5,
+    4.0,
+    4.5,
+    5.0,
+    5.5,
+    6.0,
+    6.5,
+    7.0,
+    7.5,
+    8.0
+  ],
+  "pgt_window_us": 134.0,
+  "l2v_window_us": 50.0,
+  "pgt": {
+    "per_power": {
+      "0.5": {
+        "dvdt_mV_per_K": 4.910141674440304,
+        "hot_peak_V": 0.7390000000000343,
+        "drop_peak_uA": 11.188868362554096,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -1.4694824219091964,
+            "acq_drop_ref_uA": 9.219977558926818
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 0.34326171871573713,
+            "acq_drop_ref_uA": 8.515354383036872
+          },
+          "3": {
+            "max_trackable_Kps": 100.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.7716064453467406,
+            "acq_drop_ref_uA": 9.334478248422357
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -0.8652343750342185,
+            "acq_drop_ref_uA": 8.987569092618534
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 22.13913800810842,
+            "file": "pgt_wave_0p5mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 65.08602817967767,
+            "file": "pgt_wave_0p5mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "1.0": {
+        "dvdt_mV_per_K": 4.589479361007465,
+        "hot_peak_V": 0.7390000000000343,
+        "drop_peak_uA": 22.329068013039358,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -2.07373046878423,
+            "acq_drop_ref_uA": 17.71125319126315
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": -2.0737304687842295,
+            "acq_drop_ref_uA": 17.70393169485374
+          },
+          "3": {
+            "max_trackable_Kps": 100.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -2.0737304687842295,
+            "acq_drop_ref_uA": 17.711610209105963
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -1.2680664062842133,
+            "acq_drop_ref_uA": 17.122871842936988
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 11.95723761222889,
+            "file": "pgt_wave_1p0mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 52.118740209533236,
+            "file": "pgt_wave_1p0mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "1.5": {
+        "dvdt_mV_per_K": 4.689686333955228,
+        "hot_peak_V": 0.7370000000000345,
+        "drop_peak_uA": 33.41718716686796,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -2.2893066406594613,
+            "acq_drop_ref_uA": 27.23314837321906
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": -0.4765625000344721,
+            "acq_drop_ref_uA": 25.380027473174874
+          },
+          "3": {
+            "max_trackable_Kps": 100.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -2.2893066406594333,
+            "acq_drop_ref_uA": 27.233374397377542
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -0.07373046878444978,
+            "acq_drop_ref_uA": 24.967618803937444
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 6.742512851344399,
+            "file": "pgt_wave_1p5mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 46.24213028524444,
+            "file": "pgt_wave_1p5mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "2.0": {
+        "dvdt_mV_per_K": 4.910141674440304,
+        "hot_peak_V": 0.7360000000000346,
+        "drop_peak_uA": 44.45012794291253,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -2.296386718784571,
+            "acq_drop_ref_uA": 35.54716838983336
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 0.32202148434040684,
+            "acq_drop_ref_uA": 32.181042394405935
+          },
+          "3": {
+            "max_trackable_Kps": 100.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -2.2963867187845426,
+            "acq_drop_ref_uA": 35.54736561163251
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -2.4978027344095826,
+            "acq_drop_ref_uA": 35.80181352711761
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 12.185180738797388,
+            "file": "pgt_wave_2p0mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 46.13212648891952,
+            "file": "pgt_wave_2p0mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "2.5": {
+        "dvdt_mV_per_K": 4.950224463619403,
+        "hot_peak_V": 0.7340000000000348,
+        "drop_peak_uA": 55.42512115163112,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -0.9006347656597692,
+            "acq_drop_ref_uA": 42.96041648670791
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 1.3149414062152418,
+            "acq_drop_ref_uA": 39.602421454173765
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.8070068359722915,
+            "acq_drop_ref_uA": 44.32668068590964
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -0.6992187500347581,
+            "acq_drop_ref_uA": 42.65480895208268
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 7.182335841411866,
+            "file": "pgt_wave_2p5mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 39.87136986911245,
+            "file": "pgt_wave_2p5mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "3.0": {
+        "dvdt_mV_per_K": 5.110555620335821,
+        "hot_peak_V": 0.733000000000035,
+        "drop_peak_uA": 66.3396082745968,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -1.7133789062849234,
+            "acq_drop_ref_uA": 52.03004447504966
+          },
+          "6": {
+            "max_trackable_Kps": 1500.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 1.3078613280901314,
+            "acq_drop_ref_uA": 46.842274512505114
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.8140869140974014,
+            "acq_drop_ref_uA": 52.202451759330124
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -0.706298828159868,
+            "acq_drop_ref_uA": 50.301252733213424
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 5.725362272002781,
+            "file": "pgt_wave_3p0mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 38.82353098271759,
+            "file": "pgt_wave_3p0mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "3.5": {
+        "dvdt_mV_per_K": 4.729769123134324,
+        "hot_peak_V": 0.7320000000000351,
+        "drop_peak_uA": 77.19129513052613,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -1.1162109375350007,
+            "acq_drop_ref_uA": 58.51086393136454
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": -0.3105468750349837,
+            "acq_drop_ref_uA": 56.978632658857634
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.6197509765975004,
+            "acq_drop_ref_uA": 59.46727268104767
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -0.3105468750349838,
+            "acq_drop_ref_uA": 56.978475656843415
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 3.5224347169256083,
+            "file": "pgt_wave_3p5mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 37.271431714158894,
+            "file": "pgt_wave_3p5mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "4.0": {
+        "dvdt_mV_per_K": 4.76985191231343,
+        "hot_peak_V": 0.7300000000000353,
+        "drop_peak_uA": 87.97823171487954,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -0.5261230469101873,
+            "acq_drop_ref_uA": 66.67311050229226
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 0.48095703121481265,
+            "acq_drop_ref_uA": 64.595930281516
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.835327148472732,
+            "acq_drop_ref_uA": 69.36267398904138
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": 0.07812499996479039,
+            "acq_drop_ref_uA": 65.42678103301455
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 4.981124381387789,
+            "file": "pgt_wave_4p0mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 35.833440641079044,
+            "file": "pgt_wave_4p0mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "4.5": {
+        "dvdt_mV_per_K": 5.003668182524877,
+        "hot_peak_V": 0.7290000000000354,
+        "drop_peak_uA": 98.69847606422422,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -1.741699218785364,
+            "acq_drop_ref_uA": 76.56089325403833
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": -0.3317871094103141,
+            "acq_drop_ref_uA": 73.45366906108069
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.842407226597842,
+            "acq_drop_ref_uA": 76.78215896014426
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -1.5402832031603526,
+            "acq_drop_ref_uA": 76.1176692688592
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 8.119443945071145,
+            "file": "pgt_wave_4p5mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 37.29532259308366,
+            "file": "pgt_wave_4p5mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "5.0": {
+        "dvdt_mV_per_K": 4.990307252798506,
+        "hot_peak_V": 0.7280000000000355,
+        "drop_peak_uA": 109.35043704086684,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -2.151611328160441,
+            "acq_drop_ref_uA": 84.73214362765715
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 0.4667968749645924,
+            "acq_drop_ref_uA": 78.62457414407596
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -2.050903320347963,
+            "acq_drop_ref_uA": 84.49842722343163
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": 0.06396484371457012,
+            "acq_drop_ref_uA": 79.56435758705193
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 2.2902185700815414,
+            "file": "pgt_wave_5p0mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 34.14844084437647,
+            "file": "pgt_wave_5p0mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "5.5": {
+        "dvdt_mV_per_K": 5.110555620335821,
+        "hot_peak_V": 0.7260000000000357,
+        "drop_peak_uA": 119.93588685268914,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -0.9572753906606501,
+            "acq_drop_ref_uA": 91.37103882218591
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 0.4526367187143721,
+            "acq_drop_ref_uA": 87.91695298456726
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.8636474609731726,
+            "acq_drop_ref_uA": 93.58240462792487
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -0.7558593750356392,
+            "acq_drop_ref_uA": 90.87790861317126
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 6.30350867470771,
+            "file": "pgt_wave_5p5mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 37.62739416268833,
+            "file": "pgt_wave_5p5mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "6.0": {
+        "dvdt_mV_per_K": 4.930183069029852,
+        "hot_peak_V": 0.7250000000000358,
+        "drop_peak_uA": 130.45734592787426,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -1.3671875000357825,
+            "acq_drop_ref_uA": 99.36694699610331
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": -0.3601074219107546,
+            "acq_drop_ref_uA": 96.79435121697594
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.8707275390982825,
+            "acq_drop_ref_uA": 100.64857340831102
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -0.36010742191075473,
+            "acq_drop_ref_uA": 96.7964827995382
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 4.984634731806137,
+            "file": "pgt_wave_6p0mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 36.00187582349148,
+            "file": "pgt_wave_6p0mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "6.5": {
+        "dvdt_mV_per_K": 4.709727728544776,
+        "hot_peak_V": 0.724000000000036,
+        "drop_peak_uA": 140.9027880177296,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -2.179931640660881,
+            "acq_drop_ref_uA": 108.37667413516783
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 0.43847656246415184,
+            "acq_drop_ref_uA": 101.44889861574033
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.8778076172233924,
+            "acq_drop_ref_uA": 107.58013612321766
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -1.5756835937859035,
+            "acq_drop_ref_uA": 106.7816321652587
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 6.540748020374595,
+            "file": "pgt_wave_6p5mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 37.03556015604436,
+            "file": "pgt_wave_6p5mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "7.0": {
+        "dvdt_mV_per_K": 5.070472831156716,
+        "hot_peak_V": 0.7220000000000362,
+        "drop_peak_uA": 151.2696022147364,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -2.194091796911102,
+            "acq_drop_ref_uA": 117.94825464926843
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": -0.381347656286085,
+            "acq_drop_ref_uA": 113.01138269817064
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.388427734411085,
+            "acq_drop_ref_uA": 115.76114523502476
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -0.38134765628608513,
+            "acq_drop_ref_uA": 113.01493244904191
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 4.005397506195086,
+            "file": "pgt_wave_7p0mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 36.54168554326013,
+            "file": "pgt_wave_7p0mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "7.5": {
+        "dvdt_mV_per_K": 4.649603544776121,
+        "hot_peak_V": 0.7210000000000363,
+        "drop_peak_uA": 161.55562688822826,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -1.9997558594112281,
+            "acq_drop_ref_uA": 124.1886101864623
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": 0.41723632808882144,
+            "acq_drop_ref_uA": 117.41061950987186
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -1.7983398437862175,
+            "acq_drop_ref_uA": 123.62640039787891
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": 0.01440429683879918,
+            "acq_drop_ref_uA": 118.54354548785518
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 2.5336221488765487,
+            "file": "pgt_wave_7p5mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 33.77128139241884,
+            "file": "pgt_wave_7p5mW_k5_loss_1000Kps.png"
+          }
+        }
+      },
+      "8.0": {
+        "dvdt_mV_per_K": 4.619541452891797,
+        "hot_peak_V": 0.7200000000000364,
+        "drop_peak_uA": 171.758343186715,
+        "per_kstep": {
+          "4": {
+            "max_trackable_Kps": 500.0,
+            "slew_ceiling_mV_per_ms": 3.006209188432836,
+            "acq_Vdev_mV": -1.805419921911355,
+            "acq_drop_ref_uA": 130.28799545329275
+          },
+          "6": {
+            "max_trackable_Kps": 1000.0,
+            "slew_ceiling_mV_per_ms": 12.024836753731345,
+            "acq_Vdev_mV": -0.3955078125363053,
+            "acq_drop_ref_uA": 126.23373129882674
+          },
+          "3": {
+            "max_trackable_Kps": 250.0,
+            "slew_ceiling_mV_per_ms": 1.503104594216418,
+            "acq_Vdev_mV": -2.0068359375363385,
+            "acq_drop_ref_uA": 130.86520202961896
+          },
+          "5": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 6.012418376865672,
+            "acq_Vdev_mV": -1.604003906286344,
+            "acq_drop_ref_uA": 129.70979368325564
+          }
+        },
+        "waveforms": {
+          "track": {
+            "kstep": 5,
+            "drift": 750.0,
+            "drop_loss_rms_pct": 5.256590257934733,
+            "file": "pgt_wave_8p0mW_k5_track_750Kps.png"
+          },
+          "loss": {
+            "kstep": 5,
+            "drift": 1000.0,
+            "drop_loss_rms_pct": 35.98084009764959,
+            "file": "pgt_wave_8p0mW_k5_loss_1000Kps.png"
+          }
+        }
+      }
+    }
+  },
+  "l2v": {
+    "per_power": {
+      "0.5": {
+        "dvdt_mV_per_K": 5.019287109374999,
+        "peak_dac_v": 0.7227272727272728,
+        "target_iv": 1113,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 4.948975429044889
+          },
+          "16": {
+            "max_trackable_Kps": 1500.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 9.480822749107801
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 22.604999447024987
+          },
+          "56": {
+            "max_trackable_Kps": 3000.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": 38.49293441659131
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 117.90512287428396,
+            "file": "l2v_wave_0p5mW_st16_track_1500Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1750.0,
+            "err_rms": 498.59228834790457,
+            "file": "l2v_wave_0p5mW_st16_loss_1750Kps.png"
+          }
+        }
+      },
+      "1.0": {
+        "dvdt_mV_per_K": 5.0595703125000036,
+        "peak_dac_v": 0.7227272727272728,
+        "target_iv": 2237,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 9.143921748818013
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 20.772833209708807
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 43.14255439818092
+          },
+          "56": {
+            "max_trackable_Kps": 2500.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": 74.62001100039748
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 20.68680739021853,
+            "file": "l2v_wave_1p0mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 236.81458147673254,
+            "file": "l2v_wave_1p0mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "1.5": {
+        "dvdt_mV_per_K": 4.96826171875,
+        "peak_dac_v": 0.7227272727272728,
+        "target_iv": 3291,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 15.140921233657586
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 31.189147731582267
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 61.873370685618866
+          },
+          "56": {
+            "max_trackable_Kps": 2500.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": 107.21886947392788
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 33.21376220785595,
+            "file": "l2v_wave_1p5mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 335.7763392498048,
+            "file": "l2v_wave_1p5mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "2.0": {
+        "dvdt_mV_per_K": 4.957519531250003,
+        "peak_dac_v": 0.7227272727272728,
+        "target_iv": 4236,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 19.6177559580253
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 41.29869229847522
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 78.6292566415326
+          },
+          "56": {
+            "max_trackable_Kps": 2500.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": 132.952811474316
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 44.21384398579251,
+            "file": "l2v_wave_2p0mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 425.0711775691219,
+            "file": "l2v_wave_2p0mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "2.5": {
+        "dvdt_mV_per_K": 4.936035156250001,
+        "peak_dac_v": 0.7136363636363636,
+        "target_iv": 5399,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 22.628631741796685
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 49.16903434777312
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 93.66117658880866
+          },
+          "56": {
+            "max_trackable_Kps": 2500.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": 159.60865791055548
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 52.23596462208772,
+            "file": "l2v_wave_2p5mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 509.2795735153728,
+            "file": "l2v_wave_2p5mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "3.0": {
+        "dvdt_mV_per_K": 4.925292968750002,
+        "peak_dac_v": 0.7136363636363636,
+        "target_iv": 6639,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 25.443175222653323
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 57.38922787178066
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 107.59581776258779
+          },
+          "56": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": 181.23159216869448
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 62.75812298021667,
+            "file": "l2v_wave_3p0mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 614.1028464353508,
+            "file": "l2v_wave_3p0mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "3.5": {
+        "dvdt_mV_per_K": 4.917236328125,
+        "peak_dac_v": 0.7136363636363636,
+        "target_iv": 7711,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 26.987057386033356
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 63.247667108981354
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 116.74914988983859
+          },
+          "56": {
+            "max_trackable_Kps": 1500.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": 196.47638025981647
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 72.79439538865613,
+            "file": "l2v_wave_3p5mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 691.5849926075608,
+            "file": "l2v_wave_3p5mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "4.0": {
+        "dvdt_mV_per_K": 4.93603515625,
+        "peak_dac_v": 0.7136363636363636,
+        "target_iv": 8617,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 30.006504298217138
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 69.18228461503483
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 130.2138241508942
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 81.92669894484948,
+            "file": "l2v_wave_4p0mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 769.7865379441239,
+            "file": "l2v_wave_4p0mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "4.5": {
+        "dvdt_mV_per_K": 4.944091796875001,
+        "peak_dac_v": 0.7136363636363636,
+        "target_iv": 9390,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 33.00891884834234
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 73.63095978064379
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 136.48018171148513
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 89.48770865319997,
+            "file": "l2v_wave_4p5mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 836.2640492093392,
+            "file": "l2v_wave_4p5mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "5.0": {
+        "dvdt_mV_per_K": 4.97900390625,
+        "peak_dac_v": 0.7045454545454546,
+        "target_iv": 10792,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 32.66928583253261
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 78.64972788565322
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 146.07873219603186
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 94.04669053188422,
+            "file": "l2v_wave_5p0mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 930.3897118949671,
+            "file": "l2v_wave_5p0mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "5.5": {
+        "dvdt_mV_per_K": 4.8984375000000036,
+        "peak_dac_v": 0.7045454545454546,
+        "target_iv": 12029,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 37.82478476802943
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 81.34616526681612
+          },
+          "32": {
+            "max_trackable_Kps": 2000.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 154.9736687311751
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 100.4489422542617,
+            "file": "l2v_wave_5p5mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 1051.0507808854907,
+            "file": "l2v_wave_5p5mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "6.0": {
+        "dvdt_mV_per_K": 4.930664062500001,
+        "peak_dac_v": 0.7045454545454546,
+        "target_iv": 12962,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 39.74653665011455
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 85.83748148602915
+          },
+          "32": {
+            "max_trackable_Kps": 1750.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 158.60012317346462
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 101.38911184145958,
+            "file": "l2v_wave_6p0mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 1113.6296296345567,
+            "file": "l2v_wave_6p0mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "6.5": {
+        "dvdt_mV_per_K": 4.890380859375001,
+        "peak_dac_v": 0.7045454545454546,
+        "target_iv": 13716,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 41.1203748503531
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 88.19930379521855
+          },
+          "32": {
+            "max_trackable_Kps": 1500.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 163.11507594333517
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 108.49715203635532,
+            "file": "l2v_wave_6p5mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 1142.8416915741218,
+            "file": "l2v_wave_6p5mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "7.0": {
+        "dvdt_mV_per_K": 4.922607421874998,
+        "peak_dac_v": 0.7045454545454546,
+        "target_iv": 14355,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 42.344565883084684
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 91.74624273389234
+          },
+          "32": {
+            "max_trackable_Kps": 1500.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 167.74207581879986
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 106.22192805631049,
+            "file": "l2v_wave_7p0mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 1243.0513223515754,
+            "file": "l2v_wave_7p0mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "7.5": {
+        "dvdt_mV_per_K": 4.9306640624999964,
+        "peak_dac_v": 0.6954545454545454,
+        "target_iv": 16130,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 45.178102561391086
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 94.62500829010301
+          },
+          "32": {
+            "max_trackable_Kps": 1500.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 173.7179783442117
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 119.04253021504542,
+            "file": "l2v_wave_7p5mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 1349.0851833742745,
+            "file": "l2v_wave_7p5mW_st16_loss_1500Kps.png"
+          }
+        }
+      },
+      "8.0": {
+        "dvdt_mV_per_K": 4.946777343750002,
+        "peak_dac_v": 0.6954545454545454,
+        "target_iv": 17181,
+        "per_step": {
+          "8": {
+            "max_trackable_Kps": 750.0,
+            "slew_ceiling_mV_per_ms": 4.0283203125,
+            "track_ripple_codes": 47.51585986617721
+          },
+          "16": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 8.056640625,
+            "track_ripple_codes": 96.2673937494074
+          },
+          "32": {
+            "max_trackable_Kps": 1250.0,
+            "slew_ceiling_mV_per_ms": 16.11328125,
+            "track_ripple_codes": 176.23953218323925
+          },
+          "56": {
+            "max_trackable_Kps": 0.0,
+            "slew_ceiling_mV_per_ms": 28.1982421875,
+            "track_ripple_codes": NaN
+          }
+        },
+        "waveforms": {
+          "track": {
+            "step": 16,
+            "drift": 1250.0,
+            "err_rms": 119.12994585745433,
+            "file": "l2v_wave_8p0mW_st16_track_1250Kps.png"
+          },
+          "loss": {
+            "step": 16,
+            "drift": 1500.0,
+            "err_rms": 1428.370892310537,
+            "file": "l2v_wave_8p0mW_st16_loss_1500Kps.png"
+          }
+        }
+      }
+    }
+  }
+}

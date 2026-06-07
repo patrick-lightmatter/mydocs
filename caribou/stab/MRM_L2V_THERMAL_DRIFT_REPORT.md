@@ -173,7 +173,70 @@ setpoint and carries a step-proportional ripple, and PGT does not need an
 absolute ADC target (it is power-reference-free). The choice is mission-level,
 but for *pure thermal-drift bandwidth* L2V is the stronger controller here.
 
-## 6. Recommendation & caveats
+## 6. Tracking bandwidth across optical power (0.5–8 mW campaign)
+
+The 1 mW study above was repeated across **16 optical powers, 0.5–8 mW in
+0.5 mW steps** (`run_power_campaign.py`): an open-loop op-point characterization
+plus the step × drift sweep at each power. Full aggregate data:
+[`data/power_campaign/power_campaign_summary.json`](data/power_campaign/power_campaign_summary.json);
+per-power time-domain traces in [`figures/waveforms/`](figures/waveforms/)
+(32 L2V PNGs, tracked + lock-loss per power).
+
+**Small steps are power-independent; coarse steps lose bandwidth at high power,
+and step 56 collapses entirely above ~4 mW** (Figure 4):
+
+| power | peak DAC (V) | target IADC | dV/dT_amb (mV/K) | step 8 | step 16 | step 32 | step 56 |
+|---|---|---|---|---|---|---|---|
+| 0.5 mW | 0.723 | 1113 | 5.02 | 750 | 1500 | 2000 | 3000 |
+| 1.0 mW | 0.723 | 2237 | 5.06 | 750 | 1250 | 2000 | 2500 |
+| 2.0 mW | 0.723 | 4236 | 4.96 | 750 | 1250 | 2000 | 2500 |
+| 3.0 mW | 0.714 | 6639 | 4.93 | 750 | 1250 | 2000 | 2000 |
+| 4.0 mW | 0.714 | 8617 | 4.94 | 750 | 1250 | 2000 | **lock-loss** |
+| 5.5 mW | 0.705 | 12029 | 4.90 | 750 | 1250 | 2000 | **lock-loss** |
+| 6.0 mW | 0.705 | 12962 | 4.93 | 750 | 1250 | **1750** | **lock-loss** |
+| 8.0 mW | 0.695 | 17181 | 4.95 | 750 | 1250 | **1250** | **lock-loss** |
+| | | | | *K/s, max trackable drift* | | | |
+
+Four observations:
+
+1. **`dV/dT_amb` is a power-independent plant constant: 4.89–5.06 mV/K** (mean
+   ≈ 4.95), matching the PGT value to within the high-ambient nonlinearity.
+2. **The hot-side lock point drifts down with power** (peak DAC 0.723 → 0.695 V
+   from self-heating) and the IADC target scales with power (the target is 75 %
+   of the power-proportional drop peak, 1113 → 17181 codes).
+3. **Steps 8 and 16 hold their bandwidth at every power** (750 / 1250 K/s flat),
+   exactly like the slew-ceiling-limited small-step regime — the ceiling is a
+   DAC/timing property, independent of power.
+4. **Coarse steps degrade with power.** Step 32 holds 2000 K/s only up to
+   ~5.5 mW, then erodes to 1250 K/s by 8 mW; **step 56 fails to hold lock at all
+   above ~4 mW** (and its ceiling falls 3000 → 1500 K/s even below that). As
+   power rises the resonance sharpens and the IADC target grows, so a fixed
+   coarse step (and the fixed ±4-code dead zone) overshoots increasingly until
+   the loop can no longer settle. **Above ~4 mW, cap the L2V step at 32 (and
+   prefer 16); step 56 is unusable.**
+
+![Figure 4 — L2V max trackable drift vs optical power, per step size (note the step-56 collapse above ~4 mW)](figures/power_campaign/l2v_bandwidth_vs_power.png)
+
+The matched-granularity PGT-vs-L2V comparison across power (Figure 5) shows
+L2V's 2.7× edge at 4-LSB (step 32 vs k5) holds up to ~5.5 mW, then erodes toward
+~1.7× by 8 mW as step 32 loses bandwidth while PGT k5 stays flat at 750 K/s.
+
+![Figure 5 — PGT k5 vs L2V step-32 max trackable drift vs power (matched 4-LSB granularity)](figures/power_campaign/bandwidth_vs_power_compare.png)
+
+### 6.1 Representative time-domain traces (1 mW, step 16)
+
+Each trace shows ambient temperature, ADC code vs target, ADC error, and heater
+voltage over the drift phase. **Tracked (step 16, 1250 K/s, 21-code error):** the
+heater ramps to follow resonance and the ADC sits on target.
+
+![L2V 1 mW, step 16, 1250 K/s — tracked](figures/waveforms/l2v_wave_1p0mW_st16_track_1250Kps.png)
+
+**Lock-loss (step 16, 1500 K/s, 237-code error):** past the slew ceiling the
+heater lags and the ADC error rails.
+
+![L2V 1 mW, step 16, 1500 K/s — lock loss](figures/waveforms/l2v_wave_1p0mW_st16_loss_1500Kps.png)
+
+## 7. Recommendation & caveats
 
 * **Default to step 32 (4 LSB)** at 1 mW: ~2000 K/s drift margin at 1.9 %
   steady-state ripple — the best precision/slew balance. Step 56 (7 LSB) adds
@@ -181,6 +244,9 @@ but for *pure thermal-drift bandwidth* L2V is the stronger controller here.
   cap; reserve it for known-fast ramps.
 * **Use step 8–16 (1–2 LSB)** only when drift is slow (< ~750–1250 K/s) and
   tight steady-state precision (< ~1 % ripple) is required.
+* **Above ~4 mW, cap the step at 32 and prefer 16** (§6): step 56 fails to hold
+  lock above ~4 mW and step 32 begins losing bandwidth above ~5.5 mW, so the
+  high-power operating envelope is narrower than at 1 mW.
 * **No override / acquisition tuning needed** — L2V's target-referenced
   bang-bang acquires cleanly at all step sizes, so the PGT `ovr_counter=0`
   fix has no L2V analog.
@@ -195,10 +261,14 @@ but for *pure thermal-drift bandwidth* L2V is the stronger controller here.
   obvious lever to break the precision/slew tradeoff — coarse slew to chase
   fast drift, fine step for steady-state precision.
 
-## 7. Reproduce
+## 8. Reproduce
 
 ```bash
 cd goldens/mrm
+
+# Multi-power campaign (op-point + step×drift sweep, 0.5–8 mW):
+scripts/run_tsmc.sh -m src.testbench.run_power_campaign
+python3 -m src.testbench.analyze_power_campaign
 
 # 1 mW open-loop op-point (target + hot-start, fixed sweet-spot HDAC):
 scripts/run_tsmc.sh -m src.testbench.skadi_mrm_l2v_open_loop \
