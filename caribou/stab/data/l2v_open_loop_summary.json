@@ -1,0 +1,21 @@
+{
+  "optical_power_W": 0.001,
+  "wavelength_m": 1.31e-06,
+  "v_heater_fs": 1.8,
+  "adc_fullscale_A": 0.0005,
+  "peak_adc_snap": 2983,
+  "peak_dac_v": 0.7227272727272728,
+  "peak_dac_code": 22752,
+  "bb_adc_snap": 65535,
+  "target_iv": 2237,
+  "peak_ratio_val": 96,
+  "v_acq_start_V": 0.757022372159091,
+  "hot_start_idx": 76,
+  "hot_start_truncated": false,
+  "sweep_truncated_hi": false,
+  "sweep_truncated_lo": false,
+  "n_sweep_pts": 100,
+  "v_sweep_lo": 0.05,
+  "v_sweep_hi": 0.95,
+  "sweep_csv": "/data/home/patrick/photon/goldens/mrm/output/mrm_l2v_thermal_drift_study/open_loop_1mW/l2v_open_loop_sweep.csv"
+}

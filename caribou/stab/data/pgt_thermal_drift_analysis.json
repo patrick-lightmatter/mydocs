@@ -1,0 +1,47 @@
+{
+  "dvdt_mV_per_K": 4.970265858208963,
+  "window_us": 134.0,
+  "drop_loss_track_pct": 25.0,
+  "per_kstep": {
+    "3": {
+      "step_mV": 0.20141601562500003,
+      "slew_ceiling_mV_per_ms": 1.503104594216418,
+      "max_trackable_Kps_ovr0": 100.0,
+      "slew_limited_pred_Kps": 302.41935483870924,
+      "acq_Vdev_mV_ovr3": -2.4117024739558395,
+      "acq_drop_ref_uA_ovr3": 18.57768173746447,
+      "acq_Vdev_mV_ovr0": -2.4117024739558395,
+      "acq_drop_ref_uA_ovr0": 18.577681737673192
+    },
+    "4": {
+      "step_mV": 0.40283203125000006,
+      "slew_ceiling_mV_per_ms": 3.006209188432836,
+      "max_trackable_Kps_ovr0": 250.0,
+      "slew_limited_pred_Kps": 604.8387096774185,
+      "acq_Vdev_mV_ovr3": 8.67960611979416,
+      "acq_drop_ref_uA_ovr3": 10.978356475237781,
+      "acq_Vdev_mV_ovr0": -2.4027506510391996,
+      "acq_drop_ref_uA_ovr0": 18.58058945274146
+    },
+    "5": {
+      "step_mV": 0.8056640625000001,
+      "slew_ceiling_mV_per_ms": 6.012418376865672,
+      "max_trackable_Kps_ovr0": 750.0,
+      "slew_limited_pred_Kps": 1209.677419354837,
+      "acq_Vdev_mV_ovr3": 22.78767903646083,
+      "acq_drop_ref_uA_ovr3": 5.342304788077109,
+      "acq_Vdev_mV_ovr0": -0.9883626302058448,
+      "acq_drop_ref_uA_ovr0": 17.570962609396823
+    },
+    "6": {
+      "step_mV": 1.6113281250000002,
+      "slew_ceiling_mV_per_ms": 12.024836753731345,
+      "max_trackable_Kps_ovr0": 1000.0,
+      "slew_limited_pred_Kps": 2419.354838709674,
+      "acq_Vdev_mV_ovr3": 91.2512207031275,
+      "acq_drop_ref_uA_ovr3": 0.7073259587720859,
+      "acq_Vdev_mV_ovr0": 0.22908528646077775,
+      "acq_drop_ref_uA_ovr0": 16.693418378291852
+    }
+  }
+}

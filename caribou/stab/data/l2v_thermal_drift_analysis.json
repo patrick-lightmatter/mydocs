@@ -1,0 +1,67 @@
+{
+  "controller": "L2V (lock-to-value, IADC_VALUE target)",
+  "optical_power_mW": 1.0,
+  "dvdt_mV_per_K": 5.0595703125000036,
+  "window_us": 50.0,
+  "err_track_codes": 200.0,
+  "target_iv": 2237,
+  "dead_zone_half": 4,
+  "per_step": {
+    "8": {
+      "lsb": 1,
+      "step_mV": 0.20141601562500003,
+      "slew_ceiling_mV_per_ms": 4.0283203125,
+      "max_trackable_Kps": 750.0,
+      "slew_limited_pred_Kps": 796.178343949044,
+      "slew_efficiency": 0.9420000000000007,
+      "track_ripple_codes": 9.170885141731048,
+      "track_ripple_pct_of_target": 0.40996357361336827
+    },
+    "16": {
+      "lsb": 2,
+      "step_mV": 0.40283203125000006,
+      "slew_ceiling_mV_per_ms": 8.056640625,
+      "max_trackable_Kps": 1250.0,
+      "slew_limited_pred_Kps": 1592.356687898088,
+      "slew_efficiency": 0.7850000000000006,
+      "track_ripple_codes": 20.798404087236356,
+      "track_ripple_pct_of_target": 0.9297453771674724
+    },
+    "32": {
+      "lsb": 4,
+      "step_mV": 0.8056640625000001,
+      "slew_ceiling_mV_per_ms": 16.11328125,
+      "max_trackable_Kps": 2000.0,
+      "slew_limited_pred_Kps": 3184.713375796176,
+      "slew_efficiency": 0.6280000000000004,
+      "track_ripple_codes": 43.15161642395334,
+      "track_ripple_pct_of_target": 1.928994922841008
+    },
+    "56": {
+      "lsb": 7,
+      "step_mV": 1.409912109375,
+      "slew_ceiling_mV_per_ms": 28.1982421875,
+      "max_trackable_Kps": 2500.0,
+      "slew_limited_pred_Kps": 5573.248407643308,
+      "slew_efficiency": 0.4485714285714289,
+      "track_ripple_codes": 74.61862965741845,
+      "track_ripple_pct_of_target": 3.3356562207160683
+    }
+  },
+  "pgt_comparison": {
+    "pgt_window_us": 134.0,
+    "pgt_dvdt_mV_per_K": 4.970265858208963,
+    "pgt_max_trackable_by_lsb": {
+      "1": 100.0,
+      "2": 250.0,
+      "4": 750.0,
+      "8": 1000.0
+    },
+    "l2v_max_trackable_by_lsb": {
+      "1": 750.0,
+      "2": 1250.0,
+      "4": 2000.0,
+      "7": 2500.0
+    }
+  }
+}
