@@ -9,6 +9,8 @@ mydocs/
 ├── colossus/                          # Colossus ASIC
 │   └── link/
 │       └── channel_characterization/  # Channel characterisation reports & figures
+├── caribou/                           # Caribou ASIC
+│   └── stab/                          # MRM stabilisation reports & data
 ├── oci_msa/                           # OCI MSA (Caribou OCI-Gen2)
 │   └── receiver/                      # Receiver characterisation reports & figures
 ├── nuggets/                           # Self-contained technical write-ups
@@ -25,9 +27,16 @@ mydocs/
 - [Ranjit Channel Characterisation](colossus/link/channel_characterization/ranjit/report.md) — PRBS12, 106 250 UI
 - [Point 0007 Channel Characterisation](colossus/link/channel_characterization/point_0007_report.md) — point_0007 dataset
 
+### Caribou
+
+- [MRM Stabilisation — Thermal-Drift Bandwidth Study](caribou/stab/README.md) — MRM controller temperature-tracking overview
+- [MRM L2V Thermal-Drift Study](caribou/stab/MRM_L2V_THERMAL_DRIFT_REPORT.md) — coupe + sweet-spot HDAC, 1 mW
+- [MRM PGT Thermal-Drift Study](caribou/stab/MRM_PGT_THERMAL_DRIFT_REPORT.md) — coupe + sweet-spot HDAC, 1 mW
+
 ### OCI MSA
 
 - [Caribou OCI-Gen2 Receiver Characterisation](oci_msa/receiver/report.md) — NRZ 106.25 Gbps Python receiver, post-layout waveform captures
+- [Caribou OCI-Gen2 Receiver — 1-Tap DFE](oci_msa/receiver/report_dfe.md) — DFE extension of the FFE-only receiver study
 
 ### Nuggets
 
