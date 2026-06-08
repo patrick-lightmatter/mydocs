@@ -491,3 +491,91 @@ the DFE from the CDR timing loop.
 *Script: `examples/caribou_oci_gen2_nrz_results.py --n-dfe 1 --repeat 3 --batch`*
 *Results: `runs/caribou_oci_gen2_nrz_results_dfe/`*
 *Figures: `figures_dfe/`*
+
+---
+
+## 13  DFE-Only Experiment (FFE Disabled)
+
+To isolate the contribution of the FFE, a separate run was performed with all
+FFE taps disabled (`--ffe-pre 0 --ffe-post 0 --n-dfe 1`).  This leaves only a
+1-tap DFE to cancel inter-symbol interference.
+
+### 13.1  Configuration
+
+| Parameter | Value |
+|-----------|-------|
+| CTLE | 1z2p, pk = 4 dB, G_DC = −3 dB |
+| FFE | 0 pre, 1 cursor, 0 post |
+| DFE | 1 tap |
+| Adaptation | CDR + DFE simultaneous (`ted_signal="raw"`) |
+| TED signal | Raw (pre-equaliser) |
+
+The `ted_signal="raw"` setting is used here because the cursor-only FFE provides
+no post-cursor equalization; the DFE feedback (+b₁) would otherwise bias the
+MM-TED if `"equalized"` were used.
+
+### 13.2  BER and SNR Results
+
+| Variant | Raw BER | SNR (dB) | Extrap. BER | DFE b₁ | CDR phase |
+|---------|---------|----------|-------------|---------|-----------|
+| OMA_100uW_VGA1_0 | 2.09 × 10⁻³ | 6.94 | 1.31 × 10⁻² | +0.1955 | 27/32 |
+| OMA_100uW_VGA1_2 | 1.15 × 10⁻³ | 6.94 | 1.31 × 10⁻² | +0.2030 | 27/32 |
+| OMA_150uW_VGA1_0 | 2.53 × 10⁻⁴ | 7.22 | 1.08 × 10⁻² | +0.2047 | 27/32 |
+| OMA_150uW_VGA1_2 | 2.53 × 10⁻⁴ | 7.20 | 1.10 × 10⁻² | +0.2104 | 27/32 |
+| OMA_200uW_VGA1_0 | 9.20 × 10⁻⁵ | 7.12 | 1.16 × 10⁻² | +0.1835 | 28/32 |
+| OMA_200uW_VGA1_2 | 1.38 × 10⁻⁴ | 7.11 | 1.17 × 10⁻² | +0.1896 | 28/32 |
+
+### 13.3  Comparison with FFE+DFE Baseline
+
+| Metric | FFE+DFE (5+1+14, b₁ zeroed) | DFE-only (0+1+0) | Δ |
+|--------|------------------------------|-------------------|---|
+| SNR (typ.) | ~12.5 dB | ~7.1 dB | −5.4 dB |
+| Raw BER | 0 (floor < 2 × 10⁻⁷) | 9 × 10⁻⁵ – 2 × 10⁻³ | ≫ |
+| Extrap. BER | ~1 × 10⁻⁵ | ~1 × 10⁻² | 3 orders |
+| DFE b₁ | 0.59–0.64 | 0.18–0.21 | smaller |
+| CDR phase | 29/32 | 27–28/32 | −1–2 taps |
+
+The 5.4 dB SNR penalty confirms that the multi-tap FFE carries the bulk of the
+equalization burden.  The DFE b₁ is substantially smaller in the DFE-only case
+(0.19–0.21 vs 0.62) because the CDR locks to a slightly earlier sampling instant
+(phase 27 vs 29), where h₁ is smaller.
+
+The extrapolated BER floor of ~10⁻² is flat with OMA — this is ISI-limited
+behaviour, not noise-limited.  Adding optical power provides no BER benefit once
+the residual multi-tap ISI (h₂ through h₁₃) dominates.
+
+### 13.4  OMA vs BER
+
+![OMA vs BER — DFE-only](figures_dfe_only/oma_vs_ber.png)
+
+### 13.5  Representative Eye Diagrams — OMA_200uW_VGA1_0
+
+Pre-CTLE:
+
+![Eye pre-CTLE OMA_200uW_VGA1_0](figures_dfe_only/eye_pre_ctle_OMA_200uW_VGA1_0.png)
+
+Post-CTLE / FFE input (cursor-only FFE, no taps active):
+
+![Eye post-CTLE OMA_200uW_VGA1_0](figures_dfe_only/eye_post_ctle_OMA_200uW_VGA1_0.png)
+
+Post-FFE (output = equalised signal, DFE cancels one post-cursor tap):
+
+![Eye post-FFE/DFE OMA_200uW_VGA1_0](figures_dfe_only/eye_post_ffe_OMA_200uW_VGA1_0.png)
+
+### 13.6  DFE Convergence — OMA_200uW_VGA1_0
+
+![DFE tap trajectory OMA_200uW_VGA1_0](figures_dfe_only/dfe_tap_trajectory_OMA_200uW_VGA1_0.png)
+
+### 13.7  Conclusion
+
+A single DFE tap is insufficient for this channel.  The 14-tap post-cursor ISI
+tail visible in the FFE tap weights (section 7) requires the full FFE to suppress.
+The DFE-only experiment establishes a lower bound: without the FFE, the best
+achievable SNR is ~7 dB regardless of optical power, approximately 5 dB below the
+FFE+DFE operating point.
+
+---
+
+*Script: `examples/caribou_oci_gen2_nrz_results.py --n-dfe 1 --ffe-pre 0 --ffe-post 0 --batch --results-dir runs/caribou_oci_gen2_nrz_results_dfe_only`*
+*Results: `runs/caribou_oci_gen2_nrz_results_dfe_only/`*
+*Figures: `figures_dfe_only/`*
