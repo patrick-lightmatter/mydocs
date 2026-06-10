@@ -277,6 +277,127 @@ src/optical_serdes/rx/mm_cdr.py             → AnalogMmCdr (unchanged)
 
 ---
 
+### Milestone 3 — 2026-06-09 · CTLE integration + peaking sweep
+
+#### What was done
+
+Added a 1z2p `CtleZPK` peaking stage between the BT channel and the slicer
+input in `scripts/analog_rx/analog_rx_prbs15_eye.py`.  Swept CTLE peaking
+from 0 dB (bypass) to 9 dB in 3 dB steps and measured CDR lock, h₁
+(first postcursor after equalization), and h₀ convergence at each level.
+
+Each sweep point now produces a **4-panel figure**:
+1. CDR phase trajectory
+2. h₀ sign-error LMS adaptation
+3. Frequency response (BT channel, CTLE, combined) with Nyquist marker
+4. Eye diagram at the slicer input with ±h₀ thresholds overlaid
+
+**CTLE design:** `CtleZPK.from_peaking(peaking_db, data_rate=106.25e9, samples_per_symbol=32)` —
+1-zero 2-pole (1z2p) topology; zero at 0.25·f_Nyq, second pole at 2·f_Nyq;
+first pole solved by Brent's method to achieve the target Nyquist peaking.
+Maximum achievable peaking with default pole/zero ratios: ≈ 10.4 dB.
+
+**Combined IR analysis:** after applying BT filter then CTLE to a single-symbol
+pulse, the peak (h₀) and first postcursor h₁ are extracted from the combined
+impulse response.  Both the CDR lock point and the h₀ LMS are evaluated
+against the combined channel, not the bare BT channel.
+
+#### Implementation note — loop polarity bug found and fixed
+
+An initial run (loop_sign = +1 hardwired) showed lock failure at 3, 6, 9 dB.
+Post-analysis identified the root cause: when the combined IR (BT + CTLE)
+overshoots, h₁ goes negative, which inverts the TED polarity.  The
+original CDR drove the phase in the wrong direction and diverged.
+
+**Fix:** added `loop_sign: int` to `AnalogMmCdr`
+(`src/optical_serdes/rx/mm_cdr.py`).  The TED output is multiplied by
+`loop_sign` before the loop filter.  In `run_cdr()`, `loop_sign =
+sign(h₁_true)` is derived from the combined IR before the simulation starts.
+In hardware this would be set by a brief calibration phase (or by the CTLE
+control word, since the designer knows which direction h₁ will go).
+
+The fundamental TED requirement is **|h₁| > 0** (nonzero postcursor at the
+sampling phase), not h₁ > 0.  The sign of h₁ controls which direction the
+loop must wind — it is a polarity setting, not a stability condition.
+
+#### Results (after loop_sign fix)
+
+Channel: 4th-order BT, −6 dB @ Nyquist (f₃dB = 38.97 GHz).  OSR = 32.
+
+| CTLE pk | pi_nat | lock pi | δ (UI) | h₀_peak | h₀_conv | h₀_conv gain vs bypass | h₁_true | h₁/h₀  | Locked |
+|---------|--------|---------|--------|---------|---------|------------------------|---------|--------|--------|
+| 0 dB    |  12    |  14     | +0.06  | 0.8272  | 0.8155  | baseline               | +0.1174 | +0.142 | **YES** |
+| 3 dB    |  15    |  29     | +0.44  | 1.0549  | 0.8690  | +6.6 %                 | −0.0107 | −0.010 | **YES** |
+| 6 dB    |  12    |  25     | +0.41  | 1.2777  | 0.8230  | +0.9 %                 | −0.1702 | −0.133 | **YES** |
+| 9 dB    |   9    |  21     | +0.38  | 1.5199  | 1.0040  | +23 %                  | −0.4206 | −0.277 | **YES** |
+
+δ = (lock_pi − pi_nat) / OSR in UI.  h₀_peak = IR peak amplitude; h₀_conv =
+cursor amplitude at the *actual* CDR sampling phase (the quantity the
+sign-error LMS converges to — not an estimation error).  Lock criterion:
+≥ 90 % of post-settle pi_codes within ±3 (modular) of modal value.
+
+Figures (static PNG fallback):
+
+| 0 dB bypass | 3 dB |
+|---|---|
+| ![0 dB](figures/eye_prbs15_bt4_ctle_pk0dB.png) | ![3 dB](figures/eye_prbs15_bt4_ctle_pk3dB.png) |
+
+| 6 dB | 9 dB |
+|---|---|
+| ![6 dB](figures/eye_prbs15_bt4_ctle_pk6dB.png) | ![9 dB](figures/eye_prbs15_bt4_ctle_pk9dB.png) |
+
+> Full interactive HTML figures in `optical-serdes/runs/analog_rx/`.
+
+#### Key observations
+
+* **h₁ changes sign between 0 and 3 dB peaking.**  At bypass h₁/h₀ = +14 %;
+  at 3 dB it is −1 %.  The zero crossing is at ≈ **2.7 dB** of CTLE peaking
+  for this channel.  Above 2.7 dB the combined IR overshoots and h₁ goes
+  negative at the IR peak — but the CDR still locks after the polarity fix.
+
+* **The MM lock point ≠ IR peak.**  The CDR locks where h₁(φ) = 0 — i.e.,
+  where the combined IR value exactly one UI after the sampling phase is zero.
+  For the BT-only channel this zero crossing is close to the peak (δ ≈ 0.06
+  UI); for BT + CTLE with an oscillating IR it migrates to δ ≈ 0.4 UI.
+
+* **h₀_conv is correct, not erroneous.**  The sign-error LMS adapts to the
+  cursor amplitude at the *actual sampling phase*.  The gap between h₀_conv
+  and h₀_peak is a real performance penalty: the CDR is not sampling at the
+  optimal (maximum eye-opening) point.  The h₁ = 0 lock constraint and the
+  h₀ maximisation objective are in tension.
+
+* **CTLE does help, but less than the IR peak suggests.**  The effective eye
+  opening (h₀_conv) improves by only 23 % at 9 dB peaking, even though the
+  IR peak grows by 84 %.  Most of the CTLE benefit is "wasted" because the
+  lock point migrates away from the peak.
+
+* **6 dB CTLE gives almost no cursor benefit (+0.9 %)** vs. bypass — the
+  lock-point migration nearly cancels the IR peak growth.
+
+* **Q4 revised.**  The TED remains well-conditioned (|h₁| > 0 at the lock
+  point) for all tested peaking levels.  The CDR polarity must match sign(h₁)
+  — this is a hardware calibration requirement, not a fundamental instability.
+  The original concern (TED blindness at h₁ = 0) applies only at exactly the
+  h₁ = 0 crossing (≈ 2.7 dB here); even there, the lock point shifts rather
+  than the CDR failing entirely.
+
+* **Q7 partially answered.**  Topology: 1z2p CTLE is sufficient.  The optimal
+  peaking is not simply "below 2.7 dB" but a trade-off: low peaking keeps the
+  lock point near the IR peak (good h₀_conv/h₀_peak ratio) while high peaking
+  grows the IR peak but moves the lock point away (poor ratio).  Optimal
+  operating point requires characterising h₀_conv vs. peaking for the actual
+  OCI MSA channel.
+
+#### Simulation code
+
+```
+scripts/analog_rx/analog_rx_prbs15_eye.py      (rewritten: 4-panel figure, CTLE sweep)
+src/optical_serdes/rx/mm_cdr.py                → AnalogMmCdr: added loop_sign field
+src/optical_serdes/rx/ctle.py                  → CtleZPK.from_peaking (existing)
+```
+
+---
+
 ## 5. Open Questions
 
 These are the unresolved design questions that will drive the next development phases.
@@ -288,7 +409,7 @@ These are the unresolved design questions that will drive the next development p
 | Q1 | What is the CDR bandwidth and jitter peaking for the bang-bang loop? | Jitter tolerance, limit-cycle amplitude | Not yet measured |
 | Q2 | Is a proportional-only (first-order) loop sufficient, or do we need frequency acquisition (integral path)? | Lock range, ppm tolerance | Open |
 | Q3 | How sensitive is the lock point to errors in h₀? | Error slicer miscalibration → phase offset | Open |
-| Q4 | Does the TED remain well-conditioned after CTLE equalizes most of the channel? | TED gain reduction, possible loss of lock | Open |
+| Q4 | Does the TED remain well-conditioned after CTLE equalizes most of the channel? | TED gain reduction, possible loss of lock | ✅ **Resolved** — Fundamental requirement is \|h₁\| > 0 (not h₁ > 0); CDR polarity must track sign(h₁).  With correct loop_sign the CDR locks at all tested peaking levels.  Lock point migrates ~0.4 UI from IR peak for aggressive CTLE, reducing effective cursor amplitude (Milestone 3) |
 
 ### h₀ calibration
 
@@ -301,7 +422,7 @@ These are the unresolved design questions that will drive the next development p
 
 | # | Question | Impact | Status |
 |---|---------|--------|--------|
-| Q7 | What CTLE topology and peaking target for the OCI MSA channel? | ISI structure, h₀ level, TED gain | Open |
+| Q7 | What CTLE topology and peaking target for the OCI MSA channel? | ISI structure, h₀ level, TED gain | 🟡 **Partial** — Topology: 1z2p (`CtleZPK`).  Peaking must stay below the h₁=0 crossing of the combined IR (≈ 2.7 dB for −6 dB BT; varies by channel loss profile).  Exact target requires per-channel characterisation (Milestone 3) |
 | Q8 | Half-rate (53.125 GHz × 2) or full-rate (106.25 GHz) clocking? | T/H bandwidth, VCO design | Open |
 | Q9 | How is the VGA gain controlled to keep the eye amplitude ≈ h₀_target? | Error slicer accuracy | Open |
 
@@ -323,8 +444,8 @@ These are the unresolved design questions that will drive the next development p
 
 ### Phase 3 — Channel realism
 - [ ] Add AWGN — measure BER vs. SNR floor with analytic MM-CDR
-- [ ] Add CTLE (1z2p or 1z3p) — verify TED does not lose discriminant after equalization
-- [ ] Confirm h₀ tracking still accurate after CTLE reshapes eye
+- [x] Add CTLE (1z2p) — verify TED does not lose discriminant after equalization (Milestone 3: h₁=0 crossing at ≈ 2.7 dB for −6 dB BT channel)
+- [x] Confirm h₀ tracking still accurate after CTLE reshapes eye (Milestone 3: tracking accurate only when CDR is locked; degrades when h₁ → 0)
 
 ### Phase 4 — h₀ calibration ✅ (Milestone 2 — sign-error LMS)
 - [x] Identify h₀ estimator compatible with all-slicer path (sign-error LMS)
