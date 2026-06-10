@@ -13,6 +13,7 @@ repo under `goldens/mrm/` (see each report's *Reproduce* section).
 | Aggressor | Controller | Report | Headline |
 |---|---|---|---|
 | Thermal drift | **PGT** | [`MRM_PGT_THERMAL_DRIFT_REPORT.md`](MRM_PGT_THERMAL_DRIFT_REPORT.md) | Max trackable drift ~100/250/750/1000 K/s at kstep 3/4/5/6; ~0.4× of the pure-slew limit; needs `ovr_counter=0` to acquire. **Power-independent 0.5–8 mW.** |
+| Thermal drift (triangle) | **PGT** | [`MRM_PGT_TRIANGLE_AGGRESSOR_REPORT.md`](MRM_PGT_TRIANGLE_AGGRESSOR_REPORT.md) | 10 mW triangle (up + down) study. Holds 25→80→25 °C @ 100 K/s (apex loss 12.6 %, round-trip −19.5 %) at kstep=7, mask=6, dither=48 mV. Three named failure modes: **sense-blind apex, actuator saturation, hill-climb step too small.** |
 | Thermal drift | **L2V** | [`MRM_L2V_THERMAL_DRIFT_REPORT.md`](MRM_L2V_THERMAL_DRIFT_REPORT.md) | Max trackable ~750/1250/2000/2500 K/s at 1/2/4/7 LSB; up to 0.94× pure-slew; **2.7–7.5× faster than PGT**. Small steps power-independent; **step 56 collapses above ~4 mW**. |
 | Laser power | **PGT** | [`MRM_PGT_LASER_BANDWIDTH_REPORT.md`](MRM_PGT_LASER_BANDWIDTH_REPORT.md) | Power-invariant by design; residual ≤ 9 mV pk-pk at ±10 %. **`kstep=3` is the HDAC floor and the best rejection setting** — the old "kstep→1" win is gone. |
 | Laser power | **L2V** | [`MRM_L2V_LASER_BANDWIDTH_REPORT.md`](MRM_L2V_LASER_BANDWIDTH_REPORT.md) | **Target mode decides everything: `PEAK_RATIO` rejects ~7× better than `IADC_VALUE`** (57 vs 394 codes at ±10 %) because its target scales with live power. `adc_dead_zone` irrelevant to rejection. |
@@ -41,6 +42,7 @@ studies supersede.
 stab/
   README.md                              this index
   MRM_PGT_THERMAL_DRIFT_REPORT.md        + §6 bandwidth-vs-power (0.5–8 mW)
+  MRM_PGT_TRIANGLE_AGGRESSOR_REPORT.md   10 mW triangle (up+down), 3 failure modes
   MRM_L2V_THERMAL_DRIFT_REPORT.md        + §6 bandwidth-vs-power (0.5–8 mW)
   MRM_PGT_LASER_BANDWIDTH_REPORT.md      laser aggressor, 1 mW
   MRM_L2V_LASER_BANDWIDTH_REPORT.md      laser aggressor, 1 mW, both target modes
@@ -57,10 +59,12 @@ stab/
     laser_pgt/                           PGT laser study figures + curated waveforms
     laser_l2v/                           L2V laser study figures + curated waveforms
     waveforms/                           64 per-power thermal traces (32 PGT + 32 L2V)
+    pgt_triangle/                        10 mW triangle study: 5-panels + 2 overlays
   data/
     pgt_thermal_drift_analysis.json, pgt_sweep_metrics_ovr{0,3}.csv
     l2v_thermal_drift_analysis.json, l2v_sweep_metrics.csv, l2v_open_loop_*.{json,csv}
     pgt_laser_phase{A,B,C}_summary.csv   PGT laser aggregate metrics
     l2v_laser_phase{A,B,C}_summary.csv   L2V laser aggregate metrics
     power_campaign/power_campaign_summary.json
+    pgt_triangle/                        per-run metrics JSONs for the triangle study
 ```
