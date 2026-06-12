@@ -92,6 +92,50 @@ point.
   studies (not re-derived per run). Down-steps and a finer depth sweep are
   straightforward follow-ups (`--p-depth`, both polarities).
 
+## Figures
+
+### Bandwidth / excursion summary (all cases)
+
+Top: closed-loop bandwidth from the 10–90 % rise time (bars only where the loop
+chases; "rejected" = heater held lock). Bottom: heater actuator excursion
+(small = rejected).
+
+![Loop bandwidth and actuator excursion across all configs and step sizes](figures/laser_step/laser_step_bandwidth.png)
+
+### PGT — laser-step traces (loop holds lock; no re-point)
+
+Panels per figure: laser power · heater V (actuator) · drop photocurrent ·
+Goertzel energy. The heater limit-cycles around the **same** mean after the
+step; drop/energy scale with input power only.
+
+| Config | +1 % step | +10 % step |
+|---|---|---|
+| kstep 7, mask 6 (10-bit), dither 48 mV — *triangle winner* | ![PGT k7 mask6 +1%](figures/laser_step/pgt_k7_mask6_d48_1pct.png) | ![PGT k7 mask6 +10%](figures/laser_step/pgt_k7_mask6_d48_10pct.png) |
+| kstep 6, mask 6 (10-bit), dither 48 mV | ![PGT k6 mask6 +1%](figures/laser_step/pgt_k6_mask6_d48_1pct.png) | ![PGT k6 mask6 +10%](figures/laser_step/pgt_k6_mask6_d48_10pct.png) |
+| kstep 7, mask 7 (9-bit), dither 48 mV | ![PGT k7 mask7 +1%](figures/laser_step/pgt_k7_mask7_d48_1pct.png) | ![PGT k7 mask7 +10%](figures/laser_step/pgt_k7_mask7_d48_10pct.png) |
+
+### L2V — laser-step traces
+
+Panels per figure: laser power · ADC vs target · ADC error · heater V
+(actuator). The +10 % `iadc_value` cases show the clean monotonic heater slew
+the rise time is measured on; +1 % cases are sub-quantum (no chase).
+
+#### `iadc_value` (hold absolute ADC code)
+
+| Mask | +1 % step | +10 % step |
+|---|---|---|
+| mask 7 (9-bit ENOB) | ![L2V iadc mask7 +1%](figures/laser_step/l2v_mask7_iadc_value_1pct.png) | ![L2V iadc mask7 +10%](figures/laser_step/l2v_mask7_iadc_value_10pct.png) |
+| mask 8 (8-bit ENOB) | ![L2V iadc mask8 +1%](figures/laser_step/l2v_mask8_iadc_value_1pct.png) | ![L2V iadc mask8 +10%](figures/laser_step/l2v_mask8_iadc_value_10pct.png) |
+| mask 9 (7-bit ENOB) | ![L2V iadc mask9 +1%](figures/laser_step/l2v_mask9_iadc_value_1pct.png) | ![L2V iadc mask9 +10%](figures/laser_step/l2v_mask9_iadc_value_10pct.png) |
+
+#### `peak_ratio` (hold ADC at a ratio of live broadband power)
+
+| Mask | +1 % step | +10 % step |
+|---|---|---|
+| mask 7 (9-bit ENOB) | ![L2V peak_ratio mask7 +1%](figures/laser_step/l2v_mask7_peak_ratio_1pct.png) | ![L2V peak_ratio mask7 +10%](figures/laser_step/l2v_mask7_peak_ratio_10pct.png) |
+| mask 8 (8-bit ENOB) | ![L2V peak_ratio mask8 +1%](figures/laser_step/l2v_mask8_peak_ratio_1pct.png) | ![L2V peak_ratio mask8 +10%](figures/laser_step/l2v_mask8_peak_ratio_10pct.png) |
+| mask 9 (7-bit ENOB) | ![L2V peak_ratio mask9 +1%](figures/laser_step/l2v_mask9_peak_ratio_1pct.png) | ![L2V peak_ratio mask9 +10%](figures/laser_step/l2v_mask9_peak_ratio_10pct.png) |
+
 ## Reproduce
 
 ```bash
