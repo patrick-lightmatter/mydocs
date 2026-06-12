@@ -13,10 +13,10 @@ failure modes binds first.
 
 | Artifact | This folder | Regenerated at (repo) |
 |---|---|---|
-| Winning config, 5-panel | [`figures/winner_25to80_100Kps_5panel.png`](figures/winner_25to80_100Kps_5panel.png) | `goldens/mrm/output/pgt_baseline_10mW/triangle_25to80_100Kps_mask6_dither48/pgt_thermal_drift.png` |
-| kstep=6 vs 7 overlay | [`figures/kstep_compare_25to80_100Kps.png`](figures/kstep_compare_25to80_100Kps.png) | `goldens/mrm/output/pgt_baseline_10mW/k6_vs_k7_100Kps_compare.png` |
-| Defaults vs D-config overlay | [`figures/defaults_vs_dconfig_25to105_250Kps.png`](figures/defaults_vs_dconfig_25to105_250Kps.png) | `goldens/mrm/output/pgt_baseline_10mW/defaults_vs_dconfig_25to105_250Kps_compare.png` |
-| Per-run 5-panels + metrics | [`figures/`](figures/), [`data/pgt_triangle/`](data/pgt_triangle/) | `goldens/mrm/output/pgt_baseline_10mW/<run>/` |
+| Winning config, 5-panel | [`figures/pgt_triangle/winner_25to80_100Kps_5panel.png`](figures/pgt_triangle/winner_25to80_100Kps_5panel.png) | `goldens/mrm/output/pgt_baseline_10mW/triangle_25to80_100Kps_mask6_dither48/pgt_thermal_drift.png` |
+| kstep=6 vs 7 overlay | [`figures/pgt_triangle/kstep_compare_25to80_100Kps.png`](figures/pgt_triangle/kstep_compare_25to80_100Kps.png) | `goldens/mrm/output/pgt_baseline_10mW/k6_vs_k7_100Kps_compare.png` |
+| Defaults vs D-config overlay | [`figures/pgt_triangle/defaults_vs_dconfig_25to105_250Kps.png`](figures/pgt_triangle/defaults_vs_dconfig_25to105_250Kps.png) | `goldens/mrm/output/pgt_baseline_10mW/defaults_vs_dconfig_25to105_250Kps_compare.png` |
+| Per-run 5-panels + metrics | [`figures/pgt_triangle/`](figures/pgt_triangle/), [`data/pgt_triangle/`](data/pgt_triangle/) | `goldens/mrm/output/pgt_baseline_10mW/<run>/` |
 
 The methodology, pitfall taxonomy, and a preflight dither-resolvability checker
 live in the repo skill `agents/skills/pgt-thermal-aggressor-sweep/`.
@@ -85,7 +85,7 @@ Winning configuration on **25 -> 80 -> 25 C @ 100 K/s + 10 ms settle, 10 mW**:
 
 | knob | value | rationale |
 |---|---|---|
-| `kstep` | **7** (128 codes ~ 303 mV) | larger steps sample more of the resonance per dither cycle; k=6 collapses on ramp-down (section 5) |
+| `kstep` | **7** (128 codes = 16 LSB ~ 3.22 mV) | larger steps sample more of the resonance per dither cycle; k=6 collapses on ramp-down (section 5) |
 | `adc_mask_bits` | **6** (10-bit ENOB) | one fewer masked bit doubles effective ADC resolution at the slope sense |
 | `dither_amp_v` | **0.048** (2x default) | raises AC slope swing above the masked-LSB floor |
 | `goertzel_total` | **68** | default; longer windows cost wallclock with no measurable gain |
@@ -107,7 +107,7 @@ Heater V end-start drift is only **-9.7 mV** -- the loop returns essentially to
 its starting operating point after the full round trip. The 5-panel trace
 (temperature, drop current, ADC mean, heater V, DAC code, Goertzel energy):
 
-![Winning config -- 25 to 80 to 25 C @ 100 K/s, 10 mW](figures/winner_25to80_100Kps_5panel.png)
+![Winning config -- 25 to 80 to 25 C @ 100 K/s, 10 mW](figures/pgt_triangle/winner_25to80_100Kps_5panel.png)
 
 ## 3. Failure mode F-A -- sense-blind apex
 
@@ -120,7 +120,7 @@ ramp-down recovers once the loop re-enters the linear-slope regime.
 The cleanest evidence is the defaults-vs-D-config overlay on
 **25 -> 105 -> 25 C @ 250 K/s**:
 
-![Defaults vs D-config -- 25 to 105 to 25 C @ 250 K/s](figures/defaults_vs_dconfig_25to105_250Kps.png)
+![Defaults vs D-config -- 25 to 105 to 25 C @ 250 K/s](figures/pgt_triangle/defaults_vs_dconfig_25to105_250Kps.png)
 
 - **Defaults (mask=7, dither=24 mV):** apex drop-loss RMS **97.2 %**. The heater
   stops moving near 480 mV and the loop is fully blind across the apex shoulder
@@ -131,9 +131,9 @@ The cleanest evidence is the defaults-vs-D-config overlay on
   down.
 
 Per-run 5-panels:
-[`defaults_25to105_250Kps_5panel.png`](figures/defaults_25to105_250Kps_5panel.png)
+[`defaults_25to105_250Kps_5panel.png`](figures/pgt_triangle/defaults_25to105_250Kps_5panel.png)
 and
-[`dconfig_25to105_250Kps_5panel.png`](figures/dconfig_25to105_250Kps_5panel.png).
+[`dconfig_25to105_250Kps_5panel.png`](figures/pgt_triangle/dconfig_25to105_250Kps_5panel.png).
 Neither mask=6 alone (71.9 % apex) nor dither=48 mV alone (77.3 % apex, and it
 *destabilizes* the settle with a +83 % round-trip residual) fixes it; see the
 timeline rows 7-9. **Fix: lower the apex to 80 C**, which keeps operation below
@@ -147,7 +147,7 @@ clamps. With `hot_peak_V = 0.715 V` and a 1.8 V FS HDAC, the heater is pulled
 toward 0 V as ambient rises (the plant constant is ~5 mV/K from the 1 mW report);
 by 105 C the DAC floor is ~150 mV short of the drive needed to hold resonance.
 
-![Actuator saturation -- 50 K/s monotonic 25 to 105 C](figures/actuator_saturation_50Kps_25to105_5panel.png)
+![Actuator saturation -- 50 K/s monotonic 25 to 105 C](figures/pgt_triangle/actuator_saturation_50Kps_25to105_5panel.png)
 
 Evidence (from
 [`data/pgt_triangle/actuator_saturation_50Kps_25to105_metrics.json`](data/pgt_triangle/actuator_saturation_50Kps_25to105_metrics.json)):
@@ -159,7 +159,7 @@ range (a HW change) or stay below ~80 C.**
 
 ## 5. Failure mode F-C -- hill-climb step too small
 
-With **`kstep=6`** (step ~152 mV) the per-window dither becomes too small
+With **`kstep=6`** (step = 64 codes = 8 LSB ~ 1.61 mV) the per-window dither becomes too small
 relative to the in-window resonance curvature, so the slope-sign decision gets
 noisy on the way down from apex. The loop oscillates near a sub-optimal lock
 point and never reacquires the resonance peak as ambient relaxes.
@@ -169,7 +169,7 @@ shows the mechanism precisely: heater V and DAC trajectories are nearly
 *identical* between the two -- the loop walks the same average distance -- but
 drop loss diverges only on the ramp-down phase.
 
-![kstep=6 vs kstep=7 -- 25 to 80 to 25 C @ 100 K/s](figures/kstep_compare_25to80_100Kps.png)
+![kstep=6 vs kstep=7 -- 25 to 80 to 25 C @ 100 K/s](figures/pgt_triangle/kstep_compare_25to80_100Kps.png)
 
 | metric | kstep=7 (winner) | kstep=6 |
 |---|---|---|
@@ -181,9 +181,9 @@ drop loss diverges only on the ramp-down phase.
 Slowing the ramp to **50 K/s** does not rescue kstep=6 (round-trip residual
 -33.0 %, and the apex actually gets *worse* at 23.2 % because the loop spends
 twice as long mid-flank with an insufficient step). Per-run 5-panels:
-[`kstep6_25to80_100Kps_5panel.png`](figures/kstep6_25to80_100Kps_5panel.png)
+[`kstep6_25to80_100Kps_5panel.png`](figures/pgt_triangle/kstep6_25to80_100Kps_5panel.png)
 and
-[`kstep6_25to80_50Kps_5panel.png`](figures/kstep6_25to80_50Kps_5panel.png).
+[`kstep6_25to80_50Kps_5panel.png`](figures/pgt_triangle/kstep6_25to80_50Kps_5panel.png).
 **Fix: keep kstep=7.**
 
 ## 6. Campaign timeline
