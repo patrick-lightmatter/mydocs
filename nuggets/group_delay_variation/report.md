@@ -553,6 +553,13 @@ $$
 The output waveform is therefore distorted even though GD is ideal.
 Only when $C = 0$ does the output replicate the input shifted by $k$.
 
+The figure below reproduces this experiment with a two-tone input at 100 MHz
+and 200 MHz.  With $C = 0$ the output is a perfect replica of the input;
+with $C = -\pi/2$ the two tones arrive at different times and the composite
+waveform is visibly distorted — even though GD is flat in both cases.
+
+![Linear phase shifter: C=0 vs C=−π/2](bae2017/fig2_linear_phase_shifter.png)
+
 **The polynomial phase example.**
 For $\phi(\omega) = -k_3\omega^3 - k_2\omega^2 - k_1\omega$ the
 phase and group delays are
@@ -570,6 +577,15 @@ tuned to identical group delays at the same frequencies produce visible
 waveform distortion (despite a PD difference of less than 1 ns).
 This is the same factor-of-three relationship derived analytically
 in Section 4.2 of this report.
+
+The figure below makes this concrete.  Left panel: coefficients chosen so
+that $\tau_p(\omega_1) = \tau_p(\omega_2) = 8.33\text{ns}$ — the
+output is a perfect replica of the input.  Right panel: coefficients
+chosen so that $\tau_g(\omega_1) = \tau_g(\omega_2) = 8.33\text{ns}$
+— the phase delays now differ ($\tau_p = 6.94\text{ns}$ vs
+$7.78\text{ns}$) and the output is distorted.
+
+![Polynomial phase: equal PD (left) vs equal GD (right)](bae2017/fig3_polynomial_phase_shifter.png)
 
 ---
 
@@ -598,40 +614,71 @@ $$
 while the phase delays differ by $\pi/(2\omega)$.  For $R = 1\text{ k}\Omega$,
 $C = 1\text{ pF}$ the HPF phase delay at 100 MHz is 1.61 ns versus
 893 ps for the LPF — nearly $2\times$ larger — yet GD is identical.
-A time-domain simulation confirms that the HPF output shows greater
-distortion, in agreement with the PDV ordering.
+
+The frequency-domain picture is shown below.  The magnitude curves differ
+(LPF rolls off; HPF rolls up), but the group-delay curves are identical across
+the entire band.  The phase-delay curves diverge at low frequency, tracking
+the $\pi/(2\omega)$ separation predicted analytically.
+
+![RC LPF vs HPF: magnitude, group delay, and phase delay](bae2017/fig4_rc_lpf_hpf_metrics.png)
+
+The time-domain consequence is confirmed in the waveform simulation below.
+A two-tone input at 100 + 200 MHz is passed through each filter.  The LPF
+output closely follows the input envelope; the HPF output is visibly more
+distorted — consistent with its larger PDV, not its identical GDV.
+
+![RC LPF vs HPF: two-tone waveforms](bae2017/fig5_rc_waveforms.png)
 
 **Relevance to Section 6.**
 This is the circuit-level instantiation of the constant-phase-offset
 experiment.  The HPF's $+\pi/2$ is precisely the $C = \pi/2$ case of the
-linear phase-shifter argument.  Our simulation isolates this mechanism by
-injecting $\phi_0\text{sgn}(\omega)$ while holding the Bessel
-amplitude envelope fixed.
+linear phase-shifter argument.  The simulation in Section 6 isolates this
+mechanism by injecting $\phi_0\text{sgn}(\omega)$ while holding the
+amplitude envelope fixed, allowing the effect to be studied independent of
+the magnitude shaping introduced by an actual HPF.
 
 ---
 
 ### A.3  Series-Inductive RLC Circuit — Inductance Sweep
 
-An RLC circuit ($R = 1\text{ k}\Omega$, $C = 1\text{ pF}$, $L$ swept
-100–500 nH) is driven with an 800 Mb/s PRBS-7 sequence.  The 3-dB
-bandwidth ranges from 176 to 225 MHz across the sweep.
+An RLC lowpass circuit ($R = 1\text{ k}\Omega$, $C = 1\text{ pF}$,
+$L$ swept 100–500 nH) is driven with an 800 Mb/s PRBS-7 sequence.
+The 3-dB bandwidth ranges from 176 to 225 MHz across the sweep.
+
+The figure below shows the GD and PD of the circuit across the signal band
+for each inductance value.  The group-delay curves spread widely with $L$
+and show a pronounced peak near the resonant frequency $\omega_0 = 1/\sqrt{LC}$.
+The phase-delay curves cluster much more tightly: despite large changes in
+$\Delta$GD across the sweep, $\Delta$PD barely moves.
+
+![RLC GD and PD vs frequency for L = 100–500 nH](bae2017/fig7_rlc_delays.png)
 
 The critical comparison is between $L = 300\text{ nH}$ and
-$L = 400\text{ nH}$:
+$L = 400\text{ nH}$, highlighted in the table below:
 
 | $L$ | BW | $\Delta$GD | $\Delta$PD | P2P jitter |
 |-----|----|------------|------------|------------|
 | 300 nH | 212 MHz | 874 ps | 504 ps | 128 ps |
 | 400 nH | 222 MHz | 950 ps | 505 ps | 136 ps |
 
-The GD variations differ by $\sim$9%.  Conventional analysis predicts
-meaningfully different DDJ.  The PD variations differ by 0.2%.
-The simulated P2P jitter tracks PDV almost exactly and shows
-no meaningful response to the GD change.  Across the full inductance
-sweep the deterministic jitter correlates tightly with PDV and shows no
-consistent correlation with GDV.
+The GD variations differ by $\sim$9%, which under GD-based reasoning predicts
+meaningfully different DDJ.  The PD variations differ by only 0.2%.
+The eye diagrams at these two operating points are shown below:
 
-**Connection to Section 4.1 of this report.**
+![RLC eye diagrams at L = 300 nH and L = 400 nH (800 Mb/s)](bae2017/fig8_rlc_eyes.png)
+
+The eyes are nearly identical (128 ps vs 136 ps P2P jitter), matching the
+PDV prediction rather than the GDV prediction.
+Zooming out to the full inductance sweep confirms the pattern:
+
+![RLC summary: BW, ΔGD, ΔPD, and P2P jitter vs L](bae2017/fig9_rlc_summary.png)
+
+P2P jitter tracks $\Delta$PD across the entire sweep and shows no consistent
+correlation with $\Delta$GD.  This is the central empirical result of the
+paper: in a circuit family parameterised by a single component value, DDJ
+correlates with phase delay variation, not group delay variation.
+
+**Connection to Section 4.1.**
 The inductance sweep changes the damping ratio
 $\zeta = (R_s/2)\sqrt{C_L/L}$, which shifts the quadratic GD
 coefficient $(3-4\zeta^2)/\omega_0^2$ in the Taylor expansion.
