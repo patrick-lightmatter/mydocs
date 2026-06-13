@@ -207,13 +207,7 @@ The canonical bandwidth-extension stage at an RX input pad places a series
 inductor $L$ between the driving source resistance $R_s$ and the photodiode /
 TIA load capacitance $C_L$:
 
-```
-V_in ──[ R_s ]──[ L ]──┬── V_out
-                        │
-                       C_L
-                        │
-                       GND
-```
+![Series-peaking RLC circuit](figs/rlc.png)
 
 **KVL / KCL in the Laplace domain.**
 
