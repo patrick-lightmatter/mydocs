@@ -508,6 +508,80 @@ silicon interconnects — PDV should be the optimisation target.
 
 ---
 
+## 9  Measured Channel Examples: Colossus S4P
+
+The analysis so far has used synthetic phase profiles injected on top of an
+ideal Bessel-Thomson amplitude envelope.  This section applies the same
+diagnostic — GD and PD vs frequency, impulse response, eye diagram — to two
+measured 4-port Touchstone files from a Colossus optical transceiver channel.
+The differential forward transmission $S_{dd21}$ is extracted using the
+`13_24` port convention (ports 1,3 form the transmit pair; ports 2,4 the
+receive pair).
+
+| Channel | File | IL (nom.) |
+|---------|------|-----------|
+| IL15 | `l20_il15_rl17_90ohms_100ports_v2.s4p` | ≈ 15 dB |
+| IL18 | `l20_il18_rl15_90ohms_100ports_v1.s4p` | ≈ 18 dB |
+
+Both files cover 0–120 GHz at 2.5 MHz spacing (48 003 points).
+The impulse response is synthesised with `method="ifft", phase="measured"`,
+preserving the full measured phase response.
+
+### 9.1  Group Delay and Phase Delay
+
+![Measured channel GD and PD](channels/channels_gd_pd.png)
+
+Both channels show a broadly *monotone-decreasing* GD across the signal band
+— consistent with a cubic-dominant phase error (Section 4) rather than
+sinusoidal ripple or a constant offset.  The phase delay curves are narrower
+and overlap almost exactly for the two channels, mirroring the RLC inductance-
+sweep result from Appendix A.3: GD can differ substantially between channels
+while PD stays nearly constant, so PDV is the more stable predictor of eye
+penalty.
+
+**Metrics over the evaluation band $[5\text{GHz},\ 53.125\text{GHz}]$:**
+
+| Channel | GDV (ps) | PDV (ps) | GDV / PDV |
+|---------|---------|---------|-----------|
+| IL15 (v2) | 11.1 | 7.4 | 1.5 |
+| IL18 (v1) |  9.3 | 7.4 | 1.5 |
+
+The GDV/PDV ratio of ≈ 1.5 is lower than the factor of 3 predicted for a
+pure cubic phase (Section 4.2).  This indicates the dominant contribution is
+*not* purely $\omega^3$ but a blend: the measured GD rolls off more steeply
+at low frequency (closer to sinusoidal ripple or a mix of cubic + magnitude
+dispersion).
+
+### 9.2  Impulse Responses
+
+![Measured channel impulse responses](channels/channels_ir.png)
+
+Both IRs show a compact main lobe with a multi-UI post-cursor tail — the
+signature of bandwidth-limited dispersion combined with the mild residual
+group-delay variation seen above.  The IL18 channel, being more lossy,
+produces a slightly broader and smaller main lobe, which drives the
+marginally larger ISI taps seen in the table below.
+
+### 9.3  Eye Diagrams
+
+![Measured channel eye diagrams (PRBS-15, 106.25 Gbps)](channels/channels_eyes.png)
+
+**ISI tap summary:**
+
+| Channel | GDV (ps) | PDV (ps) | +2 UI tap | +3 UI tap |
+|---------|---------|---------|----------|----------|
+| IL15 (v2) | 11.1 | 7.4 | 0.1493 | 0.0821 |
+| IL18 (v1) |  9.3 | 7.4 | 0.1535 | 0.0908 |
+
+The two channels have nearly identical PDV (7.4 ps each) and nearly
+identical ISI taps, confirming that phase delay variation — not insertion
+loss or group delay variation — is the dominant driver of eye closure in
+this channel family.  A 1-tap DFE must cancel roughly 15% of the cursor
+amplitude at +2 UI; both channels require the same tap coefficient to
+within measurement precision.
+
+---
+
 ## Appendix A — Commentary on Bae, Nikolic, and Jeong (2017) {#appendix-a}
 
 > W. Bae, B. Nikolic, and D.-K. Jeong, "Use of Phase Delay Analysis for

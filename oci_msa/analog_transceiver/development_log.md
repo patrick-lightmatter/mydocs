@@ -398,6 +398,183 @@ src/optical_serdes/rx/ctle.py                  → CtleZPK.from_peaking (existin
 
 ---
 
+### Milestone 4 — 2026-06-13 · Full OCI MSA optical link via SmfLink + phase sweep metrics
+
+#### What was done
+
+Replaced the idealised Bessel-Thomson channel with the full OCI MSA optical transceiver
+model (`SmfLink`) and created a new simulation script
+`scripts/analog_rx/oci_msa_analog_txrx.py`.  This is the first end-to-end simulation of
+the complete physical signal chain.
+
+**1. SmfLink — full transceiver chain**
+
+The `SmfLink` class (`src/optical_serdes/optical/smf_link.py`) models:
+
+```
+drive voltage → TX driver (OLA IIR) → RC IIR (τ = 3.5 ps) → MRM (TCMT Euler ODE)
+             → SMF chromatic dispersion filter → PD+TIA (OLA IIR) → piecewise-linear
+               RX nonlinearity → tp4
+```
+
+Default configuration (OCI MSA Caribou NVDA, CornerSelector = 1):
+
+| Parameter | Value |
+|---|---|
+| Baud rate | 106.25 GBaud |
+| OSR | 32 |
+| MRM average optical power | 0 dBm |
+| Fiber path | 203 m total (four SMF segments) |
+| RX corner | 1 |
+
+**2. Drive voltage convention**
+
+```python
+drive = np.repeat(symbols, OSR) / DRIVE_SCALE   # DRIVE_SCALE = 1.6
+```
+
+Matches the MATLAB `smfLink` harness (`x = (bits − mean(bits)) / 1.6`).
+For balanced PRBS-15, symbols ∈ {±1} are already mean-zero.
+
+**3. MRM through-port polarity inversion**
+
+A +1 drive voltage pushes the MRM resonance toward the laser wavelength → increased
+optical absorption → *less* transmitted power.  The channel impulse response cursor
+is therefore **negative** (h₀ ≈ −1.0 in normalised units).
+
+Consequence: `np.argmax(ir)` was finding a small positive noise feature rather than the
+actual cursor.  Fixed in both `cursor_h0_h1()` and the IR figure panel:
+
+```python
+peak_idx = int(np.argmax(np.abs(ir)))   # correct for inverted channels
+```
+
+The CDR still locks correctly because `loop_sign = sign(h₁)` is derived from the
+channel IR before the simulation starts, and h₁ = +0.029 → `loop_sign = +1`.
+
+**4. TP4 normalisation**
+
+Because the MRM nonlinearity skews the amplitude distribution, simple peak normalisation
+is unreliable.  Percentile-based normalisation is used instead:
+
+```python
+v_mid  = np.mean(tp4)
+v_half = (np.percentile(tp4, 97) − np.percentile(tp4, 3)) / 2
+rx_base = (tp4 − v_mid) / v_half
+```
+
+This is robust against the optical nonlinear wings at the extremes of the eye.
+
+**5. Channel impulse response via small-signal pulse injection**
+
+The linearised channel IR is obtained by:
+1. Warming up the MRM to DC steady-state with 200 UI of zero drive
+2. Injecting a +1/DRIVE_SCALE ZOH pulse (1 UI wide)
+3. Subtracting an all-zero baseline run
+4. Normalising the differential response to unit peak magnitude
+
+CTLE (if active) is then convolved with the normalised delta to give the effective IR
+seen at the slicer input.
+
+**6. Phase sweep metrics panel**
+
+A new analysis panel computes eye opening and Q-factor across all OSR = 32 phase offsets
+for the settled waveform:
+
+```
+opening[k] = mean(positive samples at phase k) − mean(negative samples at phase k)
+Q[k]       = opening[k] / (std(positives) + std(negatives))
+```
+
+Three markers are shown on both the sweep panel and the eye diagram:
+- **CDR lock** (crimson) — where the bang-bang MM-CDR converged
+- **max eye opening** (seagreen) — phase that maximises vertical opening
+- **max Q-factor** (darkorange) — phase that maximises the SNR metric
+
+This makes it immediately visible whether the CDR lock point is optimal or has migrated
+due to the h₁ = 0 constraint.
+
+**7. Six-panel figure**
+
+| Panel | Content |
+|---|---|
+| 1 | CDR phase trajectory (pi_code vs symbol index) |
+| 2 | h₀ adaptation (sign-error LMS) |
+| 3 | Frequency response — fiber + RX frontend + combined (magnitude + group delay) |
+| 4 | Impulse response — SmfLink channel vs SmfLink + CTLE, with h₀/h₁ markers |
+| 5 | Phase sweep — eye opening & Q-factor vs sampling phase |
+| 6 | Eye diagram at slicer input with CDR lock / max-opening / max-Q phase markers |
+
+**8. TX driver removed from FR plot**
+
+The TX driver is internal to SmfLink and not accessible as a separate output node.
+The frequency response panel previously reconstructed it from `TxDriver.half_spectrum()`
+for plotting, but this is misleading — it implies an observable that isn't in the signal
+path.  The import and trace were removed; the FR panel now shows only fiber, RX frontend,
+and their combination.
+
+**9. Cold start validation**
+
+Confirmed CDR acquires and locks correctly from a true cold start:
+`INITIAL_PI = 0`, `H0_INIT = 0.0`.  The phase trajectory panel shows the full
+acquisition sweep from phase 0 to lock at pi = 9.
+
+#### Results
+
+Channel: SmfLink (OCI MSA, 203 m SMF, MRM 0 dBm).  CTLE: bypass (0 dB).
+
+| Parameter | Value |
+|---|---|
+| Natural lock pi (IR peak % OSR) | 12 |
+| CDR lock pi | 9 |
+| h₀_true (IR cursor, normalised) | −1.0000 |
+| h₀_conv (sign-error LMS, post-settle) | 0.7625 |
+| h₁_true | +0.0291 |
+| h₁/h₀ | −0.029 |
+| CDR locked | **YES** |
+| PRBS-15 symbols | 32 767 |
+| OSR | 32 |
+
+Note: h₀_true is normalised to the IR peak (= −1 by construction); h₀_conv is in
+units of the percentile-normalised `rx_base` waveform.  The two scales are
+incommensurable — the −176 % "error" in the table is a display artefact, not a
+calibration failure.  The CDR and LMS both operate correctly in their respective
+amplitude references.
+
+Output figures: `runs/analog_rx/eye_prbs15_smflink_pk0dB.html / .png`
+
+#### Key observations
+
+* **MRM polarity inversion is handled transparently.**  The `loop_sign = sign(h₁)`
+  convention introduced in Milestone 3 generalises correctly: h₁ > 0 at the lock
+  point regardless of cursor polarity.
+
+* **CDR lock ≠ max eye opening, but the gap is small.**  Lock at pi = 9 vs.
+  max-opening at pi = 12 (3/32 UI ≈ 0.094 UI offset).  The Q-factor peak also
+  coincides with pi = 12, so both metrics agree that the CDR is slightly sub-optimal.
+  The offset is the expected h₁ = 0 lock-point shift.
+
+* **h₁/h₀ = −2.9 % is very small.**  The OCI MSA channel has much less postcursor
+  ISI than the BT test channel (which had h₁/h₀ ≈ +14 % at bypass).  This means
+  the TED error signal is weak — a small h₁ gives a narrow phase discriminant.
+  CDR Kp and bandwidth should be revisited for this channel's ISI profile.
+
+* **Fiber contribution is negligible at 203 m.**  The frequency response panel shows
+  the fiber as essentially flat — chromatic dispersion is insignificant at this length
+  for 106G NRZ.  The dominant bandwidth limits are the TX driver and RX frontend.
+
+#### Simulation code
+
+```
+scripts/analog_rx/oci_msa_analog_txrx.py    (new — replaces analog_rx_prbs15_eye.py
+                                              for OCI MSA transceiver work)
+src/optical_serdes/optical/smf_link.py      → SmfLink, SmfLinkConfig (existing)
+src/optical_serdes/rx/mm_cdr.py             → AnalogMmCdr (unchanged)
+src/optical_serdes/rx/ctle.py               → CtleZPK (unchanged)
+```
+
+---
+
 ## 5. Open Questions
 
 These are the unresolved design questions that will drive the next development phases.
@@ -422,9 +599,10 @@ These are the unresolved design questions that will drive the next development p
 
 | # | Question | Impact | Status |
 |---|---------|--------|--------|
-| Q7 | What CTLE topology and peaking target for the OCI MSA channel? | ISI structure, h₀ level, TED gain | 🟡 **Partial** — Topology: 1z2p (`CtleZPK`).  Peaking must stay below the h₁=0 crossing of the combined IR (≈ 2.7 dB for −6 dB BT; varies by channel loss profile).  Exact target requires per-channel characterisation (Milestone 3) |
+| Q7 | What CTLE topology and peaking target for the OCI MSA channel? | ISI structure, h₀ level, TED gain | 🟡 **Partial** — Topology: 1z2p (`CtleZPK`).  Peaking must stay below the h₁=0 crossing of the combined IR (≈ 2.7 dB for −6 dB BT; varies by channel loss profile).  Exact target requires per-channel characterisation using SmfLink (Milestone 4) |
 | Q8 | Half-rate (53.125 GHz × 2) or full-rate (106.25 GHz) clocking? | T/H bandwidth, VCO design | Open |
 | Q9 | How is the VGA gain controlled to keep the eye amplitude ≈ h₀_target? | Error slicer accuracy | Open |
+| Q10 | Is Kp = 1.0 appropriate for the OCI MSA channel with h₁/h₀ = −2.9 %? | CDR bandwidth, limit-cycle jitter — weak TED discriminant may require lower Kp | Open (Milestone 4: flag raised) |
 
 ---
 
@@ -459,10 +637,24 @@ These are the unresolved design questions that will drive the next development p
 - [ ] CTLE + VGA + BB MM-CDR end-to-end
 - [ ] Verify BER vs. channel loss sweep
 
+### Phase 4b — OCI MSA channel characterisation ✅ (Milestone 4)
+- [x] Replace BT test channel with `SmfLink` (full OCI MSA optical transceiver model)
+- [x] Validate drive voltage convention matches MATLAB reference (DRIVE_SCALE = 1.6)
+- [x] Handle MRM through-port polarity inversion (negative cursor; abs-value peak detection)
+- [x] Add phase sweep panel: eye opening + Q-factor vs sampling phase, with lock / max-opening / max-Q markers
+- [x] Cold start validation: CDR acquires from pi=0, h₀ from 0.0
+- [ ] Sweep CTLE peaking on OCI MSA channel (currently only bypass tested)
+- [ ] Characterise CDR Kp vs. lock stability for weak-ISI channel (h₁/h₀ = −2.9 %)
+
+### Phase 5 — Full analog front-end integration
+- [ ] Integrate VGA model (gain controlled from digital engine)
+- [ ] CTLE + VGA + BB MM-CDR end-to-end
+- [ ] Verify BER vs. channel loss sweep
+- [ ] Add noise (shot noise, TIA thermal, laser RIN) and measure SNR floor
+
 ### Phase 6 — Transmitter (future)
-- [ ] TX driver model
-- [ ] TX FIR pre-emphasis (2-tap minimum)
-- [ ] Combined TX + channel + analog RX link simulation
+- [ ] TX pre-emphasis (drive shaping before TX driver)
+- [ ] Combined TX DSP + SmfLink + analog RX link simulation
 
 ---
 
