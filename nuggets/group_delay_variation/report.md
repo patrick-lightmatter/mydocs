@@ -357,7 +357,7 @@ With $\varepsilon_r = 4$ (microstrip, $v_p = c/2 \approx 1.5\times 10^8\text{m/s
 
 ---
 
-## 6  Constant Phase Offset — Bae Blind Spot
+## 6  Constant Phase Offset — The Bae et al. Blind Spot [[A]](#appendix-a)
 
 ### 6.1  Analytical Proof
 
@@ -412,7 +412,7 @@ where $\hat{x}$ is the Hilbert transform.  Even a small $\phi_0$
 bleeds $\sin\phi_0$ of the Hilbert-transformed signal (a 90° rotated
 replica) into the eye, closing it vertically.
 
-### 6.2  Bae Validation Figure
+### 6.2  Validation Figure
 
 The plot below shows $\tau_g^{\text{err}}$ and $\tau_p^{\text{err}}$ for
 all $\phi_0$ values simultaneously.  The group delay curves are
@@ -475,3 +475,183 @@ phase offsets.
    **invisible to group-delay instruments** yet causes progressive eye
    closure through Hilbert-transform mixing.  Phase-delay measurements and
    direct eye analysis are required to detect this failure mode.
+
+---
+
+## Appendix A — Commentary on Bae, Nikolic, and Jeong (2017) {#appendix-a}
+
+> W. Bae, B. Nikolic, and D.-K. Jeong, "Use of Phase Delay Analysis for
+> Evaluating Wideband Circuits: An Alternative to Group Delay Analysis,"
+> *IEEE Transactions on VLSI Systems*, vol. 25, no. 12, pp. 3543–3547,
+> Dec. 2017.  DOI: 10.1109/TVLSI.2017.2747157.
+>
+> PDF copy: [figs/Bae2017_phase_delay_analysis.pdf](figs/Bae2017_phase_delay_analysis.pdf)
+
+This paper is the primary reference motivating the present simulation
+study.  It argues — theoretically and through circuit examples — that
+phase delay is a strictly more informative metric than group delay for
+evaluating wideband circuits, and that the widespread practice of
+optimising for flat group delay can actively mislead the designer.
+
+---
+
+### A.1  The Core Theoretical Problem
+
+The paper's starting point is that group delay is defined by a
+differentiation, $\tau_g = -d\phi/d\omega$, which is a lossy
+operation: any frequency-independent constant term in $\phi(\omega)$
+is annihilated.  Phase delay $\tau_p = -\phi(\omega)/\omega$ retains
+the full phase information.
+
+**The linear phase-shifter example.**
+Consider a transfer function with unity magnitude and phase
+
+$$
+\phi(\omega) = -k\omega + C
+$$
+
+where $k$ is a propagation delay and $C$ is an arbitrary constant.
+The group delay is $\tau_g = k$ — perfectly flat.  Yet two tones at
+$\omega_1$ and $\omega_2$ experience time delays $-\phi(\omega_i)/\omega_i$
+that differ by
+
+$$
+\Delta\tau = C\!\left(\frac{1}{\omega_2} - \frac{1}{\omega_1}\right) \neq 0
+\quad (C \neq 0).
+$$
+
+The output waveform is therefore distorted even though GD is ideal.
+Only when $C = 0$ does the output replicate the input shifted by $k$.
+
+**The polynomial phase example.**
+For $\phi(\omega) = -k_3\omega^3 - k_2\omega^2 - k_1\omega$ the
+phase and group delays are
+
+$$
+\tau_p = k_3\omega^2 + k_2\omega + k_1, \qquad
+\tau_g = 3k_3\omega^2 + 2k_2\omega + k_1.
+$$
+
+Differentiation inflates the $k_3$ coefficient by $3\times$ and $k_2$
+by $2\times$.  The paper demonstrates that two circuits tuned to
+identical phase delays at 100 and 200 MHz produce outputs that match
+the input exactly (despite a 5 ns GD difference), while two circuits
+tuned to identical group delays at the same frequencies produce visible
+waveform distortion (despite a PD difference of less than 1 ns).
+This is the same factor-of-three relationship derived analytically
+in Section 4.2 of this report.
+
+---
+
+### A.2  RC Low-Pass vs High-Pass Filter
+
+An RC LPF and HPF built from the same $R$ and $C$ have transfer functions
+
+$$
+H_\text{LPF} = \frac{1}{1 + j\omega RC}, \qquad
+H_\text{HPF} = \frac{j\omega RC}{1 + j\omega RC}.
+$$
+
+Their phase responses differ by a constant $+\pi/2$:
+
+$$
+\phi_\text{HPF}(\omega) = \frac{\pi}{2} - \arctan(\omega RC).
+$$
+
+Differentiation removes the $\pi/2$ offset, giving
+
+$$
+\tau_{g,\text{LPF}}(\omega) = \tau_{g,\text{HPF}}(\omega)
+  = \frac{RC}{1 + (\omega RC)^2},
+$$
+
+while the phase delays differ by $\pi/(2\omega)$.  For $R = 1\text{ k}\Omega$,
+$C = 1\text{ pF}$ the HPF phase delay at 100 MHz is 1.61 ns versus
+893 ps for the LPF — nearly $2\times$ larger — yet GD is identical.
+A time-domain simulation confirms that the HPF output shows greater
+distortion, in agreement with the PDV ordering.
+
+**Relevance to Section 6.**
+This is the circuit-level instantiation of the constant-phase-offset
+experiment.  The HPF's $+\pi/2$ is precisely the $C = \pi/2$ case of the
+linear phase-shifter argument.  Our simulation isolates this mechanism by
+injecting $\phi_0\operatorname{sgn}(\omega)$ while holding the Bessel
+amplitude envelope fixed.
+
+---
+
+### A.3  Series-Inductive RLC Circuit — Inductance Sweep
+
+An RLC circuit ($R = 1\text{ k}\Omega$, $C = 1\text{ pF}$, $L$ swept
+100–500 nH) is driven with an 800 Mb/s PRBS-7 sequence.  The 3-dB
+bandwidth ranges from 176 to 225 MHz across the sweep.
+
+The critical comparison is between $L = 300\text{ nH}$ and
+$L = 400\text{ nH}$:
+
+| $L$ | BW | $\Delta$GD | $\Delta$PD | P2P jitter |
+|-----|----|------------|------------|------------|
+| 300 nH | 212 MHz | 874 ps | 504 ps | 128 ps |
+| 400 nH | 222 MHz | 950 ps | 505 ps | 136 ps |
+
+The GD variations differ by $\sim$9%.  Conventional analysis predicts
+meaningfully different DDJ.  The PD variations differ by 0.2%.
+The simulated P2P jitter tracks PDV almost exactly and shows
+no meaningful response to the GD change.  Across the full inductance
+sweep the deterministic jitter correlates tightly with PDV and shows no
+consistent correlation with GDV.
+
+**Connection to Section 4.1 of this report.**
+The inductance sweep changes the damping ratio
+$\zeta = (R_s/2)\sqrt{C_L/L}$, which shifts the quadratic GD
+coefficient $(3-4\zeta^2)/\omega_0^2$ in the Taylor expansion.
+PDV integrates this quadratic deviation weighted by $1/\omega$ rather
+than by the derivative factor $3$, correctly averaging out the
+over-weighting that GD applies to high-frequency components.
+
+---
+
+### A.4  T-Coil CML Buffer — Practical 20 Gb/s Design
+
+A differential CML buffer with T-coil bandwidth extension, bonding wire,
+and ESD parasitics is driven at 20 Gb/s.  The T-coil inductance is swept
+from 0.2 to 1.0 nH.  Three operating points are compared:
+
+| Target | $L$ (nH) | 3-dB BW | $\Delta$GD | $\Delta$PD | P2P jitter |
+|--------|----------|---------|------------|------------|------------|
+| Max bandwidth    | 1.0 | 12.4 GHz | 27.0 ps | 9.32 ps | 5.28 ps |
+| Min GD variation | 0.8 | 12.0 GHz | 26.8 ps | 8.07 ps | 4.89 ps |
+| Min PD variation | 0.2 | 10.6 GHz | 29.0 ps | 5.93 ps | **4.06 ps** |
+
+The minimum-PDV design achieves the best eye despite having the lowest
+bandwidth of the three and the highest GD variation.  A designer
+following the conventional rule of minimising group delay variation
+would choose the 0.8 nH design and accept 20% more jitter than the
+PDV-optimised solution.
+
+The ratio $\Delta\text{GD}/\Delta\text{PD} \approx 29.0/5.93 \approx 4.9$
+at the optimal point exceeds the factor of 3 from the pure cubic case
+because the T-coil transfer function is fourth-order (coupled inductors
+plus bridge capacitor), so the polynomial expansion includes $\omega^5$
+and higher terms, each further amplified by differentiation.
+
+**Implication for 106.25 Gbps.**
+The Bae et al. result was demonstrated at 20 Gb/s.  At 106.25 Gbps the
+Nyquist frequency is $\sim 5\times$ higher (53.125 GHz vs $\sim$10 GHz).
+The UI is $9.41\text{ ps}$ versus $\sim$50 ps, so a 5 ps phase delay
+variation occupies $\sim$0.53 UI rather than $\sim$0.1 UI — roughly
+$5\times$ worse relative to the eye opening.  This makes the choice of
+optimisation metric correspondingly more consequential in 106G CPO
+receiver design.
+
+---
+
+### A.5  Summary: Bae et al. Claims and Status in This Report
+
+| Claim | Section | Verified? |
+|-------|---------|-----------|
+| GD is blind to constant phase offset ($C \neq 0$) | §6.1, §6.2 | Yes — GDV $< 10^{-6}$ ps for all $\phi_0$; PDV grows proportionally |
+| GD amplifies cubic coefficient by $3\times$ vs PD | §4.2 | Yes — GDV/PDV = 3.000 $\pm$ 0.001 across both PDV targets |
+| DDJ correlates with PDV, not GDV, in peaking circuits | §4–§6 eye diagrams | Consistent — +2 UI ISI tap tracks PDV across all phase families |
+| Minimising PDV (not GDV) yields the best eye | T-coil, 20 Gb/s | Implied at 106G by ISI-tap trends in §7; direct optimisation left as future work |
+| RC HPF and LPF have equal GD but different distortion | §6 | RC HPF is the $C = \pi/2$ special case of the constant-offset experiment |
