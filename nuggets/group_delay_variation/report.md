@@ -207,7 +207,7 @@ frequency $\omega_r$.  Its group delay is a Lorentzian:
 
 $$
 \tau_g(\omega) \approx \frac{\tau_0}{1 + (\omega/\omega_r)^2}
-  \approx \tau_0\!\left(1 - \frac{\omega^2}{\omega_r^2}\right)
+  \approx \tau_0\left(1 - \frac{\omega^2}{\omega_r^2}\right)
   \quad (\omega \ll \omega_r)
 $$
 
@@ -364,7 +364,7 @@ With $\varepsilon_r = 4$ (microstrip, $v_p = c/2 \approx 1.5\times 10^8\text{m/s
 Define the frequency-domain phase error as a Heaviside-based step:
 
 $$
-\theta_{\text{err}}(\omega) = \phi_0\operatorname{sgn}(\omega)
+\theta_{\text{err}}(\omega) = \phi_0\text{sgn}(\omega)
   = \begin{cases}
       +\phi_0 & \omega > 0 \\
        0       & \omega = 0 \\
@@ -380,7 +380,7 @@ by $\phi_0$ radians.
 
 $$
 \tau_g^{\text{err}}(\omega)
-  = -\frac{d}{d\omega}\bigl[\phi_0\operatorname{sgn}(\omega)\bigr]
+  = -\frac{d}{d\omega}\bigl[\phi_0\text{sgn}(\omega)\bigr]
   = -2\phi_0\\delta(\omega)
   \equiv 0 \quad \text{for } \omega \neq 0
 $$
@@ -393,7 +393,7 @@ of $\phi_0$.  The group-delay display is perfectly flat — no alarm is raised.
 
 $$
 \tau_p^{\text{err}}(\omega)
-  = -\frac{\phi_0\operatorname{sgn}(\omega)}{\omega}
+  = -\frac{\phi_0\text{sgn}(\omega)}{\omega}
   = -\frac{\phi_0}{|\omega|}
 $$
 
@@ -401,7 +401,7 @@ This diverges as $\omega \to 0$ and decays as $1/|\omega|$; it is never zero
 for $\phi_0 \neq 0$.
 
 **Time-domain consequence.**
-In the time domain, multiplication by $e^{j\phi_0\operatorname{sgn}(\omega)}$ is
+In the time domain, multiplication by $e^{j\phi_0\text{sgn}(\omega)}$ is
 a Hilbert-transform mix: for a real analytic signal $x(t)$ the output is
 
 $$
@@ -471,7 +471,7 @@ phase offsets.
    Longer traces concentrate the energy deeper in the ISI tail (+3 UI and
    beyond), making multi-tap DFE or TX FFE unavoidable.
 
-3. **Constant phase offset** ($\phi_0\operatorname{sgn}(\omega)$) is
+3. **Constant phase offset** ($\phi_0\text{sgn}(\omega)$) is
    **invisible to group-delay instruments** yet causes progressive eye
    closure through Hilbert-transform mixing.  Phase-delay measurements and
    direct eye analysis are required to detect this failure mode.
@@ -516,7 +516,7 @@ $\omega_1$ and $\omega_2$ experience time delays $-\phi(\omega_i)/\omega_i$
 that differ by
 
 $$
-\Delta\tau = C\!\left(\frac{1}{\omega_2} - \frac{1}{\omega_1}\right) \neq 0
+\Delta\tau = C\left(\frac{1}{\omega_2} - \frac{1}{\omega_1}\right) \neq 0
 \quad (C \neq 0).
 $$
 
@@ -575,7 +575,7 @@ distortion, in agreement with the PDV ordering.
 This is the circuit-level instantiation of the constant-phase-offset
 experiment.  The HPF's $+\pi/2$ is precisely the $C = \pi/2$ case of the
 linear phase-shifter argument.  Our simulation isolates this mechanism by
-injecting $\phi_0\operatorname{sgn}(\omega)$ while holding the Bessel
+injecting $\phi_0\text{sgn}(\omega)$ while holding the Bessel
 amplitude envelope fixed.
 
 ---
