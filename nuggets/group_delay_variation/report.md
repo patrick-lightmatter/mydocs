@@ -15,14 +15,14 @@ Phase delay $\tau_p(\omega) = -\phi(\omega)/\omega$ does not share this
 deficiency.
 
 This report isolates the two metrics by holding the amplitude envelope of a
-4th-order Bessel–Thomson filter fixed at $-6\,\text{dB}$ at the Nyquist
-frequency ($f_\text{Nyq} = 53.125\,\text{GHz}$, corresponding to a
-106.250 Gbps NRZ link with $T_U = 9.412\,\text{ps}$)
+4th-order Bessel–Thomson filter fixed at $-6\text{dB}$ at the Nyquist
+frequency ($f_\text{Nyq} = 53.125\text{GHz}$, corresponding to a
+106.250 Gbps NRZ link with $T_U = 9.412\text{ps}$)
 while synthetically injecting four families of non-linear phase error.
 For each family the impulse response and NRZ eye diagram are computed via
 inverse FFT and convolution with a PRBS-15 bit stream upsampled to a
-$T_U/32$ grid ($f_s = 3.40\,\text{THz}$,
-$\Delta t = 0.2941\,\text{ps}$).
+$T_U/32$ grid ($f_s = 3.40\text{THz}$,
+$\Delta t = 0.2941\text{ps}$).
 
 ---
 
@@ -33,7 +33,7 @@ $\Delta t = 0.2941\,\text{ps}$).
 The composite channel transfer function is defined as
 
 $$
-H(\omega) = |H_{\text{base}}(\omega)| \, e^{\,j\,\theta(\omega)}
+H(\omega) = |H_{\text{base}}(\omega)|  e^{j\theta(\omega)}
 $$
 
 where $|H_{\text{base}}(\omega)|$ is the amplitude-only Bessel–Thomson
@@ -43,7 +43,7 @@ $$
 \theta(\omega) = \underbrace{-\tau_L \omega}_{\text{linear bulk delay}} + \underbrace{\theta_{\text{err}}(\omega)}_{\text{injected error}}
 $$
 
-with $\tau_L = 94.118\,\text{ps}$ chosen to push the
+with $\tau_L = 94.118\text{ps}$ chosen to push the
 impulse-response peak at least 10 UI into the simulation
 window, preventing anti-causal wrap-around in the IFFT buffer.
 
@@ -66,7 +66,7 @@ $$
 $$
 
 Peak-to-peak variation over the evaluation band
-$[5\,\text{GHz},\, 53.125\,\text{GHz}]$:
+$[5\text{GHz}, 53.125\text{GHz}]$:
 
 $$
 \text{GDV} = \max_\omega \tau_g - \min_\omega \tau_g, \qquad
@@ -87,7 +87,7 @@ H(-\omega) = H^*(\omega)
 $$
 
 This is enforced by working with the one-sided rfft grid
-$\omega_k = 2\pi k \,\Delta f$, $k = 0, 1, \ldots, N/2$,
+$\omega_k = 2\pi k \Delta f$, $k = 0, 1, \ldots, N/2$,
 ensuring $\theta(-\omega) = -\theta(\omega)$ for odd-symmetric error
 profiles (cubic, sinusoidal), and explicitly constructing the antisymmetric
 sign function for the constant-offset case.
@@ -99,8 +99,8 @@ NRZ symbols $\{+1,-1\}$ and zero-order-hold upsampled by $\times 32$
 to the simulation grid.
 The waveform is convolved with $h[n]$ via causal FIR filtering
 ($\mathtt{lfilter}(h, [1], x)$).
-The output is then folded into $2\,T_U$ windows with the cursor aligned
-to $1\,T_U$ from the window start using the formula
+The output is then folded into $2T_U$ windows with the cursor aligned
+to $1T_U$ from the window start using the formula
 
 $$
 n_{\text{fold}} = \text{first} \; n \geq n_{\text{transient}}
@@ -125,9 +125,9 @@ B_4(s) = \frac{105}{s^4 + 10s^3 + 45s^2 + 105s + 105}
 $$
 
 (normalised for unity group delay at DC).  The `scipy` implementation with
-`norm='mag'` scales the prototype so that $|B_4(j\Omega_c)| = -3\,\text{dB}$,
+`norm='mag'` scales the prototype so that $|B_4(j\Omega_c)| = -3\text{dB}$,
 then $\Omega_c$ is found via bisection such that
-$|H_{\text{base}}(j\omega_{\text{Nyq}})| = -6.0\,\text{dB}$.
+$|H_{\text{base}}(j\omega_{\text{Nyq}})| = -6.0\text{dB}$.
 
 With $\theta_{\text{err}} = 0$:
 
@@ -166,17 +166,69 @@ injected *error* component is zero by definition for the baseline).
 
 ## 4  Cubic Phase Distortion
 
-### 4.1  Analytical Derivation
+### 4.1  Why Cubic?
+
+**Hermitian symmetry constrains the allowed phase orders.**
+For $h(t)$ to be real-valued the spectrum must satisfy
+$H(-\omega) = H^*(\omega)$, which requires the phase to be an *odd* function
+of frequency: $\theta(-\omega) = -\theta(\omega)$.
+A Taylor expansion of any such phase around $\omega = 0$ therefore contains
+only odd powers:
+
+$$
+\theta_{\text{err}}(\omega)
+  = c_1\omega + c_3\omega^3 + c_5\omega^5 + \cdots
+$$
+
+The $c_1$ term is *linear* phase — a pure bulk propagation delay
+$\tau = c_1$ that shifts every frequency component by the same time.
+It produces zero group-delay variation and zero ISI: it is physically
+benign and already absorbed into $\tau_L$.
+
+The **$c_3\omega^3$ term is therefore the lowest-order non-trivial
+phase error** that is (a) consistent with real-valued impulse responses
+and (b) actually distinct from a simple propagation delay.
+
+**Physical origin: quadratic group delay in LC bandwidth-extension circuits.**
+The group delay corresponding to cubic phase is
+
+$$
+\tau_g^{\text{err}}(\omega) = -\frac{d(c_3\omega^3)}{d\omega} = -3c_3\omega^2
+$$
+
+a *quadratic* function of frequency.
+This is precisely the residual group-delay profile of LC bandwidth-extension
+networks — T-coils, shunt-series inductive peaking, and bond-wire capacitance
+resonances — all of which are commonly placed at the RX input pad to extend
+bandwidth toward Nyquist.
+
+To see why, consider a single-pole inductive peaking stage with resonant
+frequency $\omega_r$.  Its group delay is a Lorentzian:
+
+$$
+\tau_g(\omega) \approx \frac{\tau_0}{1 + (\omega/\omega_r)^2}
+  \approx \tau_0\!\left(1 - \frac{\omega^2}{\omega_r^2}\right)
+  \quad (\omega \ll \omega_r)
+$$
+
+The $-\tau_0\omega^2/\omega_r^2$ deviation is quadratic — exactly the form
+$-3c_3\omega^2$ — and integrates to cubic phase.
+T-coil networks are designed to flatten this curve, but layout-dependent
+self-resonance and termination mismatch leave a residual that still
+conforms closely to the quadratic model.
+
+The cubic case therefore represents not just a convenient toy model but
+a direct surrogate for the dominant phase error mechanism of the analog
+front end in ultra-low-power CPO receivers that omit the CTLE and rely
+solely on inductive peaking for bandwidth recovery.
+
+### 4.2  Analytical Derivation
 
 The cubic error profile
 
 $$
-\theta_{\text{err}}(\omega) = a\,\omega^3
+\theta_{\text{err}}(\omega) = a\omega^3
 $$
-
-models the phase distortion introduced by inductive peaking structures
-(T-coils, bond-wire resonances) whose group delay has a quadratic
-frequency dependence.
 
 **Group delay:**
 
@@ -196,14 +248,14 @@ Both delay curves share the same quadratic shape; the group delay is
 exactly **three times** the phase delay at every frequency:
 
 $$
-\boxed{\tau_g^{\text{err}}(\omega) = 3\,\tau_p^{\text{err}}(\omega)}
+\boxed{\tau_g^{\text{err}}(\omega) = 3\tau_p^{\text{err}}(\omega)}
 $$
 
 **PDV to coefficient mapping.**
-Over $[5\,\text{GHz},\,53.125\,\text{GHz}]$:
+Over $[5\text{GHz},53.125\text{GHz}]$:
 
 $$
-\text{PDV} = |a|\,(\omega_{\max}^2 - \omega_{\min}^2)
+\text{PDV} = |a|(\omega_{\max}^2 - \omega_{\min}^2)
   \quad\Longrightarrow\quad
   a = \frac{\text{PDV}}{\omega_{\max}^2 - \omega_{\min}^2}
 $$
@@ -215,7 +267,7 @@ For the two cases shown:
 | 1 ps | $9.0554e-36$ |
 | 2 ps | $1.8111e-35$ |
 
-### 4.2  Figures
+### 4.3  Figures
 
 #### Frequency Response (magnitude / τ_g / τ_p)
 
@@ -255,7 +307,7 @@ The resulting ripple in the insertion loss translates to a sinusoidal
 phase error
 
 $$
-\theta_{\text{err}}(\omega) = A\,\sin(b\,\omega), \qquad b = \tau_d
+\theta_{\text{err}}(\omega) = A\sin(b\omega), \qquad b = \tau_d
 $$
 
 **Group delay:**
@@ -271,7 +323,7 @@ A pure cosine ripple with peak-to-peak GDV $= 2Ab$.
 
 $$
 \tau_p^{\text{err}}(\omega)
-  = -\frac{A\,\sin(b\omega)}{\omega}
+  = -\frac{A\sin(b\omega)}{\omega}
 $$
 
 The phase delay *is not* sinusoidal in $\omega$; near DC it diverges
@@ -279,7 +331,7 @@ The phase delay *is not* sinusoidal in $\omega$; near DC it diverges
 oscillates with decreasing amplitude.
 
 **Trace-length parameterisation.**
-With $\varepsilon_r = 4$ (microstrip, $v_p = c/2 \approx 1.5\times 10^8\,\text{m/s}$):
+With $\varepsilon_r = 4$ (microstrip, $v_p = c/2 \approx 1.5\times 10^8\text{m/s}$):
 
 | Trace $d$ | $b = \tau_d$ | Peak GDV $= 2Ab$ | Period in $f$ |
 |---------|------------|----------------|--------------|
@@ -320,7 +372,7 @@ With $\varepsilon_r = 4$ (microstrip, $v_p = c/2 \approx 1.5\times 10^8\,\text{m
 Define the frequency-domain phase error as a Heaviside-based step:
 
 $$
-\theta_{\text{err}}(\omega) = \phi_0\,\operatorname{sgn}(\omega)
+\theta_{\text{err}}(\omega) = \phi_0\operatorname{sgn}(\omega)
   = \begin{cases}
       +\phi_0 & \omega > 0 \\
        0       & \omega = 0 \\
@@ -336,8 +388,8 @@ by $\phi_0$ radians.
 
 $$
 \tau_g^{\text{err}}(\omega)
-  = -\frac{d}{d\omega}\bigl[\phi_0\,\operatorname{sgn}(\omega)\bigr]
-  = -2\phi_0\,\delta(\omega)
+  = -\frac{d}{d\omega}\bigl[\phi_0\operatorname{sgn}(\omega)\bigr]
+  = -2\phi_0\delta(\omega)
   \equiv 0 \quad \text{for } \omega \neq 0
 $$
 
@@ -349,7 +401,7 @@ of $\phi_0$.  The group-delay display is perfectly flat — no alarm is raised.
 
 $$
 \tau_p^{\text{err}}(\omega)
-  = -\frac{\phi_0\,\operatorname{sgn}(\omega)}{\omega}
+  = -\frac{\phi_0\operatorname{sgn}(\omega)}{\omega}
   = -\frac{\phi_0}{|\omega|}
 $$
 
@@ -372,7 +424,7 @@ replica) into the eye, closing it vertically.
 
 The plot below shows $\tau_g^{\text{err}}$ and $\tau_p^{\text{err}}$ for
 all $\phi_0$ values simultaneously.  The group delay curves are
-numerically identical (differences $< 10^{-10}\,\text{ps}$), while the
+numerically identical (differences $< 10^{-10}\text{ps}$), while the
 phase delay curves fan out proportionally to $\phi_0$.
 
 ![Bae validation](figs/bae_validation.png)
@@ -400,7 +452,7 @@ phase delay curves fan out proportionally to $\phi_0$.
 | π/8 | 0.000000 | 11.308 | 0.1771 | 0.0874 |
 | π/4 | 0.000000 | 22.615 | 0.3441 | 0.1663 |
 
-The GDV values are numerical-gradient artefacts $\ll 10^{-3}\,\text{ps}$,
+The GDV values are numerical-gradient artefacts $\ll 10^{-3}\text{ps}$,
 confirming the analytical result that group delay is blind to constant
 phase offsets.
 
@@ -431,7 +483,7 @@ phase offsets.
    Longer traces concentrate the energy deeper in the ISI tail (+3 UI and
    beyond), making multi-tap DFE or TX FFE unavoidable.
 
-3. **Constant phase offset** ($\phi_0\,\operatorname{sgn}(\omega)$) is
+3. **Constant phase offset** ($\phi_0\operatorname{sgn}(\omega)$) is
    **invisible to group-delay instruments** yet causes progressive eye
    closure through Hilbert-transform mixing.  Phase-delay measurements and
    direct eye analysis are required to detect this failure mode.
