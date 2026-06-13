@@ -202,20 +202,114 @@ networks — T-coils, shunt-series inductive peaking, and bond-wire capacitance
 resonances — all of which are commonly placed at the RX input pad to extend
 bandwidth toward Nyquist.
 
-To see why, consider a single-pole inductive peaking stage with resonant
-frequency $\omega_r$.  Its group delay is a Lorentzian:
+**Series-peaking circuit derivation.**
+The canonical bandwidth-extension stage at an RX input pad places a series
+inductor $L$ between the driving source resistance $R_s$ and the photodiode /
+TIA load capacitance $C_L$:
+
+```
+V_in ──[ R_s ]──[ L ]──┬── V_out
+                        │
+                       C_L
+                        │
+                       GND
+```
+
+**KVL / KCL in the Laplace domain.**
+
+The mesh current $I(s)$ charges $C_L$, so $V_\text{out} = I/(sC_L)$.
+Kirchhoff's voltage law around the single loop gives:
 
 $$
-\tau_g(\omega) \approx \frac{\tau_0}{1 + (\omega/\omega_r)^2}
-  \approx \tau_0\!\left(1 - \frac{\omega^2}{\omega_r^2}\right)
-  \quad (\omega \ll \omega_r)
+V_\text{in} = (R_s + sL)\,I + \frac{I}{sC_L}
 $$
 
-The $-\tau_0\omega^2/\omega_r^2$ deviation is quadratic — exactly the form
-$-3c_3\omega^2$ — and integrates to cubic phase.
-T-coil networks are designed to flatten this curve, but layout-dependent
-self-resonance and termination mismatch leave a residual that still
-conforms closely to the quadratic model.
+Substituting $I = sC_L V_\text{out}$:
+
+$$
+V_\text{in} = \bigl(1 + sR_sC_L + s^2 LC_L\bigr)\,V_\text{out}
+$$
+
+**Standard second-order low-pass form.**
+
+Defining the natural frequency $\omega_0 = 1/\sqrt{LC_L}$ and the damping
+ratio $\zeta = (R_s/2)\sqrt{C_L/L}$:
+
+$$
+\boxed{H(s) = \frac{\omega_0^2}{s^2 + 2\zeta\omega_0 s + \omega_0^2}}
+$$
+
+**Phase response.**
+
+On the imaginary axis $s = j\omega$:
+
+$$
+\angle H(j\omega)
+  = -\arctan\!\left(\frac{2\zeta\omega_0\omega}{\omega_0^2 - \omega^2}\right)
+$$
+
+Differentiating with respect to $\omega$ (quotient rule on
+$u = 2\zeta\omega_0\omega$, $v = \omega_0^2 - \omega^2$):
+
+$$
+\tau_g(\omega)
+  = -\frac{d}{d\omega}\angle H
+  = \frac{2\zeta\omega_0\,(\omega_0^2 + \omega^2)}
+         {(\omega_0^2 - \omega^2)^2 + 4\zeta^2\omega_0^2\omega^2}
+$$
+
+**Taylor expansion for $\omega \ll \omega_0$.**
+
+Let $x = \omega/\omega_0$ and $\tau_0 = 2\zeta/\omega_0$ (the DC group delay):
+
+$$
+\tau_g = \tau_0\,\frac{1 + x^2}{1 + (4\zeta^2 - 2)x^2 + x^4}
+$$
+
+Expanding the denominator to $O(x^2)$:
+
+$$
+\tau_g(\omega)
+  \approx \tau_0\Bigl[1 + (3 - 4\zeta^2)\,\frac{\omega^2}{\omega_0^2}\Bigr]
+$$
+
+The group delay has a **quadratic** frequency dependence with signed coefficient
+$(3 - 4\zeta^2)/\omega_0^2$.  Note:
+
+| $\zeta$ | Condition | $\tau_g$ shape |
+|---------|-----------|----------------|
+| $< \sqrt{3}/2 \approx 0.866$ | under-damped peaking | peaks before $\omega_0$ |
+| $= \sqrt{3}/2$ | Bessel-Thomson 2nd order | flat to $O(\omega^4)$ |
+| $> \sqrt{3}/2$ | over-damped | monotone decrease |
+
+**Mapping to cubic phase.**
+
+Integrating the quadratic group delay deviation:
+
+$$
+\theta_\text{err}(\omega)
+  = -\int_0^\omega \tau_g^\text{err}(\omega')\,d\omega'
+  = -\frac{\tau_0(3 - 4\zeta^2)}{3\omega_0^2}\,\omega^3
+  = a\,\omega^3
+$$
+
+with
+
+$$
+\boxed{a = -\frac{\tau_0(3 - 4\zeta^2)}{3\omega_0^2}
+       = -\frac{R_s C_L(3 - 4\zeta^2)}{3\omega_0^2}}
+$$
+
+This is precisely the cubic coefficient in our phase model, expressed entirely
+in terms of circuit parameters $(R_s, L, C_L)$.
+A T-coil is a coupled two-winding extension of the same topology;
+its group delay has an identical parabolic shape away from resonance,
+with a more complex expression for $a$ involving the mutual coupling
+coefficient $k$ and bridge capacitor $C_b$, but the same qualitative
+behaviour.  T-coil networks are designed to flatten $\tau_g$ (pushing
+toward the Bessel-Thomson point), but layout-dependent self-resonance
+and termination mismatch leave a residual that still conforms to the
+quadratic model.
 
 The cubic case therefore represents not just a convenient toy model but
 a direct surrogate for the dominant phase error mechanism of the analog
