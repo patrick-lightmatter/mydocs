@@ -527,7 +527,15 @@ Both files cover 0–120 GHz at 2.5 MHz spacing (48 003 points).
 The impulse response is synthesised with `method="ifft", phase="measured"`,
 preserving the full measured phase response.
 
-### 9.1  Group Delay and Phase Delay
+### 9.1  Magnitude Response
+
+![Measured channel magnitude response](channels/channels_mag.png)
+
+Both channels show smooth skin-effect rolloff with no in-band resonances.
+IL15 is approximately 3 dB less lossy than IL18 at Nyquist (−15 dB vs −18 dB),
+confirming the insertion-loss labels in the filenames.
+
+### 9.2  Group Delay and Phase Delay
 
 ![Measured channel GD and PD](channels/channels_gd_pd.png)
 
@@ -552,7 +560,7 @@ pure cubic phase (Section 4.2).  This indicates the dominant contribution is
 at low frequency (closer to sinusoidal ripple or a mix of cubic + magnitude
 dispersion).
 
-### 9.2  Impulse Responses
+### 9.3  Impulse Responses
 
 ![Measured channel impulse responses](channels/channels_ir.png)
 
@@ -562,7 +570,7 @@ group-delay variation seen above.  The IL18 channel, being more lossy,
 produces a slightly broader and smaller main lobe, which drives the
 marginally larger ISI taps seen in the table below.
 
-### 9.3  Eye Diagrams
+### 9.4  Eye Diagrams
 
 ![Measured channel eye diagrams (PRBS-15, 106.25 Gbps)](channels/channels_eyes.png)
 
@@ -570,8 +578,8 @@ marginally larger ISI taps seen in the table below.
 
 | Channel | GDV (ps) | PDV (ps) | +2 UI tap | +3 UI tap |
 |---------|---------|---------|----------|----------|
-| IL15 (v2) | 11.1 | 7.4 | 0.1493 | 0.0821 |
-| IL18 (v1) |  9.3 | 7.4 | 0.1535 | 0.0908 |
+| IL15 (v2) | 11.1 | 7.4 | 0.1606 | 0.0908 |
+| IL18 (v1) |  9.3 | 7.4 | 0.1981 | 0.1159 |
 
 The two channels have nearly identical PDV (7.4 ps each) and nearly
 identical ISI taps, confirming that phase delay variation — not insertion

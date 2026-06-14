@@ -119,33 +119,75 @@ def baud_tap(h: np.ndarray, peak: int, offset_ui: int, sps: int = SPS) -> float:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Figure 1 — GD and PD vs frequency
+# Figure 1 — GD and PD vs frequency  (2 rows × 2 cols, one channel per row)
 # ═════════════════════════════════════════════════════════════════════════════
 
 def plot_gd_pd(channel_data: dict) -> str:
+    labels = list(channel_data.keys())
+    titles = []
+    for lbl in labels:
+        titles += [f"{lbl} — Group Delay  τ_g(f)", f"{lbl} — Phase Delay  τ_p(f)"]
+
     fig = make_subplots(
-        rows=1, cols=2,
-        subplot_titles=["Group Delay  τ_g(f)", "Phase Delay  τ_p(f)"],
+        rows=len(labels), cols=2,
+        subplot_titles=titles,
         horizontal_spacing=0.10,
+        vertical_spacing=0.14,
     )
-    for label, (f_ghz, tg, tp) in channel_data.items():
+    for row_n, label in enumerate(labels, start=1):
+        f_ghz, tg, tp = channel_data[label]
         col = COLOURS[label]
         fig.add_trace(go.Scatter(x=f_ghz, y=tg, name=label,
-                                 line=dict(color=col, width=2)), row=1, col=1)
-        fig.add_trace(go.Scatter(x=f_ghz, y=tp, name=label, showlegend=False,
-                                 line=dict(color=col, width=2)), row=1, col=2)
+                                 line=dict(color=col, width=2),
+                                 showlegend=False), row=row_n, col=1)
+        fig.add_trace(go.Scatter(x=f_ghz, y=tp, name=label,
+                                 line=dict(color=col, width=2),
+                                 showlegend=False), row=row_n, col=2)
+        for c in (1, 2):
+            fig.add_vline(x=F_NYQ / 1e9, line_dash="dot",
+                          line_color="#999999", line_width=1.5,
+                          row=row_n, col=c)
 
+    for row_n in range(1, len(labels) + 1):
+        fig.update_yaxes(title_text="Delay (ps)", row=row_n, col=1)
+        fig.update_yaxes(title_text="Delay (ps)", row=row_n, col=2)
     for c in (1, 2):
-        fig.add_vline(x=F_NYQ / 1e9, line_dash="dot", line_color="#999999",
-                      line_width=1.5, col=c)
-    fig.update_xaxes(title_text="Frequency (GHz)")
-    fig.update_yaxes(title_text="Delay (ps)", row=1, col=1)
-    fig.update_yaxes(title_text="Delay (ps)", row=1, col=2)
+        fig.update_xaxes(title_text="Frequency (GHz)",
+                         row=len(labels), col=c)
+
     fig.update_layout(
         title="Measured Colossus channels: group delay and phase delay (Sdd21, 13_24 convention)",
+        height=700,
     )
     _grid(fig)
-    return save(fig, "channels_gd_pd", w=1300, h=560)
+    return save(fig, "channels_gd_pd", w=1300, h=700)
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# Figure 1b — Magnitude response
+# ═════════════════════════════════════════════════════════════════════════════
+
+def plot_mag(fd_data: dict) -> str:
+    fig = go.Figure()
+    for label, fd in fd_data.items():
+        col   = COLOURS[label]
+        f_ghz = fd.f_hz / 1e9
+        mag   = 20 * np.log10(np.abs(fd.h) + 1e-30)
+        mask  = f_ghz <= 70
+        fig.add_trace(go.Scatter(x=f_ghz[mask], y=mag[mask], name=label,
+                                 line=dict(color=col, width=2)))
+
+    fig.add_vline(x=F_NYQ / 1e9, line_dash="dot", line_color="#999999",
+                  line_width=1.5,
+                  annotation_text=f"Nyquist {F_NYQ/1e9:.1f} GHz",
+                  annotation_position="top left")
+    fig.update_layout(
+        title="Measured Colossus channels: Sdd21 magnitude (13_24 convention)",
+        xaxis_title="Frequency (GHz)",
+        yaxis_title="|Sdd21| (dB)",
+    )
+    _grid(fig)
+    return save(fig, "channels_mag", w=1100, h=520)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -253,6 +295,7 @@ def main() -> None:
     x    = np.repeat(syms, SPS)
 
     delay_data: dict  = {}   # label → (f_ghz, tg, tp)
+    fd_data:    dict  = {}   # label → FrequencyDomainChannel
     ir_data:    dict  = {}   # label → DiscreteChannelIR
     rx_data:    dict  = {}   # label → filtered waveform
     metrics:    dict  = {}   # label → dict
@@ -260,6 +303,7 @@ def main() -> None:
     for label, path in CHANNELS.items():
         print(f"Loading {path.name} …")
         fd = fd_channel_from_touchstone(path, convention="13_24")
+        fd_data[label] = fd
 
         # Interpolate onto the primer's rfft grid
         f_grid, H_grid = interpolate_onto_rfft_grid(fd.f_hz, fd.h)
@@ -267,10 +311,14 @@ def main() -> None:
         delay_data[label] = (f_ghz, tg, tp)
 
         # Synthesise IR with measured phase
+        # extrapolate_high="zero" avoids Gibbs ringing from the step
+        # discontinuity at the 120 GHz band edge when the default "hold"
+        # would extend the end-of-band value across all frequencies up to FS/2.
         ir = discrete_impulse_response(
             fd, dt=DT, r_baud=DATA_RATE,
             method="ifft", phase="measured",
             n_ui_span=128.0,
+            extrapolate_high="zero",
         )
         ir_data[label] = ir
 
@@ -280,12 +328,13 @@ def main() -> None:
         metrics[label] = compute_metrics(label, f_ghz, tg, tp, ir)
 
     print("Plotting …")
+    p_mag   = plot_mag(fd_data)
     p_gd_pd = plot_gd_pd(delay_data)
     p_ir    = plot_ir(ir_data)
     p_eyes  = plot_eyes(rx_data, ir_data)
 
     print(f"\nAll figures → {OUT}")
-    return metrics, p_gd_pd, p_ir, p_eyes
+    return metrics, p_mag, p_gd_pd, p_ir, p_eyes
 
 
 if __name__ == "__main__":

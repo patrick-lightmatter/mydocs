@@ -78,11 +78,21 @@ delta[i] = heater_joint[i] − heater_twin[i]      (indexed by window / tick)
   `mean(delta, post-step band) − mean(delta, pre-step band)` (the second term
   ≈ 0), expressed in DAC LSBs and in controller steps (PGT: `2^kstep`
   codes/step; L2V: `step_size_track = 8` codes = 1 LSB/step).
-* **Held vs chased.** As in the laser-step report, the discriminator is the net
-  re-point **relative to the loop's own limit cycle** — here the **post-step
-  pk-pk of the difference** (`limit_cycle_pkpk_lsb`). A move is a real
-  **chase** only when the permanent delta re-point clears that pk-pk; otherwise
-  the loop **held**.
+* **Held vs chased.** Unlike the pure laser-step study, the discriminator here
+  is the net re-point **magnitude in controller steps** (`net_repoint_steps`),
+  not the net re-point relative to a limit cycle. The reason is the twin
+  construction: before the step the twin and joint are *bit-identical*, so the
+  pre-step delta is **identically zero** — there is no dither "jitter floor" in
+  the *difference* to clear. The entire post-step delta (including its pk-pk) is
+  therefore step-induced, so the honest discriminator is simply how far the step
+  moved the lock point: a cell is labeled **chased** when
+  `|net_repoint_steps| ≥ 2.0` and **held** otherwise. The 2-step threshold keeps
+  PGT's in-isolation hold band (≤ 1.5 steps in the laser-step study) on the held
+  side; the L2V +10 % chases land an order of magnitude beyond it (12–18 steps).
+  `limit_cycle_pkpk_lsb` (post-step delta pk-pk) is still reported as context,
+  but it does **not** gate the verdict. Near the boundary the label is only as
+  good as its threshold, so the signed net re-point and the apex drop-loss below
+  carry the real story.
 * **Bounded settle band.** The post-step (and the symmetric pre-step) band is
   bounded to **50 windows/ticks** around the apex, so the re-point reflects the
   *apex response* and not the subsequent ramp-down drift (at 100 K/s, 50 PGT
@@ -128,23 +138,127 @@ flowchart TD
 <!-- RESULTS:BEGIN (filled from joint_aggressor_summary.csv after the full matrix run) -->
 ## TL;DR — three responses to a laser step at the thermal apex
 
-_Results section is populated from `joint_aggressor_summary.csv` after the full
-100 K/s matrix completes._
+Putting the +10 % laser step at the 80 C apex of the ramp **reproduces the same
+three-way split as the isolated laser-step study, and sharpens it** — the apex
+is the operating point where a wrong move costs the most optical power. Every one
+of the 13 cells passed the alignment gate with `delta_prestep_resid_lsb = 0.000`
+(twin and joint are bit-identical until the step), so all numbers below are
+clean step responses, not thermal-slew artifacts.
+
+| Controller / mode (+10 % at apex) | net heater re-point at apex | verdict | apex drop-loss: joint vs twin | correct? |
+|---|---|---|---|---|
+| **PGT** — winner `kstep7 / mask6` (10-bit) | **+11.5 LSB (+0.72 steps)**, inside the dither | **held** | 8.6 % vs 17.1 % (not worsened) | ✅ rejects the step |
+| **L2V `peak_ratio`** (ratio target) | **−18 LSB**, *opposite sign* to `iadc` | chased | **2.0 % vs ~0.2 %** | ✅ correct (tracks the real peak) |
+| **L2V `iadc_value`** (absolute-current target) | **+13 LSB**, detunes off-peak | chased | **8.1 % vs ~0.2 %** | ❌ unnecessary chase |
+
+1. **PGT rejects the step at the apex — at its production setting.** The triangle
+   winner (`kstep7 / mask6`, 10-bit ENOB, 48 mV dither) re-points only **+0.72
+   steps (+11.5 LSB)** at the apex and the laser step does **not** worsen apex
+   thermal tracking (power-normalized apex drop-loss is *lower* than the twin,
+   8.6 % vs 17.1 % — the +10 % of absorbed power slightly helps the hot-side ring
+   sit on resonance at the apex). The power-invariant Goertzel argmax rejects the
+   optical scaling, exactly as in isolation.
+
+2. **L2V `iadc_value` chases — and the apex makes the chase expensive.** It pins
+   the absolute drop photocurrent, so the +10 % step drives it to **detune the
+   ring ~+13 LSB** to push the current back down. At the apex this **multiplies
+   the power-normalized drop-loss ~40×** over its thermal-only twin (≈ 8 % vs
+   ≈ 0.2 %) — the loop walks *off* the optimal peak precisely where staying on it
+   matters most. Behavior is essentially mask-independent (12.8 / 13.1 / 13.6 LSB
+   at masks 8 / 9 / 7).
+
+3. **L2V `peak_ratio` re-points the other way, and it is the right move.** Its
+   target scales with live broadband power, so it ignores the optical scaling and
+   instead **tracks the real self-heating peak shift** — re-pointing **−18 LSB,
+   in the opposite direction to `iadc`** (toward the shifted peak, not away). Its
+   apex drop-loss is **~4× smaller than `iadc`'s** (≈ 2 % vs ≈ 8 %), i.e. it
+   stays far closer to the optimal peak through the step. As in the isolated
+   study, the raw excursion is *larger* than `iadc`'s; the distinction is **why**
+   it moves (chase the true peak vs defend a stale current).
+
+**The PGT rejection degrades with ENOB.** PGT holds cleanly only at its 10-bit
+winner. At tighter ENOB the apex step does perturb it: `kstep6 / mask6` re-points
+−2.04 steps (no tracking harm, 3.8 % vs 3.4 %), but **`kstep7 / mask7` (9-bit)
+re-points +5.4 steps (+86 LSB) and doubles its apex drop-loss (17.2 % vs 9.2 %)**
+— the only PGT cell where the step measurably hurts apex tracking. The headline
+"PGT rejects" claim is specific to the production 10-bit configuration.
+
+**+1 % at full 16-bit ENOB — held, and not because of quantization.** Run with
+the ENOB floor removed (mask 0), the small step is rejected on its merits: PGT
+re-points **≤ 0.12 steps** (genuine rejection, not a sub-quantum artifact), and
+L2V `iadc_value` re-points only +1.7 steps (held). The `iadc`/`peak` opposite-sign
+signature still shows even here (`iadc` +1.7 LSB vs `peak_ratio` −2.4 LSB),
+confirming it is a real controller behavior and not a quantization effect; at
++1 % the `peak_ratio` move is harmless (apex drop-loss 0.17 % ≈ twin 0.15 %).
+
+### Bandwidth of the moves that do happen
+
+The L2V +10 % chases settle in **~0.65–0.95 ms** (10–90 % rise of the
+difference), an effective large-signal bandwidth of **~370–540 Hz** — *slower*
+than the isolated study's ~0.8–1.0 kHz because the apex move is larger (13–18 LSB
+vs ~9–11), and a bigger move at the same per-tick bang-bang slew takes longer.
+Same slew-limited regime (control period × 1-LSB slew), not a small-signal loop
+bandwidth. PGT's held winner emits no bandwidth (`bw_source = rejected`); the
+sub-quantum +1 % `peak_ratio` move resolves in a single 50 µs tick (an
+artefactually high 7 kHz on a −2.4 LSB move — ignore it).
 <!-- RESULTS:END -->
 
 ## Figures
 
-### Re-point vs limit cycle, and apex drop-loss (all cells)
+### Net re-point and apex drop-loss (all cells)
 
-Top: net heater re-point at the apex in DAC LSBs (bars) with the post-step delta
-pk-pk overlaid as caps (a move above its cap is a real "chase"). Bottom: apex
-drop-loss RMS (power-normalized) for the thermal-only twin vs the joint run — if
-the joint bar is not higher than the twin bar, the laser step did not worsen
-apex thermal tracking.
+Top: net heater re-point at the apex in DAC LSBs (bars); cells re-pointing
+≥ 2 controller steps are labeled "chase" (the post-step delta pk-pk is overlaid
+as caps for context only — it does **not** define the verdict, since the pre-step
+delta is zero by construction). Bottom: apex drop-loss RMS (power-normalized) for
+the thermal-only twin vs the joint run — if the joint bar is not higher than the
+twin bar, the laser step did not worsen apex thermal tracking.
 
 ![Joint re-point and apex drop-loss across all configs](figures/joint_laser_thermal/joint_aggressor_bandwidth.png)
 
 <!-- FIGURES:BEGIN (per-cell trace tables filled after the run) -->
+Each per-cell trace shares one x-axis (time relative to the apex laser step) and
+stacks: **ambient triangle**, **laser power** (the step is the vertical edge at
+t = 0), the controller's **ADC / target**, the **heater voltage with the
+thermal-only twin overlaid** (green = joint, dashed black = twin — they sit on
+top of each other until the step), and the **delta = joint − twin** (purple) on
+which all re-point metrics are measured. The delta panel is flat at zero before
+the step (the alignment gate) and steps to the net re-point after.
+
+### PGT — `kstep / mask`, 48 mV dither
+
+**+10 % at apex (production masked IADC):**
+
+| Config | Trace |
+|---|---|
+| `kstep7 / mask6` (10-bit) — *triangle winner*, **holds** (+0.72 steps) | ![PGT k7 mask6 +10%](figures/joint_laser_thermal/pgt_k7_mask6_d48_10pct.png) |
+| `kstep6 / mask6` (10-bit) — re-points −2.0 steps, no tracking harm | ![PGT k6 mask6 +10%](figures/joint_laser_thermal/pgt_k6_mask6_d48_10pct.png) |
+| `kstep7 / mask7` (9-bit) — re-points +5.4 steps, apex drop-loss doubles | ![PGT k7 mask7 +10%](figures/joint_laser_thermal/pgt_k7_mask7_d48_10pct.png) |
+
+**+1 % at full 16-bit ENOB (mask 0)** — genuine rejection (≤ 0.12 steps):
+
+| Config | Trace |
+|---|---|
+| `kstep7 / mask0` (16-bit) | ![PGT k7 mask0 +1%](figures/joint_laser_thermal/pgt_k7_mask0_d48_1pct.png) |
+| `kstep6 / mask0` (16-bit) | ![PGT k6 mask0 +1%](figures/joint_laser_thermal/pgt_k6_mask0_d48_1pct.png) |
+
+### L2V — target mode × mask
+
+**+10 % at apex (production masked IADC)** — note `iadc_value` and `peak_ratio`
+re-point in **opposite directions**, and `iadc`'s apex drop-loss is ~4× larger:
+
+| Mask | `iadc_value` (chases off-peak, +13 LSB) | `peak_ratio` (tracks peak, −18 LSB) |
+|---|---|---|
+| mask 7 (9-bit) | ![L2V iadc mask7 +10%](figures/joint_laser_thermal/l2v_mask7_iadc_value_10pct.png) | ![L2V peak mask7 +10%](figures/joint_laser_thermal/l2v_mask7_peak_ratio_10pct.png) |
+| mask 8 (8-bit) | ![L2V iadc mask8 +10%](figures/joint_laser_thermal/l2v_mask8_iadc_value_10pct.png) | ![L2V peak mask8 +10%](figures/joint_laser_thermal/l2v_mask8_peak_ratio_10pct.png) |
+| mask 9 (7-bit) | ![L2V iadc mask9 +10%](figures/joint_laser_thermal/l2v_mask9_iadc_value_10pct.png) | ![L2V peak mask9 +10%](figures/joint_laser_thermal/l2v_mask9_peak_ratio_10pct.png) |
+
+**+1 % at full 16-bit ENOB (mask 0)** — the opposite-sign signature persists
+(`iadc` +1.7 LSB vs `peak_ratio` −2.4 LSB) but is harmless at this depth:
+
+| `iadc_value` | `peak_ratio` |
+|---|---|
+| ![L2V iadc mask0 +1%](figures/joint_laser_thermal/l2v_mask0_iadc_value_1pct.png) | ![L2V peak mask0 +1%](figures/joint_laser_thermal/l2v_mask0_peak_ratio_1pct.png) |
 <!-- FIGURES:END -->
 
 ## Method notes / caveats
