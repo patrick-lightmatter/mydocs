@@ -11,7 +11,9 @@ controllers on the **coupe** ring + **sweet-spot HDAC**:
   apex and back, 10 mW, masked-ADC sweep).
 * **Aggressor:** ambient temperature only. Laser-power aggressor studies are
   documented separately (`docs/MRM_PGT_LASER_BANDWIDTH_REPORT.md`,
-  `docs/MRM_L2V_LASER_BANDWIDTH_REPORT.md`) and are **not** covered here.
+  `docs/MRM_L2V_LASER_BANDWIDTH_REPORT.md`) and are **not** covered here. The
+  combined case — a laser step injected at the thermal apex — is in
+  [`docs/MRM_JOINT_LASER_THERMAL_PGT_L2V.md`](docs/MRM_JOINT_LASER_THERMAL_PGT_L2V.md).
 
 This document consolidates the four standalone thermal reports
 (`docs/MRM_PGT_THERMAL_DRIFT_REPORT.md`, `docs/MRM_L2V_THERMAL_DRIFT_REPORT.md`,
@@ -483,3 +485,4 @@ triangle runs should be launched detached (`nohup setsid … &`).
 | Monotonic drift (1 mW) | L2V | [`MRM_L2V_THERMAL_DRIFT_REPORT.md`](docs/MRM_L2V_THERMAL_DRIFT_REPORT.md) |
 | Triangle (10 mW) | PGT | [`MRM_PGT_TRIANGLE_AGGRESSOR_REPORT.md`](docs/MRM_PGT_TRIANGLE_AGGRESSOR_REPORT.md) |
 | Triangle (10 mW) | L2V | [`MRM_L2V_TRIANGLE_AGGRESSOR_REPORT.md`](docs/MRM_L2V_TRIANGLE_AGGRESSOR_REPORT.md) |
+| Joint laser + thermal (10 mW, apex step) | PGT + L2V | [`MRM_JOINT_LASER_THERMAL_PGT_L2V.md`](docs/MRM_JOINT_LASER_THERMAL_PGT_L2V.md) |
