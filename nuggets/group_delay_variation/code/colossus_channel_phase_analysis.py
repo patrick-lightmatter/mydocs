@@ -196,16 +196,16 @@ def plot_mag(fd_data: dict) -> str:
 
 def plot_ir(ir_data: dict) -> str:
     """
-    Plot the full meaningful post-cursor tail.  The IR array is 128 UI long
-    with no windowing; the tail decays as ~1/sqrt(t) (skin-effect dispersion)
-    and is still ~1.5% of peak at +10 UI, ~0.1% at +50 UI.
-    Show -2 to +50 UI so the full tail is visible.
+    Show full rising edge (pre-cursor visible from ~-5 UI) and post-cursor tail.
+    The IR array is 128 UI (no windowing); tail decays ~1/sqrt(t) (skin effect).
+    Pre-cursor rises from ~0 at -5 UI: IL15 -2UI=2.2%, IL18 -2UI=3.3% of peak.
     """
+    T_PRE  = 6    # UI of pre-cursor to show (rising edge starts ~-5 UI)
     T_POST = 50   # UI of post-cursor to show
     fig = make_subplots(
         rows=1, cols=2,
-        subplot_titles=["Full post-cursor tail (−2 to +50 UI)",
-                        "Main lobe detail (−2 to +10 UI)"],
+        subplot_titles=[f"Full tail (−{T_PRE} to +{T_POST} UI)",
+                        f"Main lobe detail (−{T_PRE} to +10 UI)"],
         horizontal_spacing=0.10,
     )
     for label, ir in ir_data.items():
@@ -215,7 +215,7 @@ def plot_ir(ir_data: dict) -> str:
         h     = raw / raw[pk]                        # normalise to positive peak
         t_ui  = (np.arange(len(raw)) - pk) / SPS
 
-        for col_n, (t_lo, t_hi) in enumerate([(- 2, T_POST), (-2, 10)], start=1):
+        for col_n, (t_lo, t_hi) in enumerate([(-T_PRE, T_POST), (-T_PRE, 10)], start=1):
             mask = (t_ui >= t_lo) & (t_ui <= t_hi)
             fig.add_trace(go.Scatter(
                 x=t_ui[mask], y=h[mask], name=label,
@@ -223,7 +223,7 @@ def plot_ir(ir_data: dict) -> str:
                 showlegend=(col_n == 1)), row=1, col=col_n)
 
     # UI tick lines on detail panel
-    for k in range(-2, 11):
+    for k in range(-T_PRE, 11):
         fig.add_vline(x=k, line_dash="dot", line_color="#cccccc",
                       line_width=1, col=2)
 
