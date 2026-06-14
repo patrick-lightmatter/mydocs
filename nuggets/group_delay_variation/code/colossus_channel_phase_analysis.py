@@ -195,25 +195,46 @@ def plot_mag(fd_data: dict) -> str:
 # ═════════════════════════════════════════════════════════════════════════════
 
 def plot_ir(ir_data: dict) -> str:
-    fig = go.Figure()
+    """
+    Plot the full meaningful post-cursor tail.  The IR array is 128 UI long
+    with no windowing; the tail decays as ~1/sqrt(t) (skin-effect dispersion)
+    and is still ~1.5% of peak at +10 UI, ~0.1% at +50 UI.
+    Show -2 to +50 UI so the full tail is visible.
+    """
+    T_POST = 50   # UI of post-cursor to show
+    fig = make_subplots(
+        rows=1, cols=2,
+        subplot_titles=["Full post-cursor tail (−2 to +50 UI)",
+                        "Main lobe detail (−2 to +10 UI)"],
+        horizontal_spacing=0.10,
+    )
     for label, ir in ir_data.items():
-        col  = COLOURS[label]
-        h    = ir.h / np.max(np.abs(ir.h))          # normalise to peak = 1
-        pk   = ir.peak_index
-        t_ui = (np.arange(len(h)) - pk) / SPS       # time axis in UI
-        mask = (t_ui >= -4) & (t_ui <= 10)
-        fig.add_trace(go.Scatter(x=t_ui[mask], y=h[mask], name=label,
-                                 line=dict(color=col, width=2)))
+        col   = COLOURS[label]
+        raw   = ir.h
+        pk    = np.argmax(raw)
+        h     = raw / raw[pk]                        # normalise to positive peak
+        t_ui  = (np.arange(len(raw)) - pk) / SPS
 
-    for k in range(-4, 11):
-        fig.add_vline(x=k, line_dash="dot", line_color="#cccccc", line_width=1)
+        for col_n, (t_lo, t_hi) in enumerate([(- 2, T_POST), (-2, 10)], start=1):
+            mask = (t_ui >= t_lo) & (t_ui <= t_hi)
+            fig.add_trace(go.Scatter(
+                x=t_ui[mask], y=h[mask], name=label,
+                line=dict(color=col, width=2),
+                showlegend=(col_n == 1)), row=1, col=col_n)
+
+    # UI tick lines on detail panel
+    for k in range(-2, 11):
+        fig.add_vline(x=k, line_dash="dot", line_color="#cccccc",
+                      line_width=1, col=2)
+
+    fig.update_xaxes(title_text="Time (UI)")
+    fig.update_yaxes(title_text="Amplitude (normalised)", row=1, col=1)
     fig.update_layout(
-        title="Measured Colossus channels: normalised impulse response",
-        xaxis_title="Time (UI)",
-        yaxis_title="Amplitude (normalised)",
+        title="Measured Colossus channels: impulse response "
+              "(128 UI array, no windowing applied)",
     )
     _grid(fig)
-    return save(fig, "channels_ir", w=1100, h=520)
+    return save(fig, "channels_ir", w=1400, h=520)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
