@@ -398,6 +398,149 @@ src/optical_serdes/rx/ctle.py                  → CtleZPK.from_peaking (existin
 
 ---
 
+### Milestone 5 — 2026-06-15 · Speculative (loop-unrolled) DFE + S4P electrical channel
+
+#### What was done
+
+**1. S4P electrical channel added to analog simulation**
+
+The analog script `oci_msa_analog_txrx.py` now passes the PRBS drive through
+the board/package S4P channel before the SmfLink optical transceiver.  This
+brings the analog simulation in line with the DSP script and the MATLAB reference:
+
+```
+PRBS-15 → S4P FIR filter → SmfLink → tp4 → rx_base
+```
+
+S4P file: `/lm/analog/colossus/channels/l20_il15_rl17_90ohms_100ports_v2.s4p`
+(Colossus 20-layer board, 15 dB IL, 17 dB RL, 90 Ω, 100-port, rev 2).
+Port convention: `13_24` (Sdd21 differential mode).  The IR is synthesised via
+IFFT (`discrete_impulse_response`, `phase="measured"`, `n_ui_span=128`).
+
+Adding the S4P changes the CDR operating point relative to the Milestone 4
+SmfLink-only baseline (lock_pi: 9 → 5; h₀_conv: 0.7625 → 0.5845).
+
+**2. Speculative DFE — `SpeculativeDfe` class**
+
+Implemented a loop-unrolled (speculative) DFE in
+`src/optical_serdes/rx/rx_dfe_speculative.py`.
+
+Architecture (M = 1 unrolled tap):
+
+```
+y[k] ──── direct FB: p[k] = y[k] − Σ hᵢ·d[k-i]  (i ≥ 2)
+               │
+               ├── branch +1:  y₊ = p[k] − h₁·(+1)  →  slicer  →  d̂₊₁
+               └── branch −1:  y₋ = p[k] − h₁·(−1)  →  slicer  →  d̂₋₁
+                                                               │
+                                                        MUX ← d[k−1]
+                                                               │
+                                                      y_sel,  d[k]
+
+h₁ SS-LMS:  h₁ += μ · sign(y_sel − d[k]) · d[k−1]
+```
+
+This eliminates the 1-UI feedback latency of the first DFE tap without requiring
+a high-speed analog summing node.  In silicon, each branch is a comparator with
+a programmable DAC threshold (±h₁_DAC); the MUX is a sub-ps digital gate.
+
+Key class features:
+- `n_taps` total feedback taps; `unrolled_depth` M ≤ n_taps speculated speculatively
+- SS-LMS adaptation (sign-error): `h_i += μ · sign(e) · d[k-i]`
+- Optional non-idealities: slicer offset mismatch (`slicer_offsets`), latch
+  metastability model (`metastability_threshold`), asymmetric optical rise/fall
+  h₁ (`asymmetric_h1`)
+- Drop-in compatible with `RxDFE` for use in `AdcReceiver` (`n_fb`, `modulation="nrz"`)
+- `process_block()` convenience for replay with frozen taps
+
+Three self-tests confirm: zero ISI passthrough, h₁ convergence (50 k symbols, 
+target 0.500, achieved 0.4995), and N-step error propagation with settled
+steady state from step N.
+
+**3. DSP script integration (`oci_msa_dsp_txrx.py`)**
+
+`ENABLE_SPEC_DFE` flag (default `False`) replaces the standard `RxDFE` with
+`SpeculativeDfe` in the `AdcReceiver` chain:
+
+```python
+ENABLE_SPEC_DFE  = False
+SPEC_DFE_UNROLLED = 1
+SPEC_DFE_MU      = 2e-4
+```
+
+**4. Analog script integration (`oci_msa_analog_txrx.py`)**
+
+A new `run_cdr_with_dfe()` function replaces the zero-crossing data slicer
+with the speculative DFE when `ENABLE_SPEC_DFE = True`.
+
+Critical architectural decision: **z[k] always uses raw y[k], not y_sel**.
+
+In a fully-analog receiver all comparators share the same physical waveform
+`y(t)`.  The speculative DFE only changes the *data* slicer threshold; the CDR
+error slicers compare raw `y` directly against `±h₀`.  At the CDR lock phase:
+
+```
+y[k] ≈ h₀·d[k] + h₁·d[k-1] + noise
+z[k] = sign(y[k] − d[k]·h₀) ≈ sign(h₁·d[k-1] + noise)
+```
+
+The full channel postcursor h₁ is always present in the TED error signal,
+regardless of how well the DFE has converged.  There is **no TED blindness** as
+the DFE tap h₁_est approaches h₁_true.  This is a fundamental difference from
+a DSP receiver where y_sel (post-equalization) could be substituted into z.
+
+New constants:
+
+```python
+ENABLE_SPEC_DFE = False
+N_DFE_TAPS      = 1        # h₁ speculative only
+MU_H1           = 5e-4     # SS-LMS step for h₁ DAC calibration
+H1_INIT         = 0.0      # cold-start
+```
+
+The `make_figure()` panel 2 is extended to show h₁ convergence (steelblue)
+alongside h₀ (darkorange) when h₁_hist is not None.
+
+#### Results
+
+Channel: SmfLink (OCI MSA, 203 m SMF, MRM 0 dBm) + S4P (l20_il15_rl17_90ohms).
+CTLE: bypass (0 dB).  PRBS-15 (32 767 symbols), OSR = 32.
+
+| Mode | lock_pi | h₀_conv | h₁_conv | CDR locked | Eye opening | Q-factor |
+|---|---|---|---|---|---|---|
+| No DFE (baseline) | 5 | 0.5845 | — | YES | 1.1435 | 1.97 |
+| Spec-DFE 1T | 5 | 0.5845 | **0.099** | YES | 1.1441 | **2.43** |
+
+Key findings:
+
+* **CDR unaffected by DFE.** lock_pi = 5 and h₀_conv = 0.5845 are identical in
+  both modes, confirming the raw-y z[k] architecture decouples the TED from DFE
+  convergence.
+
+* **h₁ converges to 0.099.** The channel IR shows h₁_true ≈ 0 at the nominal
+  peak phase (pi_nat = 31), but the CDR locks at pi = 5 — at that operating
+  point there is real 1-UI ISI, and the DFE finds and cancels it.
+
+* **Q-factor +23 %** (1.97 → 2.43).  Eye opening changes only +0.05 % because
+  `mean(pos) − mean(neg)` is dominated by the main cursor; the Q improvement
+  captures the variance reduction from ISI cancellation at the CDR sample phase.
+
+* **CDR lock ≠ max eye opening.** Both modes agree on opt_open_pi = opt_q_pi = 4
+  vs. CDR lock_pi = 5.  The 1-sample (1/32 UI) offset is the h₁ = 0 lock constraint.
+
+Output figures: `runs/analog_rx/eye_prbs15_smflink_pk0dB.html / .png`
+(panel 2 shows h₀ + h₁ convergence when DFE enabled).
+
+#### Simulation code
+
+```
+src/optical_serdes/rx/rx_dfe_speculative.py    (new — SpeculativeDfe, SpeculativeDfeState)
+scripts/analog_rx/oci_msa_analog_txrx.py       (updated: S4P, run_cdr_with_dfe, h₁ panel)
+scripts/dsp_rx/oci_msa_dsp_txrx.py             (updated: ENABLE_SPEC_DFE flag)
+```
+
+---
+
 ### Milestone 4 — 2026-06-13 · Full OCI MSA optical link via SmfLink + phase sweep metrics
 
 #### What was done
@@ -603,6 +746,8 @@ These are the unresolved design questions that will drive the next development p
 | Q8 | Half-rate (53.125 GHz × 2) or full-rate (106.25 GHz) clocking? | T/H bandwidth, VCO design | Open |
 | Q9 | How is the VGA gain controlled to keep the eye amplitude ≈ h₀_target? | Error slicer accuracy | Open |
 | Q10 | Is Kp = 1.0 appropriate for the OCI MSA channel with h₁/h₀ = −2.9 %? | CDR bandwidth, limit-cycle jitter — weak TED discriminant may require lower Kp | Open (Milestone 4: flag raised) |
+| Q11 | With the speculative DFE canceling h₁ at the CDR sample phase, does the TED discriminant weaken over time? | As h₁_est → h₁_true, ISI seen at the *data* slicer decreases — but z[k] uses raw y, so the TED still sees the full channel h₁. In simulation CDR is unaffected (Milestone 5). Confirmed analytically: no blindness in the raw-y architecture. | ✅ **Resolved** — No TED blindness: z[k] = sign(y[k] − d[k]·h₀), raw y regardless of DFE state |
+| Q12 | How does h₁_conv (at CDR lock phase) relate to h₁_true (at IR peak phase)? | Lock phase pi=5 ≠ IR peak phase pi_nat=31; postcursor at pi=5 is non-zero even when IR shows h₁≈0 at the peak | Open — sweep CDR lock phase vs. IR to map the relationship |
 
 ---
 
@@ -645,6 +790,18 @@ These are the unresolved design questions that will drive the next development p
 - [x] Cold start validation: CDR acquires from pi=0, h₀ from 0.0
 - [ ] Sweep CTLE peaking on OCI MSA channel (currently only bypass tested)
 - [ ] Characterise CDR Kp vs. lock stability for weak-ISI channel (h₁/h₀ = −2.9 %)
+
+### Phase 4c — Electrical channel + Speculative DFE ✅ (Milestone 5)
+- [x] Add S4P electrical channel (board + package) to analog simulation
+- [x] Implement `SpeculativeDfe` (loop-unrolled, SS-LMS, non-idealities, three self-tests)
+- [x] Wire `SpeculativeDfe` into DSP script (`oci_msa_dsp_txrx.py`, `ENABLE_SPEC_DFE` flag)
+- [x] Wire `SpeculativeDfe` into analog script via `run_cdr_with_dfe()` with raw-y z[k]
+- [x] Verify CDR–DFE decoupling: lock_pi and h₀_conv unchanged when DFE enabled
+- [x] Measure Q-factor improvement: +23 % (1.97 → 2.43) for 1-tap speculative DFE
+- [ ] Sweep MU_H1: convergence speed vs. steady-state residual h₁ error
+- [ ] Characterise h₁_conv vs CDR lock phase (Q12)
+- [ ] Extend to N_DFE_TAPS > 1 (direct-feedback taps h₂…hN)
+- [ ] Add asymmetric h₁ model (`asymmetric_h1=True`) for optical rise/fall asymmetry
 
 ### Phase 5 — Full analog front-end integration
 - [ ] Integrate VGA model (gain controlled from digital engine)
