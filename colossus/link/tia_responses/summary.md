@@ -3,6 +3,14 @@
 ## Overview
 This document records the steps and results of processing the step and single-bit response (SBR) data of the TIA across multiple settings. The raw data was provided in CSV format under `temp/data/single_bit_response/` and `temp/data/step_response/`.
 
+## Nonlinear Analysis Methodology
+To evaluate the large-signal linearity of the TIA, we extracted key metrics from the step responses across varying input swing amplitudes (`Vswing`):
+
+1. **Baseline & Steady-State Extraction**: For each response, the baseline ($Y_{init}$) is computed as the mean of the first 5% of samples (pre-step), and the steady state ($Y_{final}$) is the mean of the last 5% of samples (post-settling). The actual output step amplitude is defined as $\Delta Y = Y_{final} - Y_{init}$.
+2. **Steady State Gain**: Calculated as `|Actual Step Amplitude| / Vswing`. This reveals gain compression (saturation) or expansion as the input stimulus grows.
+3. **10-90% Rise/Fall Time**: The exact times crossing the 10% and 90% thresholds between baseline and steady state are found via linear interpolation. Increasing rise times at larger voltage swings can indicate slew-rate limiting (inability to charge parasitic capacitances quickly enough).
+4. **Overshoot (%)**: Calculated as `(|Peak| - |Steady State|) / |Actual Step Amplitude| * 100`. Variations in overshoot percentage with amplitude often point to voltage-dependent nonlinear junction capacitances (e.g., $C_{bc}$ or $C_{je}$).
+
 ## Steps Taken
 1. **Resampling**: Resampled the waveforms to put them on a UI/32 time scale, where UI = 1 / 106.25 GHz (~9.41 ps). The time axis is now plotted in Units of Interval (UI). *Note: Linear interpolation was used to prevent artificial ringing at the sharp edges of the input stimuli.*
 2. **Impulse Response Extraction**: For the Step Responses, we computed the continuous derivative (`dy/dt`) to extract the impulse response. Both the step response and its derivative are plotted in the time domain.
