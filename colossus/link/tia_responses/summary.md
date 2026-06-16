@@ -11,100 +11,121 @@ This document records the steps and results of processing the step and single-bi
    - Phase Response (rad)
    - Group Delay (ps)
    - Phase Delay (ps)
-4. **Separated Polarity**: Responses were separated by positive steps (`isign=1`) and negative steps (`isign=-1`).
-5. **Visualization**: Generated 4 PNGs per response metric (e.g. 2 for time domain positive/negative, 2 for frequency domain positive/negative).
+4. **Eye Diagrams**: Constructed PAM4 eye diagrams using the upsampled (UI/32) Single Bit Response to reflect realistic baud-rate signal properties, convolved with a sequence of 2000 random pseudo-symbols.
+5. **Separated Polarity**: Responses were separated by positive steps (`isign=1`) and negative steps (`isign=-1`).
+6. **Visualization**: Generated comprehensive PNG panels to encapsulate time domain, frequency domain, and eye diagram characteristics.
 
 ## Results
 Below are the advanced response plots for both Single Bit and Step responses across the various configurations. 
 
 ---
 
-### Single Bit Responses (SBR)
+### Single Bit Responses (SBR) & Eye Diagrams
 
 #### Attenuation 10 (Main 0.7, Tamerolloff Bypass PD)
 **Ipd**
 *Positive*:
 ![Ipd Pos Time](figures/single_bit_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_time.png)
 ![Ipd Pos Freq](figures/single_bit_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_freq.png)
+![Ipd Pos Eye](figures/single_bit_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_eye.png)
 *Negative*:
 ![Ipd Neg Time](figures/single_bit_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_time.png)
 ![Ipd Neg Freq](figures/single_bit_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_freq.png)
+![Ipd Neg Eye](figures/single_bit_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_eye.png)
 
 **Vbump**
 *Positive*:
 ![Vbump Pos Time](figures/single_bit_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_time.png)
 ![Vbump Pos Freq](figures/single_bit_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_freq.png)
+![Vbump Pos Eye](figures/single_bit_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_eye.png)
 *Negative*:
 ![Vbump Neg Time](figures/single_bit_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_time.png)
 ![Vbump Neg Freq](figures/single_bit_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_freq.png)
+![Vbump Neg Eye](figures/single_bit_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_eye.png)
 
 #### Attenuation 11 (Tamerolloff)
 **Ipd**
 *Positive*:
 ![Ipd Pos Time](figures/single_bit_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_time.png)
 ![Ipd Pos Freq](figures/single_bit_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_freq.png)
+![Ipd Pos Eye](figures/single_bit_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_eye.png)
 *Negative*:
 ![Ipd Neg Time](figures/single_bit_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_time.png)
 ![Ipd Neg Freq](figures/single_bit_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_freq.png)
+![Ipd Neg Eye](figures/single_bit_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_eye.png)
 
 **Vbump**
 *Positive*:
 ![Vbump Pos Time](figures/single_bit_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_time.png)
 ![Vbump Pos Freq](figures/single_bit_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_freq.png)
+![Vbump Pos Eye](figures/single_bit_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_eye.png)
 *Negative*:
 ![Vbump Neg Time](figures/single_bit_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_time.png)
 ![Vbump Neg Freq](figures/single_bit_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_freq.png)
+![Vbump Neg Eye](figures/single_bit_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_eye.png)
 
 #### Attenuation 11 (Xtmpeak)
 **Ipd**
 *Positive*:
 ![Ipd Pos Time](figures/single_bit_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_time.png)
 ![Ipd Pos Freq](figures/single_bit_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_freq.png)
+![Ipd Pos Eye](figures/single_bit_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_eye.png)
 *Negative*:
 ![Ipd Neg Time](figures/single_bit_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_time.png)
 ![Ipd Neg Freq](figures/single_bit_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_freq.png)
+![Ipd Neg Eye](figures/single_bit_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_eye.png)
 
 **Vbump**
 *Positive*:
 ![Vbump Pos Time](figures/single_bit_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_time.png)
 ![Vbump Pos Freq](figures/single_bit_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_freq.png)
+![Vbump Pos Eye](figures/single_bit_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_eye.png)
 *Negative*:
 ![Vbump Neg Time](figures/single_bit_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_time.png)
 ![Vbump Neg Freq](figures/single_bit_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_freq.png)
+![Vbump Neg Eye](figures/single_bit_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_eye.png)
 
 #### Attenuation 12 (Tamerolloff)
 **Ipd**
 *Positive*:
 ![Ipd Pos Time](figures/single_bit_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_time.png)
 ![Ipd Pos Freq](figures/single_bit_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_freq.png)
+![Ipd Pos Eye](figures/single_bit_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_eye.png)
 *Negative*:
 ![Ipd Neg Time](figures/single_bit_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_time.png)
 ![Ipd Neg Freq](figures/single_bit_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_freq.png)
+![Ipd Neg Eye](figures/single_bit_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_eye.png)
 
 **Vbump**
 *Positive*:
 ![Vbump Pos Time](figures/single_bit_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_time.png)
 ![Vbump Pos Freq](figures/single_bit_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_freq.png)
+![Vbump Pos Eye](figures/single_bit_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_eye.png)
 *Negative*:
 ![Vbump Neg Time](figures/single_bit_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_time.png)
 ![Vbump Neg Freq](figures/single_bit_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_freq.png)
+![Vbump Neg Eye](figures/single_bit_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_eye.png)
 
 #### Attenuation 12 (Xtmpeak)
 **Ipd**
 *Positive*:
 ![Ipd Pos Time](figures/single_bit_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_time.png)
 ![Ipd Pos Freq](figures/single_bit_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_freq.png)
+![Ipd Pos Eye](figures/single_bit_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_eye.png)
 *Negative*:
 ![Ipd Neg Time](figures/single_bit_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_time.png)
 ![Ipd Neg Freq](figures/single_bit_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_freq.png)
+![Ipd Neg Eye](figures/single_bit_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_eye.png)
 
 **Vbump**
 *Positive*:
 ![Vbump Pos Time](figures/single_bit_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_time.png)
 ![Vbump Pos Freq](figures/single_bit_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_freq.png)
+![Vbump Pos Eye](figures/single_bit_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_eye.png)
 *Negative*:
 ![Vbump Neg Time](figures/single_bit_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_time.png)
 ![Vbump Neg Freq](figures/single_bit_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_freq.png)
+![Vbump Neg Eye](figures/single_bit_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_eye.png)
 
 ---
 
