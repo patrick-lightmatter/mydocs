@@ -44,6 +44,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Ipd positive Step Norm](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Ipd positive Step Nonlin](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_nonlin.png)
 
@@ -63,6 +66,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Ipd negative Step Norm](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Ipd negative Step Nonlin](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_nonlin.png)
@@ -86,6 +92,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Vbump positive Step Norm](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Vbump positive Step Nonlin](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_nonlin.png)
 
@@ -105,6 +114,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Vbump negative Step Norm](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Vbump negative Step Nonlin](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_nonlin.png)
@@ -132,6 +144,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Ipd positive Step Norm](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Ipd positive Step Nonlin](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_nonlin.png)
 
@@ -151,6 +166,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Ipd negative Step Norm](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Ipd negative Step Nonlin](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_nonlin.png)
@@ -174,6 +192,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Vbump positive Step Norm](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Vbump positive Step Nonlin](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_nonlin.png)
 
@@ -193,6 +214,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Vbump negative Step Norm](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Vbump negative Step Nonlin](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_nonlin.png)
@@ -220,6 +244,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Ipd positive Step Norm](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Ipd positive Step Nonlin](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_nonlin.png)
 
@@ -239,6 +266,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Ipd negative Step Norm](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Ipd negative Step Nonlin](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_nonlin.png)
@@ -262,6 +292,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Vbump positive Step Norm](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Vbump positive Step Nonlin](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_nonlin.png)
 
@@ -281,6 +314,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Vbump negative Step Norm](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Vbump negative Step Nonlin](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_nonlin.png)
@@ -308,6 +344,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Ipd positive Step Norm](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Ipd positive Step Nonlin](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_nonlin.png)
 
@@ -327,6 +366,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Ipd negative Step Norm](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Ipd negative Step Nonlin](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_nonlin.png)
@@ -350,6 +392,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Vbump positive Step Norm](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Vbump positive Step Nonlin](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_nonlin.png)
 
@@ -369,6 +414,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Vbump negative Step Norm](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Vbump negative Step Nonlin](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_nonlin.png)
@@ -396,6 +444,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Ipd positive Step Norm](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Ipd positive Step Nonlin](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_nonlin.png)
 
@@ -415,6 +466,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Ipd negative Step Norm](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Ipd negative Step Nonlin](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_nonlin.png)
@@ -438,6 +492,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_time.png)
 
+*Step Response (Normalized Overlay)*:
+![Vbump positive Step Norm](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_norm.png)
+
 *Step Response (Non-linearity Analysis)*:
 ![Vbump positive Step Nonlin](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_nonlin.png)
 
@@ -457,6 +514,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_time.png)
+
+*Step Response (Normalized Overlay)*:
+![Vbump negative Step Norm](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_norm.png)
 
 *Step Response (Non-linearity Analysis)*:
 ![Vbump negative Step Nonlin](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_nonlin.png)
