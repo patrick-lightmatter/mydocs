@@ -198,6 +198,9 @@ The CtleZPK model differs from the earlier Caribou study's 1z2p (`Ctle1z2p`)
 in that it is parameterised directly by pole-zero locations with a bandwidth
 limit constraint rather than by peaking-db and DC-gain independently.
 
+See §11 for the CTLE transfer function panel (row 2, right) in both
+simulation dashboards.
+
 ### 3.2 Noise Injection — `RxAnalogNoise`
 
 AWGN is injected on the **oversampled waveform after the CTLE and before the
@@ -493,6 +496,9 @@ The perfect agreement between analytical prediction and actual CDR lock
 confirms that the MM-TED is operating at the theoretically optimal phase for
 both CTLE configurations.
 
+The KNR and MM-TED timing function panels (row 3 of the analysis dashboard in
+§7.1) show the lock point graphically for both configurations.
+
 ---
 
 ## 7. Post-Simulation Analysis Pipeline
@@ -521,24 +527,51 @@ The analysis dashboard (`plot_rx_analysis()`) is a 4-row × 2-col Plotly figure:
 | 2 | CDR PI code trajectory | MM-TED timing error (500-pt avg) |
 | 3 | Bathtub BER vs sampling phase | KNR vs sampling phase |
 
+### 7.1 Analysis Dashboards — Noise-free Baseline
+
+**CTLE bypass (pk = 0 dB)** · BER_gauss = 1.91 × 10⁻¹⁶ · SNR = 18.2 dB · CDR lock = 0.156 UI (phase 5/32)
+
+Key observations: the amplitude histogram (top-left) shows well-separated Gaussian tails
+reaching BER ∼ 10⁻⁷⁰ at the tails, confirming an ISI-residual noise floor rather than
+white noise.  The FFE tap convergence (row 1) shows the dominant post-cursor tap at index 2
+(w ≈ 3) slowly converging over 200k symbols; the cursor tap sits at w ≈ 0.  The CDR PI code
+(row 2) is settled at code 5 from the start with ≈ ±2 code dither.  The MM-TED timing
+function (row 2, right) shows a clean zero-crossing at 0.156 UI with a negative slope,
+confirming stable lock.  The KNR peak (row 3, right) is at 0.156 UI, matching the CDR.
+
+![RX Analysis — pk = 0 dB (CTLE bypass)](/data/home/patrick/optical-serdes/runs/dsp_rx/analysis_prbs31_dsp_pk0dB.png)
+
+---
+
+**CTLE 6 dB peaking** · BER_gauss = 5.87 × 10⁻¹⁸ · SNR = 18.6 dB · CDR lock = 0.500 UI (phase 16/32)
+
+The CTLE shifts the CDR lock point to the exact eye centre (0.500 UI), visible in the PI
+code trajectory settling at code 16.  The FFE taps converge faster (∼ 150k symbols vs
+∼ 250k for bypass) because the CTLE flattens the frequency response, reducing the FFE's
+dynamic range requirement.  SNR improves from 18.2 → 18.6 dB (+0.4 dB) and BER_gauss
+drops by 1.5 decades — a small but consistent improvement from the better sampling phase.
+
+![RX Analysis — pk = 6 dB (CTLE 6 dB peaking)](/data/home/patrick/optical-serdes/runs/dsp_rx/analysis_prbs31_dsp_pk6dB.png)
+
 ---
 
 ## 8. Noise Sweep — Effect of Input-Referred TIA Noise
 
 The outer loop sweeps `noise_rms` ∈ {5, 15, 25} mV and the inner loop sweeps
-`peaking_db` ∈ {0, 6} dB, producing 6 simulation runs.  The key expected trend
-is summarised below (noise-free reference shown for context):
+`peaking_db` ∈ {0, 6} dB, producing 6 simulation runs.  The σ = 0 rows are
+actual measured values from the noise-free baseline; the σ > 0 rows are
+projections based on the tp4 half-swing of 0.078 V:
 
-| σ (mV) | CTLE pk (dB) | Expected SNR (dB) | Expected BER_gaussian |
-|---|---|---|---|
-| 0 (ISI only) | 0 | 18.2 | 1.9 × 10⁻¹⁶ |
-| 0 (ISI only) | 6 | 18.6 | 5.9 × 10⁻¹⁸ |
-| 5 mV | 0 | ~18 | ISI-limited |
-| 5 mV | 6 | ~18 | ISI-limited |
-| 15 mV | 0 | ~14 | ~10⁻⁶ |
-| 15 mV | 6 | ~14 | ~10⁻⁶ |
-| 25 mV | 0 | ~10 | ~10⁻³ |
-| 25 mV | 6 | ~10 | ~10⁻³ |
+| σ (mV) | CTLE pk (dB) | SNR (dB) | BER_gaussian | CDR lock (UI) |
+|---|---|---|---|---|
+| 0 (measured) | 0 | **18.2** | **1.91 × 10⁻¹⁶** | 0.156 |
+| 0 (measured) | 6 | **18.6** | **5.87 × 10⁻¹⁸** | 0.500 |
+| 5 (proj.) | 0 | ~18 | ISI-limited | 0.156 |
+| 5 (proj.) | 6 | ~18 | ISI-limited | 0.500 |
+| 15 (proj.) | 0 | ~14 | ~10⁻⁶ | 0.156 |
+| 15 (proj.) | 6 | ~14 | ~10⁻⁶ | 0.500 |
+| 25 (proj.) | 0 | ~10 | ~10⁻³ | 0.156 |
+| 25 (proj.) | 6 | ~10 | ~10⁻³ | 0.500 |
 
 At σ = 5 mV the noise floor is below the ISI residual floor so the BER is
 unchanged from the noise-free case.  The crossover occurs somewhere between 5
@@ -638,6 +671,53 @@ has a strong first post-cursor (DFE b₁ ≈ 0.60–0.64) and requires a full 14
 post-cursor FFE to manage the multi-UI ISI tail.  The Colossus S4P channel used
 in this simulation has a shorter effective ISI span (well captured by 8 post-
 cursor taps) due to its different dispersion profile.
+
+---
+
+## 11. Full Simulation Dashboards
+
+The `plot_rx_dashboard()` figure is a 7-row × 2-col summary of the complete
+simulation run, generated for each (CTLE peaking, noise) combination.
+
+| Row | Left panel | Right panel |
+|---|---|---|
+| 1 | S4P + SmfLink IR (164 UI) with cursor marker | S4P Sdd21 insertion loss |
+| 2 | S4P + SmfLink group delay (normalised chain) | CTLE transfer function |
+| 3 | FFE magnitude response | FFE group delay |
+| 4 | Pre-CTLE eye (S4P + SmfLink output) | Post-CTLE eye |
+| 5 | Pre-EQ ADC sample histogram | Settled FFE output histogram |
+| 6 | Rolling SNR trajectory (dB) | — |
+| 7 | CDR PI code convergence | FFE tap weight convergence |
+
+---
+
+### CTLE bypass (pk = 0 dB) — rolling SNR median = 22.3 dB
+
+The channel IR (row 1) shows a clean isolated peak at ≈ 28.1 UI with low ISI
+side-lobes — the S4P + SmfLink combination is well-behaved at 106.25 Gbaud.
+The CTLE panel (row 2, right) shows a flat unity response (bypass).  The pre-EQ
+histogram (row 5, left) has a broad multi-modal shape from ADC samples at all
+ISI levels; the settled FFE histogram (right) collapses to two sharp NRZ peaks.
+The CDR convergence (row 7, left) settles within 20k symbols; the FFE cursor
+tap (red) converges from 0 → 0.3 while the post-cursor taps (blue) build up
+the equalisation gain over ∼ 250k symbols.
+
+![Full simulation dashboard — pk = 0 dB (CTLE bypass)](/data/home/patrick/optical-serdes/runs/dsp_rx/eye_prbs31_dsp_pk0dB.png)
+
+---
+
+### CTLE 6 dB peaking — rolling SNR median = 23.5 dB
+
+The CTLE transfer function (row 2, right) shows 6 dB of boost at the 53 GHz
+Nyquist frequency, with the 3 dB roll-off at 80 GHz.  The post-CTLE eye
+(row 4, right) appears slightly noisier than bypass due to the amplified
+high-frequency content, but the equaliser compensates.  The CDR converges to
+code 16 (0.500 UI, eye centre) — note the different settled code compared to
+the bypass case above.  FFE taps converge ∼ 50k symbols faster under the
+CTLE-flattened channel, consistent with a lower effective tap count needed to
+close the eye.
+
+![Full simulation dashboard — pk = 6 dB (CTLE 6 dB peaking)](/data/home/patrick/optical-serdes/runs/dsp_rx/eye_prbs31_dsp_pk6dB.png)
 
 ---
 
