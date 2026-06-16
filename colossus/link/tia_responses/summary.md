@@ -21,11 +21,11 @@ Below are the advanced response plots across the various configurations, organiz
 
 ---
 
-### Attenuation 10 (Main 0.7, Tamerolloff Bypass PD)
+## Configuration: Attenuation 10 (Main 0.7, Tamerolloff Bypass PD)
 
-#### Ipd
+### Signal: `Ipd`
 
-**Positive Steps**
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd positive SBR Time](figures/single_bit_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_time.png)
@@ -42,7 +42,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd positive Step Eye](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd negative SBR Time](figures/single_bit_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_time.png)
@@ -59,9 +59,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd negative Step Eye](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_eye.png)
 
-#### Vbump
+### Signal: `Vbump`
 
-**Positive Steps**
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump positive SBR Time](figures/single_bit_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_time.png)
@@ -78,7 +78,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump positive Step Eye](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump negative SBR Time](figures/single_bit_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_time.png)
@@ -95,11 +95,13 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump negative Step Eye](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_eye.png)
 
-### Attenuation 11 (Tamerolloff)
+---
 
-#### Ipd
+## Configuration: Attenuation 11 (Tamerolloff)
 
-**Positive Steps**
+### Signal: `Ipd`
+
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd positive SBR Time](figures/single_bit_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_time.png)
@@ -116,7 +118,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd positive Step Eye](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd negative SBR Time](figures/single_bit_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_time.png)
@@ -133,9 +135,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd negative Step Eye](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_eye.png)
 
-#### Vbump
+### Signal: `Vbump`
 
-**Positive Steps**
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump positive SBR Time](figures/single_bit_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_time.png)
@@ -152,7 +154,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump positive Step Eye](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump negative SBR Time](figures/single_bit_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_time.png)
@@ -169,11 +171,13 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump negative Step Eye](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_eye.png)
 
-### Attenuation 11 (Xtmpeak)
+---
 
-#### Ipd
+## Configuration: Attenuation 11 (Xtmpeak)
 
-**Positive Steps**
+### Signal: `Ipd`
+
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd positive SBR Time](figures/single_bit_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_time.png)
@@ -190,7 +194,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd positive Step Eye](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd negative SBR Time](figures/single_bit_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_time.png)
@@ -207,9 +211,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd negative Step Eye](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_eye.png)
 
-#### Vbump
+### Signal: `Vbump`
 
-**Positive Steps**
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump positive SBR Time](figures/single_bit_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_time.png)
@@ -226,7 +230,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump positive Step Eye](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump negative SBR Time](figures/single_bit_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_time.png)
@@ -243,11 +247,13 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump negative Step Eye](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_eye.png)
 
-### Attenuation 12 (Tamerolloff)
+---
 
-#### Ipd
+## Configuration: Attenuation 12 (Tamerolloff)
 
-**Positive Steps**
+### Signal: `Ipd`
+
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd positive SBR Time](figures/single_bit_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_time.png)
@@ -264,7 +270,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd positive Step Eye](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd negative SBR Time](figures/single_bit_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_time.png)
@@ -281,9 +287,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd negative Step Eye](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_eye.png)
 
-#### Vbump
+### Signal: `Vbump`
 
-**Positive Steps**
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump positive SBR Time](figures/single_bit_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_time.png)
@@ -300,7 +306,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump positive Step Eye](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump negative SBR Time](figures/single_bit_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_time.png)
@@ -317,11 +323,13 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump negative Step Eye](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_eye.png)
 
-### Attenuation 12 (Xtmpeak)
+---
 
-#### Ipd
+## Configuration: Attenuation 12 (Xtmpeak)
 
-**Positive Steps**
+### Signal: `Ipd`
+
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd positive SBR Time](figures/single_bit_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_time.png)
@@ -338,7 +346,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd positive Step Eye](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Ipd negative SBR Time](figures/single_bit_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_time.png)
@@ -355,9 +363,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Ipd negative Step Eye](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_eye.png)
 
-#### Vbump
+### Signal: `Vbump`
 
-**Positive Steps**
+#### Polarity: Positive Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump positive SBR Time](figures/single_bit_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_time.png)
@@ -374,7 +382,7 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response Derived IR (Eye Diagram)*:
 ![Vbump positive Step Eye](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_eye.png)
 
-**Negative Steps**
+#### Polarity: Negative Steps
 
 *Single Bit Response (Time Domain)*:
 ![Vbump negative SBR Time](figures/single_bit_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_time.png)
