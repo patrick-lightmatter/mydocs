@@ -36,6 +36,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd positive Step Risetime](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd positive Step Freq](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_freq.png)
 
@@ -52,6 +55,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd negative Step Risetime](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd negative Step Freq](figures/step_response/attn10_main0p7_tamerolloff/Ipd_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_freq.png)
@@ -72,6 +78,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump positive Step Risetime](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump positive Step Freq](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_positive_freq.png)
 
@@ -88,6 +97,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump negative Step Risetime](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump negative Step Freq](figures/step_response/attn10_main0p7_tamerolloff/Vbump_attn10_main0p7_tamerolloff_sweep_bypassPD_negative_freq.png)
@@ -112,6 +124,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd positive Step Risetime](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd positive Step Freq](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_positive_freq.png)
 
@@ -128,6 +143,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd negative Step Risetime](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd negative Step Freq](figures/step_response/attn11_tamerolloff/Ipd_attn11_tamerolloff_sweep_negative_freq.png)
@@ -148,6 +166,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump positive Step Risetime](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump positive Step Freq](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_positive_freq.png)
 
@@ -164,6 +185,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump negative Step Risetime](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump negative Step Freq](figures/step_response/attn11_tamerolloff/Vbump_attn11_tamerolloff_sweep_negative_freq.png)
@@ -188,6 +212,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd positive Step Risetime](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd positive Step Freq](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_positive_freq.png)
 
@@ -204,6 +231,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd negative Step Risetime](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd negative Step Freq](figures/step_response/attn11_xtmpeak/Ipd_attn11_xtmpeak_sweep_negative_freq.png)
@@ -224,6 +254,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump positive Step Risetime](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump positive Step Freq](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_positive_freq.png)
 
@@ -240,6 +273,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump negative Step Risetime](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump negative Step Freq](figures/step_response/attn11_xtmpeak/Vbump_attn11_xtmpeak_sweep_negative_freq.png)
@@ -264,6 +300,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd positive Step Risetime](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd positive Step Freq](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_positive_freq.png)
 
@@ -280,6 +319,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd negative Step Risetime](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd negative Step Freq](figures/step_response/attn12_tamerolloff/Ipd_attn12_tamerolloff_sweep_negative_freq.png)
@@ -300,6 +342,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump positive Step Risetime](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump positive Step Freq](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_positive_freq.png)
 
@@ -316,6 +361,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump negative Step Risetime](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump negative Step Freq](figures/step_response/attn12_tamerolloff/Vbump_attn12_tamerolloff_sweep_negative_freq.png)
@@ -340,6 +388,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd positive Step Time](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd positive Step Risetime](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd positive Step Freq](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_positive_freq.png)
 
@@ -356,6 +407,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Ipd negative Step Time](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Ipd negative Step Risetime](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Ipd negative Step Freq](figures/step_response/attn12_xtmpeak/Ipd_attn12_xtmpeak_sweep_negative_freq.png)
@@ -376,6 +430,9 @@ Below are the advanced response plots across the various configurations, organiz
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump positive Step Time](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_time.png)
 
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump positive Step Risetime](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_risetime.png)
+
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump positive Step Freq](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_positive_freq.png)
 
@@ -392,6 +449,9 @@ Below are the advanced response plots across the various configurations, organiz
 
 *Step Response & Derived Impulse Response (Time Domain)*:
 ![Vbump negative Step Time](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_time.png)
+
+*Step Response (10-90% Rise Time vs Vswing)*:
+![Vbump negative Step Risetime](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_risetime.png)
 
 *Derived Impulse Response (Frequency Domain)*:
 ![Vbump negative Step Freq](figures/step_response/attn12_xtmpeak/Vbump_attn12_xtmpeak_sweep_negative_freq.png)
