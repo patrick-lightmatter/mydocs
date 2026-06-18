@@ -157,8 +157,10 @@ In from-symbols mode the LTI input is the Dirac train
 $x[t] = \sum_k a[k] \delta[t - kL]$. The natural continuous-time
 extension of the cursor-only decomposition in Eq. (1) is
 
+**Boxed relation (Eq. 7):**
+
 $$
-\boxed{ y_\text{desired}(t) = h_0 \cdot \mathrm{ZOH}(a)(t), \qquad y_\text{ISI}(t) = \hat y(t) - y_\text{desired}(t) }
+y_\text{desired}(t) = h_0 \cdot \mathrm{ZOH}(a)(t), \qquad y_\text{ISI}(t) = \hat y(t) - y_\text{desired}(t)
 $$
 
 where $h_0 = h_\text{win}[L n_\text{pre}] \cdot \text{norm}$ is the
@@ -178,8 +180,10 @@ In per-block mode the LTI input $x$ is itself an analog waveform
 carrying upstream pulse shape. The natural split now uses $x$ directly
 in place of $\mathrm{ZOH}(a)$:
 
+**Boxed relation (Eq. 8):**
+
 $$
-\boxed{ y_\text{desired}(t) = h_{0,\text{block}} \cdot x(t - c), \qquad y_\text{ISI}(t) = \hat y(t) - y_\text{desired}(t) }
+y_\text{desired}(t) = h_{0,\text{block}} \cdot x(t - c), \qquad y_\text{ISI}(t) = \hat y(t) - y_\text{desired}(t)
 $$
 
 i.e. *what the block would produce if it were a perfect scalar gain
@@ -270,7 +274,11 @@ $$
 The distortion estimate at sample $t = m_\text{UI}  L + \phi - \lfloor L/2\rfloor + j$ is
 
 $$
-\hat d(t) = \begin{cases} \bar e_{\pi_{m_\text{sym}}}[j], & \text{if } |\mathcal{M}_{\pi_{m_\text{sym}}}| \ge N_\text{min} \\ 0, & \text{otherwise} \end{cases}
+\hat d(t) = \bar e_{\pi_{m_\text{sym}}}[j] \quad \text{for} \quad |\mathcal{M}_{\pi_{m_\text{sym}}}| \ge N_\text{min}
+$$
+
+$$
+\hat d(t) = 0 \quad \text{for} \quad |\mathcal{M}_{\pi_{m_\text{sym}}}| < N_\text{min}
 $$
 
 and the random-noise estimate is the complementary residual
@@ -300,8 +308,10 @@ magnitude below $\sigma_n^2$ and $\hat d$ closely tracks the true $d$.
 
 A useful design rule:
 
+**Boxed rule of thumb (Eq. 18):**
+
 $$
-\boxed{ N_\text{sym} \gtrsim 100 \cdot |\mathcal{A}|^P }
+N_\text{sym} \gtrsim 100 \cdot |\mathcal{A}|^P
 $$
 
 for an unbiased and well-conditioned $\hat d$. PAM4 with $P=5$ asks for
