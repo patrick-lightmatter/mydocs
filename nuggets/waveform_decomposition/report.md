@@ -407,6 +407,25 @@ Observations:
   $n(t)$ (grey). Some of $n$ leaks into $\hat d$ via Eq. (17), but only
   at the $\sigma_n^2 / |\mathcal{M}_\pi|$ level.
 
+To make the pattern-conditioned averaging step itself visible, we also
+render a window-level diagnostic:
+[`figures/synthetic_pattern_windows.png`](figures/synthetic_pattern_windows.png).
+
+![Pattern window averaging diagnostic](figures/synthetic_pattern_windows.png)
+
+This figure shows exactly the "extract windows -> average -> subtract"
+pipeline:
+
+* Top row: a long residual segment $e(t)=y(t)-\hat y(t)$ with selected
+  UI windows highlighted, and the recovered distortion $\hat d(t)$
+  overlaid.
+* Middle row: the extracted residual windows for one repeated symbol
+  pattern (thin traces), plus their conditional mean (bold) which is
+  the deterministic distortion template for that pattern.
+* Bottom row: each window after subtracting the mean template. The
+  remainder is near-zero-mean and noise-like, matching the intended
+  $\hat n$ interpretation.
+
 For this synthetic example: SNDR = 24.6 dB, SDR = 25.3 dB, SNR = 32.9 dB,
 closure = $3.1\cdot10^{-17}$. The fact that SDR < SNR correctly flags
 the link as *distortion-dominated*, consistent with the strong tanh

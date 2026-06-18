@@ -2,6 +2,7 @@
 
 Produces:
     figures/synthetic_decomposition.png    — recovery on a known synthetic signal
+    figures/synthetic_pattern_windows.png  — residual windows + pattern averaging
     figures/pkctrl3_block_comparison.png   — bar chart of SNDR / SDR / SNR
 
 The pkctrl3-derived plots (`pkctrl3_from_symbols_*`, `pkctrl3_per_block_*`)
@@ -165,6 +166,203 @@ def figure_synthetic_recovery() -> None:
     print(f"saved → {out}")
 
 
+def figure_synthetic_pattern_windows() -> None:
+    """Visualise window extraction + pattern averaging on the residual."""
+    sps = 8
+    pattern_n_pre = 2
+    pattern_n_post = 2
+    symbols, y, _, _ = _synthesise(n_sym=9000, sps=sps)
+    decomp = decompose_waveform(
+        y,
+        symbols,
+        sps=sps,
+        n_pre=4,
+        n_post=8,
+        pattern_n_pre=pattern_n_pre,
+        pattern_n_post=pattern_n_post,
+        pattern_min_hits=4,
+        guard_ui=20,
+    )
+
+    residual = decomp.residual
+    n_ui = len(residual) // sps
+
+    pattern_bins: dict[tuple[int, ...], list[tuple[int, int, np.ndarray]]] = {}
+    sym_lo = int(pattern_n_pre)
+    sym_hi = len(symbols) - int(pattern_n_post) - 1
+    ui_lo = max(sym_lo, int(decomp.cursor_ui_offset))
+    ui_hi = min(sym_hi, int(decomp.cursor_ui_offset) + n_ui - 1)
+    for m_sym in range(ui_lo, ui_hi + 1):
+        start = (m_sym - int(decomp.cursor_ui_offset)) * sps
+        chunk = residual[start : start + sps]
+        if len(chunk) != sps:
+            continue
+        ctx = symbols[m_sym - pattern_n_pre : m_sym + pattern_n_post + 1]
+        key = tuple(int(v) for v in ctx.tolist())
+        pattern_bins.setdefault(key, []).append((m_sym, start, chunk.copy()))
+
+    if not pattern_bins:
+        raise RuntimeError("No pattern windows found for synthetic diagnostic figure.")
+
+    target_pattern, entries = max(pattern_bins.items(), key=lambda kv: len(kv[1]))
+    n_hits = len(entries)
+    n_show = min(14, n_hits)
+    sample_idx = np.linspace(0, n_hits - 1, n_show, dtype=int)
+    selected = [entries[int(i)] for i in sample_idx]
+
+    chunks = np.stack([v[2] for v in selected], axis=0)
+    chunk_mean = chunks.mean(axis=0)
+    chunk_std = chunks.std(axis=0)
+    chunk_noise = chunks - chunk_mean[None, :]
+
+    sel_ui_idx = np.array([v[1] // sps for v in selected], dtype=int)
+    ui_center = int(np.median(sel_ui_idx))
+    seg_ui_pre = 55
+    seg_ui_post = 130
+    seg_lo = max(0, ui_center - seg_ui_pre)
+    seg_hi = min(n_ui - 1, ui_center + seg_ui_post)
+    sl = slice(seg_lo * sps, (seg_hi + 1) * sps)
+
+    t_long = (np.arange(sl.stop - sl.start) / sps) + seg_lo
+    t_zoom = np.arange(sps) / sps
+
+    fig = make_subplots(
+        rows=3,
+        cols=1,
+        shared_xaxes=False,
+        vertical_spacing=0.07,
+        subplot_titles=[
+            "Long segment: residual e(t) = y(t) - ŷ(t), with selected UI windows highlighted",
+            "Extracted residual windows for one symbol pattern (thin) + pattern mean d̂ (bold)",
+            "Window residual after mean removal: n̂ = e_window - d̂ (noise-like remainder)",
+        ],
+    )
+
+    fig.add_trace(
+        go.Scatter(
+            x=t_long.tolist(),
+            y=residual[sl].tolist(),
+            mode="lines",
+            name="e(t) = y - ŷ",
+            line={"color": "steelblue", "width": 1.0},
+        ),
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=t_long.tolist(),
+            y=decomp.y_distortion[sl].tolist(),
+            mode="lines",
+            name="d̂(t) from pattern averaging",
+            line={"color": "crimson", "width": 1.2, "dash": "dash"},
+        ),
+        row=1,
+        col=1,
+    )
+
+    for ui_idx in sel_ui_idx.tolist():
+        if seg_lo <= ui_idx <= seg_hi:
+            fig.add_vrect(
+                x0=float(ui_idx),
+                x1=float(ui_idx + 1),
+                fillcolor="rgba(255,165,0,0.14)",
+                line_width=0,
+                row=1,
+                col=1,
+            )
+
+    for i in range(n_show):
+        fig.add_trace(
+            go.Scatter(
+                x=t_zoom.tolist(),
+                y=chunks[i].tolist(),
+                mode="lines",
+                showlegend=False,
+                line={"color": "rgba(70,70,70,0.30)", "width": 1.0},
+                hovertemplate="sample=%{x:.2f} UI<br>e=%{y:.4f}<extra></extra>",
+            ),
+            row=2,
+            col=1,
+        )
+    fig.add_trace(
+        go.Scatter(
+            x=t_zoom.tolist(),
+            y=chunk_mean.tolist(),
+            mode="lines",
+            name="pattern mean d̂(window)",
+            line={"color": "crimson", "width": 2.6},
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=t_zoom.tolist(),
+            y=(chunk_mean + chunk_std).tolist(),
+            mode="lines",
+            name="mean ± 1σ",
+            line={"color": "rgba(220,20,60,0.40)", "width": 1.0, "dash": "dot"},
+            showlegend=False,
+        ),
+        row=2,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=t_zoom.tolist(),
+            y=(chunk_mean - chunk_std).tolist(),
+            mode="lines",
+            fill="tonexty",
+            fillcolor="rgba(220,20,60,0.12)",
+            line={"color": "rgba(220,20,60,0.40)", "width": 1.0, "dash": "dot"},
+            showlegend=False,
+            hoverinfo="skip",
+        ),
+        row=2,
+        col=1,
+    )
+
+    for i in range(n_show):
+        fig.add_trace(
+            go.Scatter(
+                x=t_zoom.tolist(),
+                y=chunk_noise[i].tolist(),
+                mode="lines",
+                showlegend=False,
+                line={"color": "rgba(46,139,87,0.30)", "width": 1.0},
+                hovertemplate="sample=%{x:.2f} UI<br>n=%{y:.4f}<extra></extra>",
+            ),
+            row=3,
+            col=1,
+        )
+    fig.add_hline(y=0.0, line={"color": "gray", "width": 1.0, "dash": "dot"}, row=3, col=1)
+
+    fig.update_xaxes(title_text="UI index", row=1, col=1)
+    fig.update_xaxes(title_text="within-UI sample index (UI)", row=2, col=1)
+    fig.update_xaxes(title_text="within-UI sample index (UI)", row=3, col=1)
+    for r in (1, 2, 3):
+        fig.update_yaxes(title_text="amplitude", row=r, col=1)
+
+    pattern_text = ", ".join(str(v) for v in target_pattern)
+    fig.update_layout(
+        title=(
+            "Pattern-window decomposition diagnostic   |   "
+            f"pattern=[{pattern_text}], hits={n_hits}, shown={n_show}, sps={sps}"
+        ),
+        template="plotly_white",
+        height=980,
+        width=1220,
+        showlegend=True,
+        legend={"orientation": "h", "y": -0.08},
+        margin={"t": 90},
+    )
+
+    out = OUT_DIR / "synthetic_pattern_windows.png"
+    fig.write_image(str(out), scale=1.6)
+    print(f"saved → {out}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Figure 2 — pkctrl3 per-block bar chart
 # ─────────────────────────────────────────────────────────────────────────────
@@ -228,4 +426,5 @@ def figure_pkctrl3_block_comparison() -> None:
 
 if __name__ == "__main__":
     figure_synthetic_recovery()
+    figure_synthetic_pattern_windows()
     figure_pkctrl3_block_comparison()
