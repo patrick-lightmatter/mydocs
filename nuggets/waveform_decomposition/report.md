@@ -13,10 +13,10 @@ A captured serial-link waveform is the sum of several physically distinct
 contributions. The textbook decomposition is
 
 $$
-r(t) = a[m]\, h_0 + \sum_{k\neq m} a[k]\, h_{m-k} + d(t) + n(t)
+r(t) = a[m]  h_0 + \sum_{k\neq m} a[k]  h_{m-k} + d(t) + n(t)
 $$
 
-evaluated at every UI's cursor sampling instant. The four terms are, in order: the **desired** cursor-only signal $a[m]\, h_0$; the linear **ISI** $\sum_{k\neq m} a[k]\, h_{m-k}$ from neighbouring symbols; the deterministic **distortion** $d(t)$ from any non-LTI behaviour of the channel; and the random **noise** $n(t)$ that is uncorrelated with the symbol stream.
+evaluated at every UI's cursor sampling instant. The four terms are, in order: the **desired** cursor-only signal $a[m]  h_0$; the linear **ISI** $\sum_{k\neq m} a[k]  h_{m-k}$ from neighbouring symbols; the deterministic **distortion** $d(t)$ from any non-LTI behaviour of the channel; and the random **noise** $n(t)$ that is uncorrelated with the symbol stream.
 
 This nugget describes the procedure used by
 `optical_serdes.analysis.waveform_decomposition` to recover each of the
@@ -47,7 +47,9 @@ $L = T \cdot f_s$ is the integer "samples per UI" (SPS).
 
 The link is modelled as
 
-$$ y(t) = \int_{-\infty}^{\infty} h(\tau)\, x(t-\tau)\, d\tau + d(t) + n(t) \tag{2} $$
+$$
+y(t) = \int_{-\infty}^{\infty} h(\tau)  x(t-\tau)  d\tau + d(t) + n(t)
+$$
 
 where $x(t)$ is whatever LTI input drives the block under study and
 $h(t)$ is the block's symbol-spaced single-bit response (SBR).
@@ -58,7 +60,7 @@ The two modes differ only in their choice of $x$:
 
 | Mode            | $x[t]$                                              | $h[\tau]$ recovered                 |
 |-----------------|-----------------------------------------------------|-------------------------------------|
-| from-symbols    | $\delta_L(t)\!\sum_k a[k]\,\delta[t - kL]$ (Dirac train) | full link SBR (symbols → probe)     |
+| from-symbols    | $\delta_L(t)\sum_k a[k] \delta[t - kL]$ (Dirac train) | full link SBR (symbols → probe)     |
 | per-block       | measured upstream probe waveform                    | block-only IR (upstream → block out) |
 
 In from-symbols mode the Dirac train carries all frequencies, so the
@@ -79,7 +81,9 @@ they are summarised here only to establish notation.
 
 Cross-correlation gives the integer-sample lag
 
-$$ \hat\tau = \arg\max_\tau \big| (y \star x)[\tau] \big|, \qquad (y \star x)[\tau] = \sum_t y[t+\tau]\,x[t] $$
+$$
+\hat\tau = \arg\max_\tau \big| (y \star x)[\tau] \big|, \qquad (y \star x)[\tau] = \sum_t y[t+\tau] x[t]
+$$
 
 After alignment we work on a trimmed pair $(\tilde x[t], \tilde y[t])$
 of length $N$ chosen as the largest multiple of $L$ that fits, with
@@ -91,7 +95,9 @@ With $\mathbf{X}[f] = \mathcal{F}\{\tilde x\}$ and
 $\mathbf{Y}[f] = \mathcal{F}\{\tilde y\}$, the Tikhonov-regularised
 deconvolution is
 
-$$ \mathbf{H}[f] = \frac{\overline{\mathbf{X}[f]}\,\mathbf{Y}[f]}{|\mathbf{X}[f]|^2 + \lambda}, \qquad \lambda = \rho\,\overline{|\mathbf{X}|^2} \tag{3} $$
+$$
+\mathbf{H}[f] = \frac{\overline{\mathbf{X}[f]} \mathbf{Y}[f]}{|\mathbf{X}[f]|^2 + \lambda}, \qquad \lambda = \rho \overline{|\mathbf{X}|^2}
+$$
 
 with $\rho \in [10^{-5}, 10^{-3}]$ a fractional regularisation. The
 length-$N$ time-domain estimate is
@@ -103,9 +109,11 @@ The cursor sample is identified as
 $c = \arg\max_{\tau < N/4} |h_\text{full}[\tau]|$. The windowed,
 cursor-normalised IR is
 
-$$ h_\text{win}[\tau] = \frac{h_\text{full}\!\big[(\tau - L\,n_\text{pre} + c) \bmod N\big]}{h_\text{full}[c]}, \qquad \tau \in [0,\, L(n_\text{pre}+n_\text{post})) $$
+$$
+h_\text{win}[\tau] = \frac{h_\text{full}\big[(\tau - L n_\text{pre} + c) \bmod N\big]}{h_\text{full}[c]}, \qquad \tau \in [0, L(n_\text{pre}+n_\text{post}))
+$$
 
-so that $h_\text{win}[L\,n_\text{pre}] = 1$ and $\|h_\text{win}\|$ is
+so that $h_\text{win}[L n_\text{pre}] = 1$ and $\|h_\text{win}\|$ is
 bounded. The "actual" IR is then $h_\text{win} \cdot \text{norm}$ with
 $\text{norm} = h_\text{full}[c]$.
 
@@ -113,7 +121,9 @@ $\text{norm} = h_\text{full}[c]$.
 
 For both modes the linear prediction is
 
-$$ \hat y[t] = \mathcal{F}^{-1}\!\Big\{ \mathbf{X}[f] \cdot \mathcal{F}\{h_\text{rec}\}[f] \Big\}[t] \tag{4} $$
+$$
+\hat y[t] = \mathcal{F}^{-1}\Big\{ \mathbf{X}[f] \cdot \mathcal{F}\{h_\text{rec}\}[f] \Big\}[t]
+$$
 
 where $h_\text{rec}$ is $h_\text{win}\cdot\text{norm}$ embedded in a
 length-$N$ kernel and rolled back so its cursor sits at sample
@@ -121,11 +131,15 @@ index $c$. This is the canonical $\hat y$ used by `compute_sndr`.
 
 The **LTI residual** is
 
-$$ e[t] = \tilde y[t] - \hat y[t] \tag{5} $$
+$$
+e[t] = \tilde y[t] - \hat y[t]
+$$
 
 and the **classical SNDR** of the linear fit is
 
-$$ \text{SNDR}_\text{dB} = 10 \log_{10} \frac{\langle \tilde y^2\rangle}{\langle e^2 \rangle} \tag{6} $$
+$$
+\text{SNDR}_\text{dB} = 10 \log_{10} \frac{\langle \tilde y^2\rangle}{\langle e^2 \rangle}
+$$
 
 evaluated over a guard-trimmed window to suppress circular-edge
 artefacts of $\mathcal{F}^{-1}$.
@@ -140,12 +154,14 @@ in two different ways depending on the mode.
 ### 4.1  From-Symbols Split (Eq. 7)
 
 In from-symbols mode the LTI input is the Dirac train
-$x[t] = \sum_k a[k]\,\delta[t - kL]$. The natural continuous-time
+$x[t] = \sum_k a[k] \delta[t - kL]$. The natural continuous-time
 extension of the cursor-only decomposition in Eq. (1) is
 
-$$ \boxed{\, y_\text{desired}(t) = h_0 \cdot \mathrm{ZOH}(a)(t), \qquad y_\text{ISI}(t) = \hat y(t) - y_\text{desired}(t) \,} \tag{7} $$
+$$
+\boxed{ y_\text{desired}(t) = h_0 \cdot \mathrm{ZOH}(a)(t), \qquad y_\text{ISI}(t) = \hat y(t) - y_\text{desired}(t) }
+$$
 
-where $h_0 = h_\text{win}[L\,n_\text{pre}] \cdot \text{norm}$ is the
+where $h_0 = h_\text{win}[L n_\text{pre}] \cdot \text{norm}$ is the
 cursor tap value and $\mathrm{ZOH}(a)$ is the rectangular PAM4 staircase
 holding $a[m]$ throughout UI $m$. Because the Dirac input has a flat
 spectrum, $h_0$ recovers the link's true cursor gain without
@@ -162,7 +178,9 @@ In per-block mode the LTI input $x$ is itself an analog waveform
 carrying upstream pulse shape. The natural split now uses $x$ directly
 in place of $\mathrm{ZOH}(a)$:
 
-$$ \boxed{\, y_\text{desired}(t) = h_{0,\text{block}} \cdot x(t - c), \qquad y_\text{ISI}(t) = \hat y(t) - y_\text{desired}(t) \,} \tag{8} $$
+$$
+\boxed{ y_\text{desired}(t) = h_{0,\text{block}} \cdot x(t - c), \qquad y_\text{ISI}(t) = \hat y(t) - y_\text{desired}(t) }
+$$
 
 i.e. *what the block would produce if it were a perfect scalar gain
 plus its own delay*. For a memoryless block $y_\text{ISI} \equiv 0$
@@ -172,11 +190,15 @@ plus its own delay*. For a memoryless block $y_\text{ISI} \equiv 0$
 
 By construction, both splits satisfy
 
-$$ \hat y(t) \equiv y_\text{desired}(t) + y_\text{ISI}(t) \quad \text{(exact, up to FP rounding)} \tag{9} $$
+$$
+\hat y(t) \equiv y_\text{desired}(t) + y_\text{ISI}(t) \quad \text{(exact, up to FP rounding)}
+$$
 
 so the full four-way decomposition
 
-$$ \tilde y(t) = y_\text{desired}(t) + y_\text{ISI}(t) + y_\text{distortion}(t) + y_\text{noise}(t) \tag{10} $$
+$$
+\tilde y(t) = y_\text{desired}(t) + y_\text{ISI}(t) + y_\text{distortion}(t) + y_\text{noise}(t)
+$$
 
 closes to machine epsilon (see §5 for the residual split). The
 implementation reports `closure_rms`; it has been observed at
@@ -203,7 +225,9 @@ assumption) while preserving the deterministic component.
 Let $\phi = c \bmod L$ be the within-UI cursor phase. We bin
 $\tilde y$ into cursor-centred UI windows of width $L$,
 
-$$ \mathcal{W}_{m_\text{UI}} = \big[\, m_\text{UI}\, L + \phi - \lfloor L/2 \rfloor,\; m_\text{UI}\, L + \phi + L - \lfloor L/2 \rfloor \,\big) \tag{11} $$
+$$
+\mathcal{W}_{m_\text{UI}} = \big[ m_\text{UI} L + \phi - \lfloor L/2 \rfloor, m_\text{UI} L + \phi + L - \lfloor L/2 \rfloor \big)
+$$
 
 each of which contains exactly one cursor sample. The map from UI
 window $m_\text{UI}$ to symbol index $m_\text{sym}$ depends on the mode:
@@ -214,7 +238,9 @@ window $m_\text{UI}$ to symbol index $m_\text{sym}$ depends on the mode:
   symbol→$\tilde y$ lag $c_\text{sym}$ must be recovered separately by
   cross-correlating $\mathrm{Dirac}(a)$ with $\tilde y$:
 
-$$ c_\text{sym} = \arg\max_\tau \big|(\tilde y \star \mathrm{Dirac}(a))[\tau]\big| \tag{12} $$
+$$
+c_\text{sym} = \arg\max_\tau \big|(\tilde y \star \mathrm{Dirac}(a))[\tau]\big|
+$$
 
 after which $m_\text{sym} = m_\text{UI} - \lfloor c_\text{sym} / L\rfloor$
 and the UI grid uses $\phi = c_\text{sym} \bmod L$.
@@ -223,7 +249,9 @@ and the UI grid uses $\phi = c_\text{sym} \bmod L$.
 
 The local symbol context at UI $m_\text{sym}$ of length $P = p_- + 1 + p_+$ is
 
-$$ \pi_{m_\text{sym}} = \big(a[m_\text{sym} - p_-],\, \ldots,\, a[m_\text{sym}],\, \ldots,\, a[m_\text{sym} + p_+]\big) \in \mathcal{A}^P \tag{13} $$
+$$
+\pi_{m_\text{sym}} = \big(a[m_\text{sym} - p_-], \ldots, a[m_\text{sym}], \ldots, a[m_\text{sym} + p_+]\big) \in \mathcal{A}^P
+$$
 
 There are $|\mathcal{A}|^P$ distinct patterns; for PAM4 with $P=5$ this
 is $4^5 = 1024$.
@@ -235,15 +263,21 @@ $\mathcal{M}_\pi = \{ m_\text{UI} : \pi_{m_\text{sym}} = \pi \}$, the set
 of UIs sharing that context. The empirical conditional mean of the
 residual restricted to UI $m_\text{UI}$ is
 
-$$ \bar e_\pi[j] = \frac{1}{|\mathcal{M}_\pi|} \sum_{m \in \mathcal{M}_\pi} e\big[mL + \phi - \lfloor L/2\rfloor + j\big], \qquad j \in [0, L) \tag{14} $$
+$$
+\bar e_\pi[j] = \frac{1}{|\mathcal{M}_\pi|} \sum_{m \in \mathcal{M}_\pi} e\big[mL + \phi - \lfloor L/2\rfloor + j\big], \qquad j \in [0, L)
+$$
 
-The distortion estimate at sample $t = m_\text{UI}\, L + \phi - \lfloor L/2\rfloor + j$ is
+The distortion estimate at sample $t = m_\text{UI}  L + \phi - \lfloor L/2\rfloor + j$ is
 
-$$ \hat d(t) = \begin{cases} \bar e_{\pi_{m_\text{sym}}}[j], & \text{if } |\mathcal{M}_{\pi_{m_\text{sym}}}| \ge N_\text{min} \\ 0, & \text{otherwise} \end{cases} \tag{15} $$
+$$
+\hat d(t) = \begin{cases} \bar e_{\pi_{m_\text{sym}}}[j], & \text{if } |\mathcal{M}_{\pi_{m_\text{sym}}}| \ge N_\text{min} \\ 0, & \text{otherwise} \end{cases}
+$$
 
 and the random-noise estimate is the complementary residual
 
-$$ \hat n(t) = e(t) - \hat d(t) \tag{16} $$
+$$
+\hat n(t) = e(t) - \hat d(t)
+$$
 
 The minimum-hits threshold $N_\text{min}$ (default $4$) prevents
 patterns with too few observations from contaminating the distortion
@@ -254,7 +288,9 @@ estimate; their residual flows entirely into $\hat n$.
 Under the model $e[t] = d_\pi[j] + n[t]$ with $n[t]$ zero-mean and
 uncorrelated with $\pi$,
 
-$$ \mathbb{E}\big[\bar e_\pi[j]\big] = d_\pi[j], \qquad \mathrm{Var}\big[\bar e_\pi[j]\big] = \frac{\sigma_n^2}{|\mathcal{M}_\pi|} \tag{17} $$
+$$
+\mathbb{E}\big[\bar e_\pi[j]\big] = d_\pi[j], \qquad \mathrm{Var}\big[\bar e_\pi[j]\big] = \frac{\sigma_n^2}{|\mathcal{M}_\pi|}
+$$
 
 So $\bar e_\pi$ is an *unbiased* estimator of the deterministic
 distortion at the cost of a per-bin variance $\sigma_n^2 /
@@ -264,7 +300,9 @@ magnitude below $\sigma_n^2$ and $\hat d$ closely tracks the true $d$.
 
 A useful design rule:
 
-$$ \boxed{\, N_\text{sym} \gtrsim 100 \cdot |\mathcal{A}|^P \,} \tag{18} $$
+$$
+\boxed{ N_\text{sym} \gtrsim 100 \cdot |\mathcal{A}|^P }
+$$
 
 for an unbiased and well-conditioned $\hat d$. PAM4 with $P=5$ asks for
 $\sim 10^5$ symbols; the pkctrl3 dataset's $N_\text{sym} = 1.6 \cdot 10^5$
@@ -275,17 +313,25 @@ gives $\sim 156$ hits per pattern.
 ## 6  Scalar Metrics
 
 All metrics are computed over a guard-trimmed evaluation region
-$\mathcal{R} = [G\,L,\, N - G\,L)$ with $G$ the guard in UIs. Define
+$\mathcal{R} = [G L,  N - G L)$ with $G$ the guard in UIs. Define
 
-$$ P_q = \frac{1}{|\mathcal{R}|} \sum_{t\in\mathcal{R}} q[t]^2, \qquad q \in \{\tilde y,\, y_\text{desired},\, y_\text{ISI},\, \hat d,\, \hat n,\, e\} \tag{19} $$
+$$
+P_q = \frac{1}{|\mathcal{R}|} \sum_{t\in\mathcal{R}} q[t]^2, \qquad q \in \{\tilde y, y_\text{desired}, y_\text{ISI}, \hat d, \hat n, e\}
+$$
 
 Then the three SNDR-like quantities are
 
-$$ \text{SNDR}_\text{dB} = 10 \log_{10} \frac{P_{\tilde y}}{P_e} \tag{20a} $$
+$$
+\text{SNDR}_\text{dB} = 10 \log_{10} \frac{P_{\tilde y}}{P_e}
+$$
 
-$$ \text{SDR}_\text{dB} = 10 \log_{10} \frac{P_{\tilde y}}{P_{\hat d}} \tag{20b} $$
+$$
+\text{SDR}_\text{dB} = 10 \log_{10} \frac{P_{\tilde y}}{P_{\hat d}}
+$$
 
-$$ \text{SNR}_\text{dB} = 10 \log_{10} \frac{P_{\tilde y}}{P_{\hat n}} \tag{20c} $$
+$$
+\text{SNR}_\text{dB} = 10 \log_{10} \frac{P_{\tilde y}}{P_{\hat n}}
+$$
 
 Interpretation:
 
@@ -299,14 +345,18 @@ Interpretation:
 
 These three satisfy
 
-$$ \frac{1}{10^{\text{SNDR}/10}} = \frac{1}{10^{\text{SDR}/10}} + \frac{1}{10^{\text{SNR}/10}} + \frac{2\,\langle \hat d, \hat n\rangle / |\mathcal{R}|}{P_{\tilde y}} \tag{21} $$
+$$
+\frac{1}{10^{\text{SNDR}/10}} = \frac{1}{10^{\text{SDR}/10}} + \frac{1}{10^{\text{SNR}/10}} + \frac{2 \langle \hat d, \hat n\rangle / |\mathcal{R}|}{P_{\tilde y}}
+$$
 
 so the gap $\min(\text{SDR}, \text{SNR}) - \text{SNDR}$ measures how
 close the link is to being limited by a single mechanism.
 
 The implementation also exports `closure_rms`,
 
-$$ \text{closure\_rms} = \sqrt{\frac{1}{|\mathcal{R}|} \sum_{t\in\mathcal{R}} \Big(\tilde y[t] - y_\text{desired}[t] - y_\text{ISI}[t] - \hat d[t] - \hat n[t]\Big)^2} \tag{22} $$
+$$
+\text{closure\_rms} = \sqrt{\frac{1}{|\mathcal{R}|} \sum_{t\in\mathcal{R}} \Big(\tilde y[t] - y_\text{desired}[t] - y_\text{ISI}[t] - \hat d[t] - \hat n[t]\Big)^2}
+$$
 
 which by Eq. (9), (15), (16) is identically zero up to floating-point
 rounding.
