@@ -122,7 +122,7 @@ $\text{norm} = h_\text{full}[c]$.
 For both modes the linear prediction is
 
 $$
-\hat y[t] = \mathcal{F}^{-1}\Big\{ \mathbf{X}[f] \cdot \mathcal{F}\{h_\text{rec}\}[f] \Big\}[t]
+\hat{y}[t] = \mathcal{F}^{-1} \left\{ X[f] \cdot \mathcal{F}\{h_{\text{rec}}\}[f] \right\}[t]
 $$
 
 where $h_\text{rec}$ is $h_\text{win}\cdot\text{norm}$ embedded in a
