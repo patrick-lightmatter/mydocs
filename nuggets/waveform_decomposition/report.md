@@ -12,9 +12,9 @@
 A captured serial-link waveform is the sum of several physically distinct
 contributions. The textbook decomposition is
 
-$$ r(t) = \underbrace{a[m]\, h_0}_{\text{desired}} + \underbrace{\sum_{k\neq m} a[k]\, h_{m-k}}_{\text{ISI}} + \underbrace{d(t)}_{\text{distortion}} + \underbrace{n(t)}_{\text{noise}} \tag{1} $$
+$$ r(t) = a[m]\, h_0 + \sum_{k\neq m} a[k]\, h_{m-k} + d(t) + n(t) \tag{1} $$
 
-evaluated at every UI's cursor sampling instant.
+evaluated at every UI's cursor sampling instant. The four terms are, in order: the **desired** cursor-only signal $a[m]\, h_0$; the linear **ISI** $\sum_{k\neq m} a[k]\, h_{m-k}$ from neighbouring symbols; the deterministic **distortion** $d(t)$ from any non-LTI behaviour of the channel; and the random **noise** $n(t)$ that is uncorrelated with the symbol stream.
 
 This nugget describes the procedure used by
 `optical_serdes.analysis.waveform_decomposition` to recover each of the
