@@ -11,6 +11,20 @@ To evaluate the large-signal linearity of the TIA, we extracted key metrics from
 3. **10-90% Rise/Fall Time**: The exact times crossing the 10% and 90% thresholds between baseline and steady state are found via linear interpolation. Increasing rise times at larger voltage swings can indicate slew-rate limiting (inability to charge parasitic capacitances quickly enough).
 4. **Overshoot (%)**: Calculated as `(|Peak| - |Steady State|) / |Actual Step Amplitude| * 100`. Variations in overshoot percentage with amplitude often point to voltage-dependent nonlinear junction capacitances (e.g., $C_{bc}$ or $C_{je}$).
 
+## Nonlinearity Summary Plots
+
+The following plots show each metric vs. input swing (`vswing`, pk-to-pk optical) across all TIA settings and both polarities (`isign = ±1`). Color encodes setting; solid lines = `isign=+1`, dotted = `isign=−1`.
+
+### Steady-State Gain
+
+*Ipd — SS Gain (µA/µW = A/W, effective responsivity)*:
+![Ipd SS Gain](figures/nonlinearity/nonlin_ipd_ss_gain.png)
+
+*Vbump — SS Gain (mV/µW, large-signal transimpedance)*:
+![Vbump SS Gain](figures/nonlinearity/nonlin_vbump_ss_gain.png)
+
+---
+
 ## Steps Taken
 1. **Resampling**: Resampled the waveforms to put them on a UI/32 time scale, where UI = 1 / 106.25 GHz (~9.41 ps). The time axis is now plotted in Units of Interval (UI). *Note: Linear interpolation was used to prevent artificial ringing at the sharp edges of the input stimuli.*
 2. **Impulse Response Extraction**: For the Step Responses, we computed the continuous derivative (`dy/dt`) to extract the impulse response. Both the step response and its derivative are plotted in the time domain.

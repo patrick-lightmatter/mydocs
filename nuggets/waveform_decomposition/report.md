@@ -379,7 +379,9 @@ To confirm the algorithm recovers each component on a controlled signal,
 build a synthetic NRZ waveform with **known** truth values:
 
 1. $a[k] \stackrel{\text{iid}}{\sim} \mathrm{Uniform}\{-1, +1\}$, $N_\text{sym} = 6000$.
-2. Pulse $p[t] = \mathrm{sinc}(t/T) \cdot \exp(-(t/2T)^2)$, $L = 8$ SPS.
+2. Pulse $p[t]$ from a 5th-order digital Bessel low-pass filter
+   impulse response ($f_{3\text{dB}} = 0.42$ cycles/UI), sampled at
+   $L = 8$ SPS and truncated to an 8-UI span.
 3. $y_\text{linear} = (a \otimes \delta_L) * p$ — pure LTI baseline.
 4. $y_\text{nonlinear} = \tanh(\alpha y_\text{linear}) / \tanh(\alpha)$,
    $\alpha = 1.1$ — known compression.
@@ -396,16 +398,16 @@ Observations:
 
 * Row 1: $y$ (blue) and $\hat y$ (orange dashed) overlap — the linear fit
   captures the LTI portion well.
-* Row 2: the new from-symbols split. **Desired** is a clean PAM4
-  staircase at $\pm h_0$; **ISI** is the smooth deviation
-  $\hat y - h_0\cdot\mathrm{ZOH}(a)$, which carries the pulse-shape rise/fall.
-* Row 3: the recovered $\hat d(t)$ (red) closely tracks the true
-  $d(t) = \tanh(\alpha y_\text{linear})/\tanh\alpha - y_\text{linear}$ (grey).
-  The match confirms that pattern conditioning is unbiased on the
-  deterministic structure of $d$.
-* Row 4: the recovered $\hat n(t)$ (green) matches the injected
-  $n(t)$ (grey). Some of $n$ leaks into $\hat d$ via Eq. (17), but only
-  at the $\sigma_n^2 / |\mathcal{M}_\pi|$ level.
+* Row 2: direct filter-validation view. The planted synthetic pulse
+  $h_\text{true}$ (black) is overlaid with the recovered Wiener estimate
+  $h_\text{est}$ (orange dashed), both aligned at the cursor.
+* Row 3: the recovered $\hat d(t)$ (red) is the deterministic residual
+  that remains *after* the fitted linear model. In this Bessel synthetic
+  setup, much of the static tanh curvature is absorbed by $\hat y$, so
+  $\hat d$ is small.
+* Row 4: the recovered $\hat n(t)$ (green) is the complementary
+  residual $\hat n = e - \hat d$ and therefore carries most of the
+  remaining error power in this case.
 
 To make the pattern-conditioned averaging step itself visible, we also
 render a window-level diagnostic:
@@ -426,10 +428,10 @@ pipeline:
   remainder is near-zero-mean and noise-like, matching the intended
   $\hat n$ interpretation.
 
-For this synthetic example: SNDR = 24.6 dB, SDR = 25.3 dB, SNR = 32.9 dB,
-closure = $3.1\cdot10^{-17}$. The fact that SDR < SNR correctly flags
-the link as *distortion-dominated*, consistent with the strong tanh
-compression we injected.
+For this synthetic example: SNDR = 32.5 dB, SDR = 50.0 dB, SNR = 32.6 dB,
+closure = $2.4\cdot10^{-17}$. Here SNDR $\approx$ SNR and both are far
+below SDR, so the residual floor is noise-dominated while deterministic
+distortion is small but still correctly recovered in Row 3.
 
 ---
 
