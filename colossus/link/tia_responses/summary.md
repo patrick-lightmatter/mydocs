@@ -24,6 +24,16 @@ To evaluate the large-signal linearity of the TIA, we extracted key metrics from
 6. **Visualization**: Generated comprehensive PNG panels to encapsulate time domain, frequency domain, and eye diagram characteristics.
 7. **Organization**: Results are grouped by configuration setting below.
 
+## Code Repository
+The Python scripts used to process the data and generate the plots are included in the `code/` subdirectory alongside this document:
+
+- [`plot_advanced.py`](code/plot_advanced.py): Resamples waveforms, computes derivatives for impulse responses, and performs FFTs for frequency domain plots.
+- [`plot_eyes.py`](code/plot_eyes.py): Constructs PAM4 eye diagrams from the Single Bit Responses.
+- [`plot_eyes_ir.py`](code/plot_eyes_ir.py): Constructs PAM4 eye diagrams from the Step Responses (using the derivative and a Zero-Order Hold filter).
+- [`plot_nonlin.py`](code/plot_nonlin.py): Extracts 10-90% rise time, steady-state gain, and overshoot for nonlinearity analysis.
+- [`plot_normalized_steps.py`](code/plot_normalized_steps.py): Aligns step responses and normalizes them by the input `vswing` for overlay comparisons.
+- [`plot_tia_responses.py`](code/plot_tia_responses.py): Initial script for plotting raw CSV data.
+
 ## Results
 Below are the advanced response plots across the various configurations, organized on a per-node/setting basis.
 
