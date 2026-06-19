@@ -32,7 +32,9 @@ transmitted symbol sequence. The construction generalises in two ways:
 The linear baseline is Wiener-Hopf channel estimation from the
 [`channel-characterise`](../../../optical-serdes/.claude/skills/channel-characterise.md)
 skill; the new piece is the pattern-conditioned residual averaging
-that separates deterministic distortion from random noise.
+that separates deterministic distortion from random noise. How wide a
+symbol context that averaging needs is governed by the collapse law
+$L_\text{collapse} = \min(M, N)$ derived and validated in §7.8.
 
 Notation: lowercase Latin letters denote time-domain real signals;
 boldface uppercase denotes their length-$N$ rfft transforms;
@@ -376,7 +378,14 @@ rounding.
 ## 7  Synthetic Verification and New Sweep Results
 
 The synthetic validation was expanded to stress identifiability and
-conditioning, not just "single-point" correctness.
+conditioning, not just "single-point" correctness. The central result of
+this section is the **collapse law** $L_\text{collapse} = \min(M, N)$
+(§7.8): the context window needed to fully separate deterministic
+distortion from noise is the smaller of the channel memory $M$ and the
+source-state order $N$, bounded by data starvation. §7.1–§7.7 build up
+the evidence; §7.8 states and verifies the law, and §7.9 shows the
+pre-collapse floor *value* is itself predicted by the IR taps. Readers
+after the punchline can jump to §7.8.
 
 ### 7.1  Current Synthetic Setup
 
@@ -457,6 +466,192 @@ curves collapse to machine epsilon as context approaches the PRBS order
 state-identifiability behavior: once the context effectively resolves
 the driving sequence state, deterministic residuals are fully captured
 by $\hat d$ and $\hat n\to0$.
+
+### 7.6  Static Nonlinearity Strength vs Context
+
+To check whether the collapse context depends on the *severity* of the
+distortion, we sweep the static (memoryless) tanh compression strength
+$\alpha \in \{0.05, 0.1, 0.2, 0.3, 0.4\}$ and re-run the context sweep
+(5–15 UI) at exact baseline, zero noise.
+
+* [`figures/nonlinearity_gain_context_sweep.png`](figures/nonlinearity_gain_context_sweep.png) — PRBS13.
+* [`figures/nonlinearity_gain_context_sweep_prbs31.png`](figures/nonlinearity_gain_context_sweep_prbs31.png) — PRBS31, same 5–15 UI window.
+* [`figures/nonlinearity_gain_context_sweep_prbs31_ctx25-35.png`](figures/nonlinearity_gain_context_sweep_prbs31_ctx25-35.png) — PRBS31 extended to 25–35 UI, chasing the PRBS31 collapse.
+
+![Static nonlinearity gain × context sweep](figures/nonlinearity_gain_context_sweep.png)
+
+Two findings, both as predicted:
+
+1. **Magnitude scales, location does not.** Stronger $\alpha$ raises the
+   distortion magnitude and the *pre-collapse* leftover-noise floor in
+   lockstep, but the context at which the floor collapses is unchanged.
+   The collapse is a property of *source-state identifiability*, not of
+   how hard the nonlinearity bends.
+2. **PRBS13 collapses at 13; PRBS31 does not collapse in-window.** With
+   PRBS31 the floor keeps descending but never crashes to epsilon — even
+   out to 35 UI — because the 31-bit state is never resolved within a
+   feasible window (and the available record starves long before then,
+   see §7.8).
+
+### 7.7  Source-Order Dependence and the Identifiability Mechanism
+
+Holding the channel and a weak nonlinearity fixed, sweeping the PRBS
+order across $\{7, 9, 11, 13, 15\}$ shows the collapse context tracking
+the order exactly:
+
+[`figures/prbs_order_context_collapse_sweep.png`](figures/prbs_order_context_collapse_sweep.png)
+
+![PRBS-order dependence of the collapse](figures/prbs_order_context_collapse_sweep.png)
+
+Each PRBS-$N$ noise floor crashes to the floating-point floor precisely
+when the context window reaches $N$ UI, and the distortion-captured
+fraction hits 100 % there. The mechanism is illustrated in
+
+[`figures/context_identifiability_intuition.png`](figures/context_identifiability_intuition.png)
+
+![Why the collapse happens at the PRBS order](figures/context_identifiability_intuition.png)
+
+Conditioning on $N-1$ symbols leaves one past symbol free; because the
+channel is causal, that free symbol still drives the cursor distortion,
+so a single context bin secretly holds **two** distinct distortion
+waveforms and their conditional mean leaves a residual (the "noise"
+floor). Extending the context to the full $N$ symbols pins the LFSR
+state, splitting the bin into two pure groups that each collapse onto a
+single waveform — residual $\to 0$.
+
+### 7.8  The Collapse Law: Context $= \min(M, N)$
+
+The §7.5–§7.7 results are unified by recognising **two independent
+routes** to fully resolving the linear ISI by conditional averaging:
+
+* **Cover the memory.** If the context window spans every significant
+  channel tap, the distortion is determined by the in-window symbols
+  regardless of the source. This needs context $\ge M$, the **channel
+  memory** (effective tap span in UI).
+* **Identify the source state.** For an order-$N$ PRBS, any $N$
+  consecutive symbols uniquely fix the LFSR state and therefore the
+  *entire* surrounding sequence — all taps, however far. This needs
+  context $\ge N$, the **source-state order**, independent of $M$.
+
+Whichever fires first wins, giving the
+
+**Boxed collapse law:**
+
+$$
+\boxed{\;L_\text{collapse} \;=\; \min(M,\, N)\;}
+$$
+
+subject to enough data for the patterns to recur (§5.4). This is
+verified by fixing the source and varying the channel memory $M$ (via
+the skin + dielectric loss budget), then repeating across three sources
+of increasing entropy:
+
+| Channel memory $M$ (UI) | 3 | 7 | 9 | 13 | 51 |
+|---|---|---|---|---|---|
+| **PRBS9** ($N=9$) collapse | 3 | 7 | 9 | **9** | **9** |
+| **IID** ($N\to\infty$) collapse | 3 | 7 | 11 | **13** | **never** |
+| **PRBS31** ($N=31$) collapse | 3 | 7 | 11 | **13** | **never** |
+
+* [`figures/channel_memory_vs_context_prbs9.png`](figures/channel_memory_vs_context_prbs9.png) — fixed PRBS9, varied $M$: points land on $\min(M, 9)$ (flat cap at $N=9$ once $M\ge 9$).
+* [`figures/channel_memory_vs_context_iid.png`](figures/channel_memory_vs_context_iid.png) — IID source: $N\to\infty$, so the law degenerates to $L_\text{collapse}=M$ (the bare diagonal); the long-memory channel never collapses.
+* [`figures/channel_memory_vs_context_prbs31.png`](figures/channel_memory_vs_context_prbs31.png) — PRBS31: $N=31$ exceeds both the sweep and the data-starvation wall, so it is locally indistinguishable from IID and reproduces it exactly.
+
+![Channel memory M vs source order N — PRBS9](figures/channel_memory_vs_context_prbs9.png)
+
+![Channel memory M vs source order N — IID](figures/channel_memory_vs_context_iid.png)
+
+The PRBS9 panel shows the cap: channels with $M = 13$ or $51$ both
+collapse at $N=9$, because identifying the 9-bit state resolves taps the
+window cannot reach. Removing the state shortcut (IID, or PRBS31 over a
+record far shorter than its $2^{31}-1$ period) pushes the collapse back
+to $M$: $M=13$ now needs context 13, and $M=51$ never collapses.
+
+**Data-starvation ceiling.** With a high-entropy source, conditioning on
+$L$ symbols creates $2^L$ distinct patterns, each recurring
+$\approx N_\text{sym}/2^L$ times. Once $2^L \gtrsim N_\text{sym}/N_\text{min}$
+the bins stop recurring often enough to estimate, so the leftover noise
+*rises* again past that wall (here $L\approx\log_2(256{,}000/4)\approx 16$
+UI). A PRBS-$N$ source never hits this wall as long as $N$ is small,
+because its distinct patterns saturate at $2^N$ rather than $2^L$ — which
+is exactly why PRBS9 collapses cleanly but IID/PRBS31 degrade beyond
+~16 UI.
+
+### 7.9  The Pre-Collapse Floor is Predicted by the IR
+
+The §7.8 *location* of the collapse is set by $\min(M,N)$; its *value*
+before collapse is set quantitatively by the IR. The leftover noise at a
+finite context is the first-order distortion response to the **uncovered
+ISI**. At context $L = 2W+1$ the symbols outside the window contribute a
+linear component
+
+$$
+u_W(t) = \sum_{|k|>W} a[m-k]\, p_k
+$$
+
+— exactly $\mathrm{conv}(a, p)$ with the pulse's central $\pm W$ UI
+zeroed — and a first-order expansion of the static nonlinearity
+$g(y)=\tanh(\alpha y)/\tanh(\alpha)-y$ about the covered value gives
+
+**Boxed pre-collapse floor:**
+
+$$
+\boxed{\;\hat n_\text{RMS}(L) \;\approx\; \mathrm{RMS}\big( g'(y_\text{lin})\, u_W \big),
+\qquad g'(y) = \tfrac{\alpha}{\tanh\alpha}\,\mathrm{sech}^2(\alpha y) - 1\;}
+$$
+
+This prediction uses **only the planted IR taps and the known
+nonlinearity — no fit**.
+
+[`figures/predicted_floor_vs_ir.png`](figures/predicted_floor_vs_ir.png)
+
+![Pre-collapse floor predicted from the IR taps](figures/predicted_floor_vs_ir.png)
+
+For three IID-driven channels ($M = 7, 13, 51$ UI) the predicted curve
+(dashed) lands on the measured leftover (markers) across the entire
+descent and into the collapse — e.g. for $M=13$, measured
+$[2.7, 1.6, 0.99, 0.58, 0.16]\times10^{-5}$ vs predicted
+$[2.8, 1.5, 0.99, 0.54, 0.17]\times10^{-5}$. Two consequences:
+
+1. **The floor decay rate is the IR tail.** As $W$ grows, $u_W$ loses the
+   taps now inside the window, so the floor falls like the square root of
+   the *uncovered tap energy* $\sum_{|k|>W}p_k^2$. The right panel shows
+   the symbol-spaced $|p_k|$ profiles: the long-memory channel ($M=51$)
+   has the slowest-decaying tail and therefore the slowest-falling floor.
+2. **Divergence pinpoints data starvation.** Measured and predicted agree
+   until $L \gtrsim 16$, where the *measured* floor turns back up (the
+   §7.8 starvation wall) while the IR prediction keeps falling. The gap is
+   the signature that the rise is a finite-data artefact, not channel
+   physics.
+
+So the deterministic-distortion floor is fully accounted for: its
+*location* by $\min(M,N)$ and its *value* by the IR taps, leaving only
+genuine random noise and finite-data starvation unmodelled.
+
+#### 7.9.1  Confirming the rise is data starvation, not channel physics
+
+The leftover *climbs* past $\sim$16 UI in the figure above. To prove this
+is the data-starvation ceiling and not a channel effect, re-run the
+identical $M=51$ channel with **10× more symbols** ($N_\text{sym}$:
+$256\text{k}\to2.56\text{M}$). The IR — and therefore the IR-predicted
+floor — is unchanged, so any movement must be a finite-data artefact.
+
+[`figures/predicted_floor_vs_ir_2p5M.png`](figures/predicted_floor_vs_ir_2p5M.png)
+
+![Data-starvation wall moves with record length](figures/predicted_floor_vs_ir_2p5M.png)
+
+| Context $L$ | leftover @256k | %UIs kept @256k | leftover @2.56M | %UIs kept @2.56M | IR-predicted |
+|---|---|---|---|---|---|
+| 13 | $3.2\times10^{-5}$ | 100 % | $3.2\times10^{-5}$ | 100 % | $3.2\times10^{-5}$ |
+| 15 | $4.3\times10^{-5}$ | 98 % | $2.8\times10^{-5}$ | 100 % | $2.9\times10^{-5}$ |
+| **17** | $\mathbf{2.3\times10^{-4}}$ | **31 %** | $\mathbf{2.5\times10^{-5}}$ | **100 %** | $2.5\times10^{-5}$ |
+| 19 | $2.7\times10^{-4}$ | 1 % | $1.0\times10^{-4}$ | 87 % | $2.3\times10^{-5}$ |
+| 21 | $2.7\times10^{-4}$ | 0 % | $2.5\times10^{-4}$ | 13 % | $2.1\times10^{-5}$ |
+
+Three things confirm the mechanism:
+
+1. **The $L=17$ climb vanishes with more data** — leftover drops $2.3\times10^{-4}\to2.5\times10^{-5}$ (9×) purely by adding symbols, and `%UIs kept` flips $31\%\to100\%$. The channel was identical, so that floor was a starvation artefact.
+2. **The measured floor lands on the $N_\text{sym}$-independent IR prediction** once the data permits ($2.5\times10^{-5}$ at $L=17$, matching the prediction exactly) — the IR said where the floor *should* be; 256k was too starved to reach it, 2.56M does.
+3. **The wall moves by exactly $\log_2(10)\approx 3.3$ UI** (from $\sim$16 to $\sim$19.3 UI), relocating the climb to $L=19$–$21$ where hits-per-pattern fall back through $N_\text{min}=4$. A channel-physics floor cannot move when only data is added; a starvation floor must — and does, by the predicted amount.
 
 ---
 
@@ -542,11 +737,16 @@ benefit from a quieter front end before a nonlinear canceller is added.
 
 2. **Pattern context vs. nonlinear memory and sequence state.** Eq. (15)
    bins on a finite symbol window. If context is too short, deterministic
-   structure leaks into $\hat n$. In PRBS-driven synthetic tests this
-   threshold can align with PRBS order (state identifiability), while for
-   IID/random symbol drives it follows effective nonlinear/channel memory.
-   Choose $P$ to cover the dominant memory, then verify with context
-   sweeps (see §7.4–§7.5).
+   structure leaks into $\hat n$. The context needed to capture all of it
+   follows the collapse law $L_\text{collapse} = \min(M, N)$ (§7.8): the
+   smaller of the **channel memory** $M$ and the **source-state order**
+   $N$. PRBS-driven synthetic tests can collapse early via state
+   identifiability (the $N$ route), masking the true channel memory;
+   IID or long-PRBS drives remove that shortcut and expose $M$ directly,
+   but are then bounded by the data-starvation ceiling
+   $2^P \lesssim N_\text{sym}/N_\text{min}$. For real captures (effectively
+   high-entropy sources) choose $P$ to cover the dominant memory $M$, and
+   verify with context sweeps (§7.4–§7.8).
 
 3. **Pattern sparsity.** Eq. (18) is a soft floor. For PAM4 with
    $P=7$ ($4^7 = 16{,}384$ patterns), the pkctrl3 capture only delivers
