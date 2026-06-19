@@ -843,6 +843,157 @@ def figure_distortion_error_heatmap() -> None:
     print(f"saved → {out}")
 
 
+def figure_distortion_error_vs_sequence_no_noise() -> None:
+    """1D sweep: distortion RMS error vs bit-sequence window length at zero noise."""
+    sps = 8
+    n_sym = 500 * 512
+    ir_ui = 25
+    n_pre = ir_ui
+    n_post = ir_ui
+    guard_ui = 20
+    distortion_gain = 0.15
+    noise_sigma = 0.0
+
+    contexts = np.arange(2, 15, dtype=int)  # pre=post=2..14
+    total_bits = 2 * contexts + 1
+    rms_errs: list[float] = []
+    noise_sigmas_est: list[float] = []
+
+    symbols, y, dist_true, _, pulse_true = _synthesise(
+        n_sym=n_sym,
+        sps=sps,
+        pulse_span_ui=2 * ir_ui,
+        distortion_gain=distortion_gain,
+        noise_sigma=noise_sigma,
+    )
+    decomp = decompose_waveform(
+        y,
+        symbols,
+        sps=sps,
+        n_pre=n_pre,
+        n_post=n_post,
+        pattern_n_pre=2,
+        pattern_n_post=2,
+        pattern_min_hits=4,
+        guard_ui=guard_ui,
+    )
+
+    lag_samples = int(decomp.channel_estimate.lag_samples)
+    symbol_cursor = int(decomp.channel_estimate.cursor)
+
+    x_dirac = np.zeros(len(symbols) * sps, dtype=np.float64)
+    x_dirac[::sps] = symbols
+    y_linear_true = np.convolve(x_dirac, pulse_true)[: len(x_dirac)]
+    y_hat_exact = np.zeros(len(decomp.y_aligned), dtype=np.float64)
+    if lag_samples < len(y_linear_true):
+        n_copy = min(len(y_linear_true) - lag_samples, len(y_hat_exact))
+        y_hat_exact[:n_copy] = y_linear_true[lag_samples : lag_samples + n_copy]
+
+    dist_true_aligned = np.zeros(len(decomp.y_aligned), dtype=np.float64)
+    if lag_samples < len(dist_true):
+        n_copy = min(len(dist_true) - lag_samples, len(dist_true_aligned))
+        dist_true_aligned[:n_copy] = dist_true[lag_samples : lag_samples + n_copy]
+
+    residual_exact = decomp.y_aligned - y_hat_exact
+
+    for ctx in contexts:
+        y_dist, _, _, _ = _pattern_average_distortion(
+            residual_exact,
+            np.asarray(symbols, dtype=np.float64),
+            sps=sps,
+            cursor_phase=symbol_cursor % sps,
+            cursor_ui_offset=symbol_cursor // sps,
+            pattern_n_pre=int(ctx),
+            pattern_n_post=int(ctx),
+            pattern_min_hits=4,
+        )
+        # Use only the interior region where the pattern-conditioned estimate
+        # is valid for this context (exclude edge samples by construction).
+        window_start = (symbol_cursor % sps) - sps // 2
+        if window_start < 0:
+            ui_lo = (-window_start + sps - 1) // sps
+        else:
+            ui_lo = 0
+        ui_hi = (len(residual_exact) - sps - window_start) // sps
+        sym_lo = int(ctx)
+        sym_hi = len(symbols) - int(ctx) - 1
+        ui_lo_total = max(ui_lo, sym_lo + symbol_cursor // sps)
+        ui_hi_total = min(ui_hi, sym_hi + symbol_cursor // sps)
+        start = ui_lo_total * sps + window_start
+        stop = ui_hi_total * sps + window_start + sps
+
+        y_noise = residual_exact - y_dist
+        err = y_dist - dist_true_aligned
+        rms_errs.append(float(np.sqrt(np.mean(err[start:stop] ** 2))))
+        noise_sigmas_est.append(float(np.std(y_noise[start:stop])))
+
+    fig = make_subplots(
+        rows=2,
+        cols=1,
+        shared_xaxes=True,
+        vertical_spacing=0.08,
+        subplot_titles=[
+            "Distortion RMS error vs window length (interior only, noise_sigma = 0)",
+            "Estimated noise sigma vs window length (interior only, noise_sigma = 0)",
+        ],
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=total_bits.tolist(),
+            y=rms_errs,
+            mode="lines+markers",
+            name="distortion RMS error",
+            line={"color": "crimson", "width": 2},
+            marker={"size": 8},
+            hovertemplate=(
+                "bit-sequence length=%{x}<br>"
+                "RMS error=%{y:.3e}<extra></extra>"
+            ),
+        )
+    ,
+        row=1,
+        col=1,
+    )
+    fig.add_trace(
+        go.Scatter(
+            x=total_bits.tolist(),
+            y=noise_sigmas_est,
+            mode="lines+markers",
+            name="estimated noise sigma",
+            line={"color": "mediumseagreen", "width": 2},
+            marker={"size": 8},
+            hovertemplate=(
+                "bit-sequence length=%{x}<br>"
+                "noise sigma est=%{y:.3e}<extra></extra>"
+            ),
+        ),
+        row=2,
+        col=1,
+    )
+    fig.update_xaxes(
+        title_text="bit-sequence window length (pre + 1 + post)",
+        dtick=2,
+        row=2,
+        col=1,
+    )
+    fig.update_yaxes(title_text="distortion error RMS", type="log", row=1, col=1)
+    fig.update_yaxes(title_text="estimated noise sigma", type="log", row=2, col=1)
+    fig.update_layout(
+        title=(
+            "Distortion/noise estimates vs bit-sequence window length "
+            "(PRBS13, exact linear baseline, interior analyzed region, noise_sigma=0)"
+        ),
+        template="plotly_white",
+        height=760,
+        width=980,
+        showlegend=True,
+    )
+
+    out = OUT_DIR / "distortion_error_vs_bit_sequence_no_noise.png"
+    fig.write_image(str(out), scale=1.6)
+    print(f"saved → {out}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
@@ -855,3 +1006,4 @@ if __name__ == "__main__":
     figure_distortion_sigma_vs_noise_sigma()
     figure_prbs13_5ui_histogram()
     figure_distortion_error_heatmap()
+    figure_distortion_error_vs_sequence_no_noise()

@@ -373,65 +373,90 @@ rounding.
 
 ---
 
-## 7  Synthetic Verification
+## 7  Synthetic Verification and New Sweep Results
 
-To confirm the algorithm recovers each component on a controlled signal,
-build a synthetic NRZ waveform with **known** truth values:
+The synthetic validation was expanded to stress identifiability and
+conditioning, not just "single-point" correctness.
 
-1. $a[k] \stackrel{\text{iid}}{\sim} \mathrm{Uniform}\{-1, +1\}$, $N_\text{sym} = 6000$.
-2. Pulse $p[t]$ from a 5th-order digital Bessel low-pass filter
-   impulse response ($f_{3\text{dB}} = 0.42$ cycles/UI), sampled at
-   $L = 8$ SPS and truncated to an 8-UI span.
-3. $y_\text{linear} = (a \otimes \delta_L) * p$ — pure LTI baseline.
-4. $y_\text{nonlinear} = \tanh(\alpha y_\text{linear}) / \tanh(\alpha)$,
-   $\alpha = 1.1$ — known compression.
-5. $y = y_\text{nonlinear} + n$, $n \sim \mathcal{N}(0, \sigma^2)$,
-   $\sigma = 0.02$.
+### 7.1  Current Synthetic Setup
 
-Running `decompose_waveform(y, a, sps=8, n_pre=4, n_post=8,
-pattern_n_pre=2, pattern_n_post=2)` produces the four panels of
+For the controlled experiments in this report, the generator now uses:
+
+1. **PRBS13 NRZ** source, length $N_\text{bits}=500\cdot512=256{,}000$.
+2. 5th-order digital Bessel pulse at $L=8$ SPS (same construction as §3).
+3. Optional weak nonlinearity:
+   $y_\text{nonlinear}=\tanh(\alpha y_\text{linear})/\tanh(\alpha)$
+   (typical sweep value $\alpha=0.15$).
+4. Configurable AWGN $\sigma_n$.
+5. Two linear-baseline modes in plotting:
+   - **wiener**: $\hat y$ from Wiener deconvolution
+   - **exact**: planted pulse used directly (oracle baseline)
+
+The main diagnostic remains:
 [`figures/synthetic_decomposition.png`](figures/synthetic_decomposition.png).
 
 ![Synthetic decomposition recovery](figures/synthetic_decomposition.png)
 
-Observations:
+### 7.2  Pattern Coverage Sanity Check
 
-* Row 1: $y$ (blue) and $\hat y$ (orange dashed) overlap — the linear fit
-  captures the LTI portion well.
-* Row 2: direct filter-validation view. The planted synthetic pulse
-  $h_\text{true}$ (black) is overlaid with the recovered Wiener estimate
-  $h_\text{est}$ (orange dashed), both aligned at the cursor.
-* Row 3: the recovered $\hat d(t)$ (red) is the deterministic residual
-  that remains *after* the fitted linear model. In this Bessel synthetic
-  setup, much of the static tanh curvature is absorbed by $\hat y$, so
-  $\hat d$ is small.
-* Row 4: the recovered $\hat n(t)$ (green) is the complementary
-  residual $\hat n = e - \hat d$ and therefore carries most of the
-  remaining error power in this case.
+To verify that finite-context averaging is statistically meaningful, we
+added explicit 5-bit context histograms for the PRBS streams:
 
-To make the pattern-conditioned averaging step itself visible, we also
-render a window-level diagnostic:
-[`figures/synthetic_pattern_windows.png`](figures/synthetic_pattern_windows.png).
+* [`figures/prbs13_5ui_sequence_histogram.png`](figures/prbs13_5ui_sequence_histogram.png)
+* (historical comparison) [`figures/prbs9_5ui_sequence_histogram.png`](figures/prbs9_5ui_sequence_histogram.png)
 
-![Pattern window averaging diagnostic](figures/synthetic_pattern_windows.png)
+![PRBS13 5-bit histogram](figures/prbs13_5ui_sequence_histogram.png)
 
-This figure shows exactly the "extract windows -> average -> subtract"
-pipeline:
+These figures show that pattern occupancy is close to uniform but not
+exactly identical for a finite capture, which matters for per-pattern
+variance.
 
-* Top row: a long residual segment $e(t)=y(t)-\hat y(t)$ with selected
-  UI windows highlighted, and the recovered distortion $\hat d(t)$
-  overlaid.
-* Middle row: the extracted residual windows for one repeated symbol
-  pattern (thin traces), plus their conditional mean (bold) which is
-  the deterministic distortion template for that pattern.
-* Bottom row: each window after subtracting the mean template. The
-  remainder is near-zero-mean and noise-like, matching the intended
-  $\hat n$ interpretation.
+### 7.3  Noise Sweep at Fixed Context
 
-For this synthetic example: SNDR = 32.5 dB, SDR = 50.0 dB, SNR = 32.6 dB,
-closure = $2.4\cdot10^{-17}$. Here SNDR $\approx$ SNR and both are far
-below SDR, so the residual floor is noise-dominated while deterministic
-distortion is small but still correctly recovered in Row 3.
+The 1-D sweep
+[`figures/distortion_sigma_vs_noise_sigma.png`](figures/distortion_sigma_vs_noise_sigma.png)
+shows distortion-estimate sigma vs injected noise sigma (exact linear
+baseline, nonlinearity off):
+
+![Distortion sigma vs noise sigma](figures/distortion_sigma_vs_noise_sigma.png)
+
+Result: $\sigma_{\hat d}$ scales approximately linearly with $\sigma_n$,
+as expected from Eq. (17) ($\mathrm{Var}(\bar e_\pi)\propto \sigma_n^2 /
+|\mathcal M_\pi|$).
+
+### 7.4  2-D Sweep: Noise Sigma vs Context Length
+
+The new heatmap
+[`figures/distortion_error_heatmap_noise_vs_context.png`](figures/distortion_error_heatmap_noise_vs_context.png)
+maps distortion RMS error over:
+
+* x-axis: $\sigma_n \in [10^{-8},10^{-2}]$ (log-spaced)
+* y-axis: context length $P=2p+1$ with $p\in\{2,\ldots,14\}$
+
+![Distortion error heatmap](figures/distortion_error_heatmap_noise_vs_context.png)
+
+This makes two trends explicit:
+
+1. At fixed context, higher noise raises distortion-estimate error.
+2. At fixed noise, increasing context lowers deterministic leakage until
+   a floor set by finite data / edge handling / floating-point limits.
+
+### 7.5  Context-Length Sweep at Zero Noise (Interior Region)
+
+The figure
+[`figures/distortion_error_vs_bit_sequence_no_noise.png`](figures/distortion_error_vs_bit_sequence_no_noise.png)
+plots (i) distortion RMS error and (ii) estimated noise sigma vs
+bit-sequence window length, **computed on the interior analyzed region
+only**.
+
+![Distortion/noise vs bit-sequence length](figures/distortion_error_vs_bit_sequence_no_noise.png)
+
+Key finding: with PRBS13 + exact baseline + zero injected noise, both
+curves collapse to machine epsilon as context approaches the PRBS order
+(about 13 bits and above in this setup). This reproduces the expected
+state-identifiability behavior: once the context effectively resolves
+the driving sequence state, deterministic residuals are fully captured
+by $\hat d$ and $\hat n\to0$.
 
 ---
 
@@ -515,13 +540,13 @@ benefit from a quieter front end before a nonlinear canceller is added.
    preserved cleanly (important for real TIA-style blocks with
    actual postcursor memory).
 
-2. **Pattern context vs. nonlinear memory.** Eq. (15) bins on a finite
-   symbol window. Nonlinear effects with longer memory than
-   $L \cdot (p_- + p_+)$ samples appear in $\hat n$ (treated as noise)
-   even though they're deterministic. The user should choose $P$ large
-   enough to cover the IR's significant ISI span — for the TIA's
-   ~UI+50 postcursor tail, that means $p_+ \gtrsim 5$ if you want to
-   catch slow nonlinear memory effects.
+2. **Pattern context vs. nonlinear memory and sequence state.** Eq. (15)
+   bins on a finite symbol window. If context is too short, deterministic
+   structure leaks into $\hat n$. In PRBS-driven synthetic tests this
+   threshold can align with PRBS order (state identifiability), while for
+   IID/random symbol drives it follows effective nonlinear/channel memory.
+   Choose $P$ to cover the dominant memory, then verify with context
+   sweeps (see §7.4–§7.5).
 
 3. **Pattern sparsity.** Eq. (18) is a soft floor. For PAM4 with
    $P=7$ ($4^7 = 16{,}384$ patterns), the pkctrl3 capture only delivers
@@ -540,6 +565,13 @@ benefit from a quieter front end before a nonlinear canceller is added.
    correlated with no symbol pattern and lands in $\hat n$. For DCD or
    slow gain wander, a more elaborate Volterra estimate of $\hat d$
    would be needed.
+
+6. **Interior vs full-wave metrics.** `_pattern_average_distortion`
+   populates $\hat d$ only on valid cursor-centered UI windows. Samples
+   outside that analyzed span are left at zero in $\hat d$, so full-wave
+   `std(ŷ_noise)` can be dominated by edge regions. For context-sweep
+   diagnostics, report interior-only metrics (as in §7.5) unless edge
+   behaviour is explicitly the quantity of interest.
 
 ---
 
