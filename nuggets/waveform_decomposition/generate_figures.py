@@ -40,6 +40,60 @@ SYNTHETIC_LINEAR_MODE: Literal["wiener", "exact"] = "exact"
 SYNTHETIC_SKIN_LOSS_DB = 4.0
 SYNTHETIC_DIELECTRIC_LOSS_DB = 2.0
 
+# Synthetic TX analog front end: a low-loss LPF shaping the ZOH staircase
+# before it hits the channel.  Defaults model a typical serdes TX (Bessel,
+# 3 dB around the symbol Nyquist, low overshoot).  Set
+# ``SYNTHETIC_TX_AFE_CUTOFF_FRACTION = None`` to fall back to the bare ZOH
+# (the historical "ideal-TX" model used in §7.1 of the report).
+SYNTHETIC_TX_AFE_CUTOFF_FRACTION: float | None = 0.5
+SYNTHETIC_TX_AFE_ORDER: int = 4
+SYNTHETIC_TX_AFE_KIND: Literal["bessel", "butter"] = "bessel"
+
+
+def _build_tx_afe_sos(
+    *,
+    sps: int,
+    cutoff_fraction: float,
+    order: int,
+    kind: Literal["bessel", "butter"],
+):
+    """SOS coefficients for the TX-AFE low-pass filter.
+
+    ``cutoff_fraction`` is in units of ``f_baud`` (so 0.5 ⇒ 3 dB at the
+    symbol Nyquist).  scipy's ``Wn`` is relative to the sampling Nyquist
+    (``sps · f_baud / 2``), hence the conversion factor ``2 / sps``.
+    """
+    from scipy import signal as sp_signal  # local import to keep cold-start light
+    wn = 2.0 * float(cutoff_fraction) / float(sps)
+    if kind == "bessel":
+        return sp_signal.bessel(int(order), wn, btype="low", output="sos", norm="mag")
+    if kind == "butter":
+        return sp_signal.butter(int(order), wn, btype="low", output="sos")
+    raise ValueError(f"Unsupported tx_afe kind={kind!r}; use 'bessel' or 'butter'.")
+
+
+def _build_tx_afe_input(
+    symbols: np.ndarray,
+    *,
+    sps: int,
+    cutoff_fraction: float | None = SYNTHETIC_TX_AFE_CUTOFF_FRACTION,
+    order: int = SYNTHETIC_TX_AFE_ORDER,
+    kind: Literal["bessel", "butter"] = SYNTHETIC_TX_AFE_KIND,
+) -> np.ndarray:
+    """Build the analog TX waveform ``x_afe = LPF ∘ ZOH(symbols)``.
+
+    With ``cutoff_fraction=None`` the AFE is bypassed and the bare ZOH
+    staircase is returned (useful for AFE-off comparisons).
+    """
+    x_zoh = np.repeat(np.asarray(symbols, dtype=np.float64), int(sps))
+    if cutoff_fraction is None:
+        return x_zoh
+    from scipy import signal as sp_signal
+    sos = _build_tx_afe_sos(
+        sps=sps, cutoff_fraction=cutoff_fraction, order=order, kind=kind,
+    )
+    return sp_signal.sosfilt(sos, x_zoh)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Figure 1 — synthetic recovery on a known signal
@@ -57,8 +111,27 @@ def _synthesise(
     skin_loss_db: float = SYNTHETIC_SKIN_LOSS_DB,
     dielectric_loss_db: float = SYNTHETIC_DIELECTRIC_LOSS_DB,
     source: Literal["prbs", "iid"] = "prbs",
+    tx_afe_cutoff_fraction: float | None = SYNTHETIC_TX_AFE_CUTOFF_FRACTION,
+    tx_afe_order: int = SYNTHETIC_TX_AFE_ORDER,
+    tx_afe_kind: Literal["bessel", "butter"] = SYNTHETIC_TX_AFE_KIND,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Build a synthetic waveform with a known LTI + distortion + noise split."""
+    """Build a synthetic waveform with a known LTI + distortion + noise split.
+
+    With ``tx_afe_cutoff_fraction`` set (the default), the TX physics is
+
+        x_afe = LPF ∘ ZOH(symbols)           (LPF = Bessel/Butter, 3 dB at
+                                              cutoff_fraction · f_baud)
+        y_lin = x_afe ⊛ h_channel            (linear chain output)
+        y     = nonlinearity(y_lin) + AWGN
+
+    and the returned ``pulse`` is the **AFE-including** single-bit response
+    ``rect ⊛ LPF_ir ⊛ h_channel`` (normalised), so the exact-baseline
+    reconstruction ``conv(dirac(symbols), pulse)`` reproduces ``y_lin``
+    exactly even with the AFE in the chain.
+
+    Set ``tx_afe_cutoff_fraction=None`` to bypass the AFE and use the
+    historical bare-ZOH synthesis (the model used in §7.1 of the report).
+    """
     rng = np.random.default_rng(seed)
     if source == "iid":
         # IID random ±1 symbols: no finite source state (entropy order N → ∞),
@@ -84,22 +157,40 @@ def _synthesise(
         skin_loss_db=float(skin_loss_db),
         dielectric_loss_db=float(dielectric_loss_db),
     )
-    # NRZ transmit waveform: upsample the symbols and apply a one-UI zero-order
-    # hold (each symbol held for the full bit period), then drive the linear
-    # channel filter.  This is the physical NRZ model — a dirac/impulse-train
-    # drive would instead look return-to-zero.  The effective linear pulse that
-    # maps one symbol to the output is the NRZ single-bit response (the channel
-    # impulse response convolved with the 1-UI hold); we return it as `pulse`
-    # so the exact-baseline reconstruction conv(dirac(symbols), pulse)
-    # reproduces y exactly.
+    # TX physics: symbols → ZOH staircase → optional analog front end → channel.
+    # The AFE is a low-loss low-pass that models the finite bandwidth of a
+    # real serdes TX (typical 3 dB ~ f_baud/2, Bessel for clean step response).
+    # With the AFE on, ``x_afe`` is the analog waveform actually driving the
+    # channel and the effective per-symbol kernel is rect ⊛ AFE_ir ⊛ h_channel.
     channel_h = np.asarray(channel_ir.h, dtype=np.float64)
     nrz_hold = np.ones(sps, dtype=np.float64)
-    single_bit_response = np.convolve(channel_h, nrz_hold)
+    if tx_afe_cutoff_fraction is None:
+        afe_ir = np.array([1.0], dtype=np.float64)
+    else:
+        from scipy import signal as sp_signal
+        sos = _build_tx_afe_sos(
+            sps=sps, cutoff_fraction=tx_afe_cutoff_fraction,
+            order=tx_afe_order, kind=tx_afe_kind,
+        )
+        # Truncate the AFE impulse response to a span comparable with the
+        # channel kernel (16 UI is far past the LPF settling time at typical
+        # cutoffs and keeps `single_bit_response` short).
+        n_afe_ir = max(16 * sps, 128)
+        afe_imp = np.zeros(n_afe_ir, dtype=np.float64); afe_imp[0] = 1.0
+        afe_ir = sp_signal.sosfilt(sos, afe_imp)
+
+    # Single-bit response = rect ⊛ AFE_ir ⊛ channel_h (= channel_h when AFE
+    # is off, since AFE_ir is then a unit-amplitude delta).
+    single_bit_response = np.convolve(np.convolve(channel_h, afe_ir), nrz_hold)
     pulse_norm = float(np.max(np.abs(single_bit_response)))
     pulse = single_bit_response / pulse_norm
 
-    x_nrz = np.repeat(symbols, sps)
-    y_linear = np.convolve(x_nrz, channel_h)[: len(x_nrz)] / pulse_norm
+    x_zoh = np.repeat(symbols, sps)
+    if tx_afe_cutoff_fraction is None:
+        x_drive = x_zoh
+    else:
+        x_drive = sp_signal.sosfilt(sos, x_zoh)
+    y_linear = np.convolve(x_drive, channel_h)[: len(x_drive)] / pulse_norm
     if abs(distortion_gain) < 1e-12:
         y_nonlinear = y_linear.copy()
     else:
@@ -2976,6 +3067,10 @@ def figure_wiener_vs_exact_baseline(
 
     g_samp = guard_ui * sps
 
+    from optical_serdes.analysis.waveform_decomposition import (
+        decompose_block_waveform,
+    )
+
     def _run_case(scale: float, sigma: float, reg: float = default_reg) -> dict:
         skin = 4.0 * scale
         diel = 2.0 * scale
@@ -2986,10 +3081,13 @@ def figure_wiener_vs_exact_baseline(
             skin_loss_db=skin, dielectric_loss_db=diel,
         )
         m_ui = _pulse_memory_ui(pulse_true, sps=sps, max_ui=ir_ui, tol=1e-6)
+        # Analog TX input (matches the AFE used inside _synthesise) — pass to
+        # the Wiener stage so the recovered kernel is the channel IR.
+        x_afe = _build_tx_afe_input(symbols, sps=sps)
 
         # Wiener-baseline decomposition (alignment is fixed here for both paths).
-        decomp = decompose_waveform(
-            y, symbols, sps=sps, n_pre=n_pre, n_post=n_post, reg=reg,
+        decomp = decompose_block_waveform(
+            x_afe, y, symbols, sps=sps, n_pre=n_pre, n_post=n_post, reg=reg,
             pattern_n_pre=pattern_n_pre, pattern_n_post=pattern_n_post,
             pattern_min_hits=pmh, guard_ui=guard_ui,
         )
@@ -3274,6 +3372,10 @@ def figure_predicted_floor_wiener_recovers_ir(
     tanh_a = float(np.tanh(alpha))
 
     g_samp = guard_ui * sps
+    from optical_serdes.analysis.waveform_decomposition import (
+        decompose_block_waveform,
+    )
+
     interior = None  # bound per-case
     ms = lambda arr: float(np.mean(arr[interior] ** 2))  # noqa: E731
     rms = lambda arr: float(np.sqrt(ms(arr)))  # noqa: E731
@@ -3302,9 +3404,12 @@ def figure_predicted_floor_wiener_recovers_ir(
         m_ui = _pulse_memory_ui(pulse_true, sps=sps, max_ui=ir_ui, tol=1e-6)
         sym = np.asarray(symbols, dtype=np.float64)
 
-        # Anchor alignment from a default Wiener decomposition.
-        decomp0 = decompose_waveform(
-            y, symbols, sps=sps, n_pre=n_pre, n_post=n_post,
+        # Analog TX input matching the AFE used inside _synthesise.
+        x_afe = _build_tx_afe_input(symbols, sps=sps)
+
+        # Anchor alignment from a default Wiener decomposition (per-block).
+        decomp0 = decompose_block_waveform(
+            x_afe, y, symbols, sps=sps, n_pre=n_pre, n_post=n_post,
             pattern_n_pre=2, pattern_n_post=2,
             pattern_min_hits=pmh, guard_ui=guard_ui,
         )
@@ -3315,6 +3420,9 @@ def figure_predicted_floor_wiener_recovers_ir(
         interior = slice(g_samp, n - g_samp)
 
         # Exact baseline residual and IR-predicted-floor inputs.
+        # pulse_true already includes the AFE (rect ⊛ AFE_ir ⊛ channel_h), so
+        # conv(x_dirac, pulse_true) reproduces y_linear independently of the
+        # AFE on/off choice.
         x_dirac = np.zeros(len(symbols) * sps, dtype=np.float64)
         x_dirac[::sps] = symbols
         y_lin_full = np.convolve(x_dirac, pulse_true)[: len(x_dirac)]
@@ -3342,12 +3450,12 @@ def figure_predicted_floor_wiener_recovers_ir(
             u = _align(np.convolve(x_dirac, pulse_tail)[: len(x_dirac)])
             predicted.append(rms(gprime * u))
 
-        # Wiener baseline residuals at each reg.
+        # Wiener baseline residuals at each reg, via per-block path with x_afe.
         measured_W: dict[float, list[float]] = {}
         eps_W_rms: dict[float, float] = {}
         for reg in regs:
-            decomp_r = decompose_waveform(
-                y, symbols, sps=sps, n_pre=n_pre, n_post=n_post, reg=reg,
+            decomp_r = decompose_block_waveform(
+                x_afe, y, symbols, sps=sps, n_pre=n_pre, n_post=n_post, reg=reg,
                 pattern_n_pre=2, pattern_n_post=2,
                 pattern_min_hits=pmh, guard_ui=guard_ui,
             )
@@ -3436,6 +3544,255 @@ def figure_predicted_floor_wiener_recovers_ir(
     )
 
     out = OUT_DIR / "predicted_floor_wiener_recovers_ir.png"
+    fig.write_image(str(out), scale=1.6)
+    print(f"saved → {out}")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# §7.12 — TX AFE (Butterworth-shaped ZOH) variant of §7.11
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+def figure_wiener_vs_exact_baseline_tx_afe(
+    *,
+    tx_afe_cutoff_fraction: float = 0.5,
+    tx_afe_order: int = 4,
+    tx_afe_kind: Literal["bessel", "butter"] = "bessel",
+    n_sym: int = 256_000,
+    sps: int = 8,
+    ir_ui: int = 25,
+    prbs_order: int = 13,
+    distortion_gain: float = 0.10,
+    pattern_min_hits: int = 4,
+    guard_ui: int = 20,
+    partA_loss_scale: float = 0.22,
+    partC_noise_sigma: float = 1e-2,
+    noise_sigmas_partA: Sequence[float] | None = None,
+    regs_partC: Sequence[float] | None = None,
+) -> None:
+    """Re-run §7.11 Parts A and C with a low-loss TX-AFE in the chain.
+
+    Replaces the ideal ZOH at the channel input with an AFE-shaped ZOH,
+
+        x_afe(t) = LPF(f_3dB = cutoff_fraction · f_baud) ∘ ZOH(symbols)
+
+    where ``LPF`` is either a Bessel (default, maximally flat group delay
+    → essentially no overshoot, matches real TX AFE behaviour) or a
+    Butterworth (sharper roll-off, more ringing).  The captured y is then
+    ``y = x_afe ⊛ h_channel + d + n``, and the Wiener decomposition is
+    run via the per-block entry point with ``x_afe`` as the LTI input.
+    """
+    from scipy import signal as sp_signal
+
+    from optical_serdes.analysis.waveform_decomposition import (
+        decompose_block_waveform,
+    )
+
+    n_pre = n_post = ir_ui
+    pattern_n_pre = pattern_n_post = 3
+    default_reg = 1e-4
+    g_samp = guard_ui * sps
+
+    noise_sigmas_A = list(noise_sigmas_partA) if noise_sigmas_partA is not None else [
+        1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1,
+    ]
+    regs_C = list(regs_partC) if regs_partC is not None else [
+        1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8,
+    ]
+
+    # SOS for the AFE LPF.  ``Wn`` is relative to the SAMPLING Nyquist
+    # (sps · f_baud / 2), so to land the 3 dB point at
+    # ``cutoff_fraction · f_baud`` we use ``Wn = 2 · cutoff_fraction / sps``.
+    wn = 2.0 * float(tx_afe_cutoff_fraction) / float(sps)
+    if tx_afe_kind == "bessel":
+        afe_sos = sp_signal.bessel(
+            int(tx_afe_order), wn, btype="low", output="sos", norm="mag",
+        )
+    elif tx_afe_kind == "butter":
+        afe_sos = sp_signal.butter(int(tx_afe_order), wn, btype="low", output="sos")
+    else:
+        raise ValueError(f"Unsupported tx_afe_kind={tx_afe_kind!r}")
+
+    # Long-enough impulse response of the AFE filter for SBR normalisation.
+    n_afe_ir = max(16 * sps, 128)
+    afe_imp = np.zeros(n_afe_ir, dtype=np.float64)
+    afe_imp[0] = 1.0
+    afe_ir = sp_signal.sosfilt(afe_sos, afe_imp)
+
+    def _run_case_afe(scale: float, sigma: float, reg: float = default_reg) -> dict:
+        skin = SYNTHETIC_SKIN_LOSS_DB * scale
+        diel = SYNTHETIC_DIELECTRIC_LOSS_DB * scale
+
+        prbs_bits = generate_prbs(order=int(prbs_order), n_bits=n_sym)
+        symbols = (2.0 * prbs_bits.astype(np.float64)) - 1.0
+
+        ch_ir = skin_dielectric_channel_ir(
+            samples_per_symbol=sps,
+            n_ui_span=float(2 * ir_ui),
+            skin_loss_db=float(skin),
+            dielectric_loss_db=float(diel),
+        )
+        channel_h = np.asarray(ch_ir.h, dtype=np.float64)
+
+        # x_afe = LPF ∘ ZOH(symbols), played as the LTI input to the channel.
+        x_zoh = np.repeat(symbols, sps).astype(np.float64)
+        x_afe_raw = sp_signal.sosfilt(afe_sos, x_zoh)
+
+        # Single-bit response = rect ⊛ afe_ir ⊛ channel_h.  Normalize y so the
+        # SBR peak is unity, matching the convention used in §7.11.
+        rect_box = np.ones(sps, dtype=np.float64)
+        sbr_full = np.convolve(np.convolve(rect_box, afe_ir), channel_h)
+        pulse_norm = float(np.max(np.abs(sbr_full)))
+
+        y_linear = np.convolve(x_afe_raw, channel_h)[: len(x_afe_raw)] / pulse_norm
+        x_afe = x_afe_raw / pulse_norm
+        if abs(distortion_gain) < 1e-12:
+            y_nl = y_linear.copy()
+        else:
+            y_nl = np.tanh(distortion_gain * y_linear) / np.tanh(distortion_gain)
+        dist_true = y_nl - y_linear
+        noise_true = np.random.default_rng(11).normal(0.0, sigma, size=len(y_linear))
+        y = y_nl + noise_true
+
+        decomp = decompose_block_waveform(
+            x_afe, y, symbols, sps=sps, n_pre=n_pre, n_post=n_post, reg=reg,
+            pattern_n_pre=pattern_n_pre, pattern_n_post=pattern_n_post,
+            pattern_min_hits=pattern_min_hits, guard_ui=guard_ui,
+        )
+        ya = decomp.y_aligned
+        n_aligned = len(ya)
+        lag = int(decomp.channel_estimate.lag_samples)
+        cursor = int(decomp.channel_estimate.cursor)
+        y_hat_W = decomp.y_hat
+        d_hat_W = decomp.y_distortion
+        n_hat_W = decomp.y_noise
+
+        def _align(full: np.ndarray) -> np.ndarray:
+            out = np.zeros(n_aligned, dtype=np.float64)
+            if lag < len(full):
+                nc = min(len(full) - lag, n_aligned)
+                out[:nc] = full[lag : lag + nc]
+            return out
+
+        y_hat_E = _align(y_linear)
+        d_true_aligned = _align(dist_true)
+
+        res_E = ya - y_hat_E
+        sym_arr = np.asarray(symbols, dtype=np.float64)
+        d_hat_E, _, _, _ = _pattern_average_distortion(
+            res_E, sym_arr, sps=sps,
+            cursor_phase=cursor % sps, cursor_ui_offset=cursor // sps,
+            pattern_n_pre=pattern_n_pre, pattern_n_post=pattern_n_post,
+            pattern_min_hits=pattern_min_hits,
+        )
+        n_hat_E = res_E - d_hat_E
+
+        interior = slice(g_samp, n_aligned - g_samp)
+        ms = lambda a: float(np.mean(a[interior] ** 2))  # noqa: E731
+        rms = lambda a: float(np.sqrt(ms(a)))  # noqa: E731
+
+        eps_W = y_hat_E - y_hat_W
+        sigma2 = float(sigma) ** 2 if sigma > 0 else float("nan")
+        return {
+            "scale": scale, "sigma": sigma, "reg": reg,
+            "h0_W": float(decomp.h_0),
+            "d_true_rms": rms(d_true_aligned),
+            "eps_W_rms": rms(eps_W),
+            "d_err_E_rms": rms(d_hat_E - d_true_aligned),
+            "d_err_W_rms": rms(d_hat_W - d_true_aligned),
+            "n_var_ratio_E": ms(n_hat_E) / sigma2 if sigma > 0 else float("nan"),
+            "n_var_ratio_W": ms(n_hat_W) / sigma2 if sigma > 0 else float("nan"),
+        }
+
+    print(
+        f"\n=== TX AFE on:  {tx_afe_kind.capitalize()}-{tx_afe_order}, "
+        f"3 dB at {tx_afe_cutoff_fraction:.2f}·f_baud ===\n"
+    )
+
+    print(f"[Part A] in-window channel (loss_scale={partA_loss_scale:.2f}), "
+          f"reg={default_reg:.0e}, sweep σ")
+    recs_A = [_run_case_afe(partA_loss_scale, s) for s in noise_sigmas_A]
+    d_true_rms = recs_A[0]["d_true_rms"]
+    print(f"  {'σ':>9} {'ε_W RMS':>12} {'d_err_E':>12} {'d_err_W':>12} "
+          f"{'n²/σ² E':>9} {'n²/σ² W':>9}   (d_true RMS={d_true_rms:.2e})")
+    for r in recs_A:
+        print(f"  {r['sigma']:9.2e} {r['eps_W_rms']:12.2e} "
+              f"{r['d_err_E_rms']:12.2e} {r['d_err_W_rms']:12.2e} "
+              f"{r['n_var_ratio_E']:9.4f} {r['n_var_ratio_W']:9.4f}")
+
+    print(f"\n[Part C] loss_scale={partA_loss_scale:.2f}, σ={partC_noise_sigma:.0e}, "
+          f"sweep reg")
+    recs_C = [_run_case_afe(partA_loss_scale, partC_noise_sigma, reg=r) for r in regs_C]
+    print(f"  {'reg':>9} {'h_0_W':>9} {'ε_W RMS':>12} "
+          f"{'d_err_W':>12} {'n²/σ² W':>9}")
+    for r in recs_C:
+        print(f"  {r['reg']:9.0e} {r['h0_W']:9.5f} {r['eps_W_rms']:12.3e} "
+              f"{r['d_err_W_rms']:12.2e} {r['n_var_ratio_W']:9.4f}")
+
+    # Quick 2-panel comparison figure (AFE-only results — pair with §7.11 by eye)
+    fig = make_subplots(
+        rows=1, cols=2, horizontal_spacing=0.11,
+        subplot_titles=[
+            f"Part A: σ sweep, in-window M, reg={default_reg:.0e}",
+            f"Part C: reg sweep at σ={partC_noise_sigma:g}",
+        ],
+    )
+    sigmas = [r["sigma"] for r in recs_A]
+    fig.add_trace(go.Scatter(
+        x=sigmas, y=[r["d_err_E_rms"] for r in recs_A], mode="lines+markers",
+        name="d_err (exact)", line={"color": "#1f77b4", "width": 2},
+        marker={"size": 9, "line": {"color": "black", "width": 1}},
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=sigmas, y=[r["d_err_W_rms"] for r in recs_A], mode="lines+markers",
+        name="d_err (Wiener)", line={"color": "#d62728", "width": 2},
+        marker={"size": 10, "symbol": "diamond", "line": {"color": "black", "width": 1}},
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=sigmas, y=[r["eps_W_rms"] for r in recs_A], mode="lines+markers",
+        name="ε_W", line={"color": "#7f7f7f", "width": 1.5, "dash": "dot"},
+        marker={"size": 8, "symbol": "x-thin", "line": {"color": "#7f7f7f", "width": 2}},
+    ), row=1, col=1)
+    fig.add_hline(y=d_true_rms, line={"color": "black", "dash": "dash", "width": 1.0},
+                  row=1, col=1)
+
+    regs = [r["reg"] for r in recs_C]
+    fig.add_trace(go.Scatter(
+        x=regs, y=[r["d_err_W_rms"] for r in recs_C], mode="lines+markers",
+        name="d_err (Wiener) vs reg",
+        line={"color": "#d62728", "width": 2},
+        marker={"size": 10, "symbol": "diamond", "line": {"color": "black", "width": 1}},
+        showlegend=False,
+    ), row=1, col=2)
+    fig.add_trace(go.Scatter(
+        x=regs, y=[r["eps_W_rms"] for r in recs_C], mode="lines+markers",
+        name="ε_W vs reg",
+        line={"color": "#7f7f7f", "width": 1.5, "dash": "dot"},
+        marker={"size": 8, "symbol": "x-thin", "line": {"color": "#7f7f7f", "width": 2}},
+        showlegend=False,
+    ), row=1, col=2)
+    fig.add_hline(y=d_true_rms, line={"color": "black", "dash": "dash", "width": 1.0},
+                  row=1, col=2)
+
+    fig.update_xaxes(title_text="injected σ (log)", type="log", row=1, col=1)
+    fig.update_xaxes(title_text="Wiener Tikhonov reg (log)", type="log",
+                     autorange="reversed", row=1, col=2)
+    for c in (1, 2):
+        fig.update_yaxes(title_text="RMS (log)", type="log", row=1, col=c)
+
+    fig.update_layout(
+        title=(
+            f"§7.12 — TX AFE ({tx_afe_kind.capitalize()}-{tx_afe_order}, "
+            f"3 dB at {tx_afe_cutoff_fraction:.2f}·f_baud) "
+            "Wiener vs exact baseline<br>"
+            "<sup>compare numbers against §7.11 (ideal-ZOH input).  AFE "
+            "shapes x but does not remove the sinc nulls.</sup>"
+        ),
+        template="plotly_white", height=520, width=1200, margin={"t": 110},
+        legend={"orientation": "h", "y": -0.22},
+    )
+
+    out = OUT_DIR / f"wiener_vs_exact_baseline_tx_afe_{tx_afe_kind}.png"
     fig.write_image(str(out), scale=1.6)
     print(f"saved → {out}")
 

@@ -9,15 +9,33 @@
 
 ## TL;DR
 
-> **Update (Jun 22 2026):** the LTI input model was unified.  Both modes
-> now feed the Wiener stage a **ZOH staircase** $x_\text{ZOH}(t)$ built
-> from the symbol stream (or the measured upstream waveform in per-block
-> mode); there is no longer a Dirac-train code path.  The recovered
-> kernel $\hat h$ is therefore the **channel impulse response**, *not*
-> the single-bit response.  Numbers and conclusions tied to the
-> Wiener baseline (§7.11, §7.11.1, §8) have been re-measured under
-> the new model; the **exact-baseline** results in §7.1–§7.10 are
-> unaffected (they never relied on the Wiener path).
+> **Update (Jun 22 2026):** two related model changes have landed.
+>
+> 1. **Unified ZOH model.**  Both modes feed the Wiener stage a
+>    continuous-time-like input $x$ — for per-block, the measured
+>    upstream waveform; for from-symbols, a **ZOH staircase**
+>    $x_\text{ZOH}$ built from the symbol stream.  The recovered
+>    kernel $\hat h$ is therefore the **channel impulse response**,
+>    not the single-bit response.
+>
+> 2. **TX analog front end (AFE) is now in the synthetic chain by
+>    default.**  Real serdes TXs do not output an ideal ZOH staircase
+>    — they have a finite-BW analog driver.  The synthetic setup now
+>    models this as a **4th-order Bessel low-pass at 3 dB = f_baud/2**
+>    sitting between the symbol-stream ZOH and the channel:
+>    $x_\text{afe} = \mathrm{Bessel}_4 \circ x_\text{ZOH}$.
+>    The Wiener stage receives $x_\text{afe}$, so the recovered
+>    kernel is still the channel IR (the AFE is part of $x$, not of
+>    $\hat h$).  This swap is empirically a clear net win — it
+>    halves the Wiener fit-error floor and recovers
+>    $\sigma_{\hat n_W}/\sigma\to 1$ at substantially lower SNR.
+>
+> Numbers and conclusions tied to the Wiener baseline (§7.10–§7.11.1,
+> §8) have been re-measured under the AFE-on model; the
+> **exact-baseline** results in §7.5–§7.10 stand qualitatively (the
+> collapse law and IR prediction are properties of the residual,
+> not of the linear baseline) but absolute numbers shift slightly
+> because the AFE adds ~2 UI of memory.
 
 **What this is.**  A method that takes one captured waveform + the
 transmitted symbols and splits the result into four physically distinct
@@ -49,45 +67,53 @@ across $M\in\{7,13,51\}$ UI to within a few % (§7.9).  No mystery floor.
 | baseline | what $\hat h$ is | use | floor |
 |---|---|---|---|
 | **exact** (oracle IR) | planted channel IR (or SBR) | synthetic validation only | machine $\epsilon$; matches IR prediction down to $10^{-18}$ (§7.9, §7.10) |
-| **Wiener** (real captures) | Tikhonov-regularised channel IR recovered from $(x_\text{ZOH}, y)$ | production | clipped from below by $\varepsilon_W$ (§7.11), split between $\hat d$ and $\hat n$ |
+| **Wiener** (real captures) | Tikhonov-regularised channel IR recovered from $(x_\text{afe}, y)$ | production | clipped from below by $\varepsilon_W$ (§7.11), split between $\hat d$ and $\hat n$ |
 
-The Wiener clip $\varepsilon_W = \hat y_\text{exact} - \hat y_\text{W}$
-under a ZOH drive has **two distinct components**: (i) a small
-symbol-correlated piece that pattern averaging attributes to
-$\hat d_W$ (the band-limited cursor-tap effect remains, but is now
-the *channel-IR* cursor, not the SBR cursor), and (ii) a broadband
-piece coming from the ZOH input's sinc nulls — these are the
-frequencies the Wiener filter regularises into noise.  Pattern
-averaging cannot capture (ii), so it lands in $\hat n_W$.
+Under the AFE-on model, $x_\text{afe}$ is the band-limited TX
+output (no spectral content far above f_baud/2).  Out-of-band
+frequencies that the bare-ZOH model used to inject as broadband
+Wiener noise are now suppressed by the AFE.  The result: the
+Wiener fit error $\varepsilon_W = \hat y_\text{exact} - \hat y_\text{W}$
+is dominated by a (i) symbol-correlated piece that pattern
+averaging attributes to $\hat d_W$, with only a small (ii)
+residual broadband piece going into $\hat n_W$ — flipping the
+old balance.  The remaining sinc nulls at integer multiples of
+f_baud still set an absolute regularisation-noise floor, but
+it is small enough that $\sigma_{\hat n_W}/\sigma\to 1$ to
+~2 % at σ ~ 1e-2.
 
-**Concrete Wiener floors under the ZOH model (in-window $M=7$, PRBS13):**
+**Concrete Wiener floors under the AFE-on model (in-window $M=9$, PRBS13):**
 
-* Default `reg=1e-4`: $\varepsilon_W\approx1.6\times10^{-2}$ RMS,
-  $d_\text{err,W}\approx1.5\times10^{-2}$, with $\hat n_W$ inflated by
-  the broadband Wiener noise.
-* Fine `reg=1e-6`: $\varepsilon_W\approx3.0\times10^{-3}$,
-  $d_\text{err,W}\approx9\times10^{-4}$ — best achievable on this
-  setup; reducing `reg` further enters the noise-amplification
-  regime.
-* Effective SDR ceiling against a signal RMS $\approx 0.95$ is
-  $\sim 36$ dB at default reg, $\sim 60$ dB at `reg=1e-6`.
+* Default `reg=1e-4`: $\varepsilon_W\approx9.2\times10^{-3}$ RMS,
+  $d_\text{err,W}\approx9.1\times10^{-3}$, with
+  $\text{var}(\hat n_W)/\sigma^2\approx 1.02$ at σ ~ 1e-2.
+* Fine `reg=1e-6` (**recommended sweet spot**):
+  $\varepsilon_W\approx2.4\times10^{-3}$,
+  $d_\text{err,W}\approx1.2\times10^{-3}$,
+  $\text{var}(\hat n_W)/\sigma^2\approx 1.04$.
+* Below `reg=1e-6` the broadband Wiener-noise component reasserts
+  itself (`n²/σ²` jumps to 1.87 at `reg=1e-7`, 3.7 at `reg=1e-8`).
+  Best `d_err_W` actually goes a hair lower (~9.4×10⁻⁴) at
+  `reg=1e-7`/`1e-8`, at the cost of a noisier $\hat n_W$.
+* Effective SDR ceiling against a signal RMS $\approx 0.85$ is
+  $\sim 39$ dB at default reg, $\sim 57$ dB at `reg=1e-6`.
 
 **Operating guidance for real captures (§7.11):**
 
 1. Use Wiener IR window $n_\text{pre}=n_\text{post}\gtrsim M$.  For
-   pkctrl3-class channels ($M\lesssim 20$–$30$ UI) the default 51-UI
-   window is fine.
+   pkctrl3-class channels ($M\lesssim 20$–$30$ UI including the TX
+   AFE) the default 51-UI window is fine.
 2. Pick context $L \geq \min(M, N)$ for collapse, or use the §7.9
    IR-predicted floor to know how much distortion is unresolved at
    smaller $L$.
 3. For coarse measurements (real SDR $\ll 35$ dB) keep the default
    `reg=1e-4`.  For fine measurements (35–60 dB target), drop to
-   `reg=1e-6` — this is the new sweet spot under the ZOH model.
-4. **Trust $\hat n_W$ only when injected $\sigma$ comfortably
-   exceeds $\varepsilon_W$.**  In the §7.10 null-case sweep,
-   $\sigma_{\hat n_W}/\sigma\to 1$ as $\sigma$ rises above the
-   Wiener noise floor; below it $\hat n_W$ is dominated by the
-   broadband Wiener noise and over-reports.
+   `reg=1e-6` — sweet spot under the AFE-on model.
+4. **Trust $\hat n_W$ down to σ ~ 1e-3.**  In the §7.11 σ-sweep
+   under AFE-on, $\text{var}(\hat n_W)/\sigma^2 \to 1$ for any
+   σ comfortably above the Wiener noise floor (~$\varepsilon_W$
+   for the chosen reg).  Below that σ the broadband Wiener
+   regularisation noise dominates $\hat n_W$ and inflates it.
 5. Distortion bins need $\gtrsim 4$ hits each; for context $L$ this
    demands a record of at least $\sim4\cdot 2^L$ UI (data-starvation
    wall in §7.9.1).
@@ -99,21 +125,22 @@ averaging cannot capture (ii), so it lands in $\hat n_W$.
   exact baseline gives $\sigma_\hat n/\sigma\to 1$ and
   $d_\text{err}\propto\sigma/\sqrt K$ across 4 decades (§7.3, §7.10).
 * Null case: known channel, no nonlinearity, noise only — exact baseline
-  recovers $\hat d_\text{RMS}\sim 10^{-7}$ and
-  $\sigma_\hat n/\sigma=1.000$ (§7.10).
+  recovers $\sigma_\hat n/\sigma=0.9994$ at σ ~ 10⁻² (§7.10).
 * Static-nonlinearity sweep, PRBS-order sweep, channel-memory sweep —
-  all line up on the $\min(M,N)$ collapse law (§7.6–§7.8).
-* Wiener (ZOH-input) baseline calibrated against the exact baseline
+  all line up on the $\min(M,N)$ collapse law (§7.6–§7.8).  M now
+  includes ~2 UI of TX AFE memory; absolute numbers shift slightly
+  but the law is unchanged.
+* Wiener (AFE-on) baseline calibrated against the exact baseline
   (§7.11), and the §7.9 IR prediction re-tested through the Wiener
-  pipeline (§7.11.1).  The Wiener floor under ZOH is higher than the
-  old Dirac-train numbers when distortion is weak and noise is
-  near-zero (because regularised sinc-nulls now leak into $\hat n_W$);
-  it is comparable to the old numbers when σ dominates ε_W.
+  pipeline (§7.11.1).  Compared with the bare-ZOH model: ε_W at
+  `reg=1e-4` halved (1.6e-2 → 9.2e-3), and
+  $\sigma_{\hat n_W}/\sigma$ at low σ improved by an order of
+  magnitude (e.g. n²/σ² at σ=1e-3 went 17.4 → 2.2).
 
 **Confidence.**  The exact-baseline pipeline is fully understood —
 every observed floor is predicted by an analytic model, and the
 synthetic chain reaches machine epsilon when the assumptions are
-met.  The Wiener (ZOH) baseline is the only non-trivial bias in
+met.  The Wiener (AFE-on) baseline is the only non-trivial bias in
 production; its magnitude is bounded by §7.11 and its operating
 sweet spot is `reg=1e-6` with $n_\text{pre}=n_\text{post}\gtrsim M$.
 
@@ -189,27 +216,57 @@ $h_\text{ch}$, rather than the *single-bit response*
 $\text{SBR} = h_\text{ch}\star\mathrm{rect}_T$ that the previous
 Dirac-train code path returned.
 
+**TX analog front end (AFE).**  Real serdes TXs do not deliver an
+ideal ZOH staircase to the channel — there is always a finite-BW
+analog driver in front.  The synthetic chain therefore models this
+with a **low-loss low-pass filter** between the symbol-stream ZOH
+and the channel:
+
+$$
+x_\text{afe}(t) \;=\; \mathrm{LPF}_{f_{3\text{dB}}=\,c\cdot f_\text{baud}} \circ x_\text{ZOH}(t)
+$$
+
+The default `_synthesise(...)` in `generate_figures.py` uses a
+**4th-order Bessel with 3 dB at $f_\text{baud}/2$** (symbol
+Nyquist) — Bessel for maximally flat group delay (negligible
+overshoot, ~2.7 % peak ringing in the step response), with the
+cutoff at the symbol Nyquist matching a typical high-end-serdes
+TX BW.  The filter can be switched off by passing
+`tx_afe_cutoff_fraction=None` (§7.1 documents the historical
+bare-ZOH baseline for reference).
+
+The Wiener stage receives $x_\text{afe}$, so the recovered kernel
+$\hat h$ is still the **channel impulse response** $h_\text{ch}$;
+the AFE is folded into $x$, not $\hat h$.  Per-block analyses
+already used the measured upstream waveform (which naturally
+contains the upstream chain's AFE), so per-block code is
+unchanged; only from-symbols got an explicit AFE synthesis step.
+
 | Mode            | $x[t]$                                              | $\hat h[\tau]$ recovered             |
 |-----------------|-----------------------------------------------------|--------------------------------------|
-| from-symbols    | synthesised ZOH staircase $x_\text{ZOH}$            | full link channel IR (symbols → probe) |
+| from-symbols    | synthesised $x_\text{afe} = \mathrm{Bessel}_4 \circ x_\text{ZOH}$ | full link channel IR (symbols → probe) |
 | per-block       | measured upstream probe waveform                    | block-only IR (upstream → block out)   |
 
-**Consequence: the cursor tap is now sub-unit.**  The cursor sample
+**Consequence: the cursor tap is sub-unit.**  The cursor sample
 $h_0 = \hat h[L n_\text{pre}]$ is the value of the channel IR at the
 cursor offset — *not* the full per-symbol gain.  For a smooth
-band-limited channel the ZOH staircase already carries the per-UI
-rectangle, so $h_0$ underestimates the "gain per symbol" that one
-would read off the SBR.  This is by design; the multi-tap structure
-of $\hat h$ is what makes the desired/ISI split clean (§4) and is
-also what gets convolved with the ZOH staircase to produce
-$y_\text{desired}$.  See §9.1 for the implications on the
+band-limited channel, $x_\text{afe}$ already carries the per-UI
+pulse shape, so $h_0$ underestimates the "gain per symbol" that
+one would read off the SBR.  This is by design; the multi-tap
+structure of $\hat h$ is what makes the desired/ISI split clean
+(§4) and is also what gets convolved with $x_\text{afe}$ to
+produce $y_\text{desired}$.  See §9.1 for the implications on the
 desired/ISI cosmetic.
 
-The ZOH input has spectral nulls at every integer multiple of the
-baud rate.  At those frequencies the Tikhonov regularisation of
-the Wiener filter dominates, leaving a small **broadband noise**
-in $\hat h$; this is the source of the new Wiener-baseline noise
-floor characterised in §7.11.
+**Spectral picture.**  $x_\text{afe}$ still has the ZOH staircase's
+sinc-envelope nulls at every integer multiple of the baud rate
+(the Bessel multiplies them by a finite number, but zero × finite
+= zero).  The Bessel does, however, suppress the *sidelobes*
+between the nulls (frequencies in $(f_\text{baud}/2, f_\text{baud})$,
+$(f_\text{baud}, 2 f_\text{baud})$, etc.) by 20–60 dB, which
+substantially reduces the broadband-Wiener-regularisation noise
+that the bare-ZOH input was producing.  §7.11 quantifies this
+improvement.
 
 ---
 
@@ -544,15 +601,26 @@ under the ZOH model.
 For the controlled experiments in this report, the generator now uses:
 
 1. **PRBS13 NRZ** source, length $N_\text{bits}=500\cdot512=256{,}000$.
-2. 5th-order digital Bessel pulse at $L=8$ SPS (same construction as §3).
-3. Optional weak nonlinearity:
+2. Causal skin-effect + dielectric-loss channel at $L=8$ SPS
+   (`skin_dielectric_channel_ir`, default 4 dB skin + 2 dB
+   dielectric at baud Nyquist).
+3. **TX analog front end** — 4th-order Bessel low-pass at
+   3 dB = $f_\text{baud}/2$ — sitting between the symbol-stream
+   ZOH and the channel (§2).  This is enabled by default in
+   `_synthesise(...)` and can be bypassed via
+   `tx_afe_cutoff_fraction=None` to recover the historical
+   bare-ZOH model (used in earlier revisions of this report).
+4. Optional weak nonlinearity:
    $y_\text{nonlinear}=\tanh(\alpha y_\text{linear})/\tanh(\alpha)$
    (typical sweep value $\alpha=0.15$).
-4. Configurable AWGN $\sigma_n$.
-5. Two linear-baseline modes in plotting:
-   - **wiener**: $\hat y$ from Wiener deconvolution against $x_\text{ZOH}$
-   - **exact**: planted pulse convolved with the symbol stream
-     (oracle baseline; bypasses Wiener entirely)
+5. Configurable AWGN $\sigma_n$.
+6. Two linear-baseline modes in plotting:
+   - **wiener**: $\hat y$ from Wiener deconvolution against $x_\text{afe}$
+     (the per-block decomposition entry point with the AFE-shaped
+     ZOH played as the LTI input).
+   - **exact**: planted SBR (rect ⊛ AFE_ir ⊛ channel_h) convolved
+     with the symbol stream (oracle baseline; bypasses Wiener
+     entirely).
 
 The main diagnostic remains:
 [`figures/synthetic_decomposition.png`](figures/synthetic_decomposition.png).
@@ -819,9 +887,12 @@ noise variance.
 
 **Panel 1 (vs injected $\sigma$, short $P=5$ context).** The estimated
 noise RMS lands on the unity diagonal across three decades of $\sigma$
-(recovered/injected variance $= 0.9994$), while the estimated distortion
-RMS sits a factor $\sqrt{K}\approx 89$ below it and scales linearly with
-$\sigma$ — i.e. it is a finite-sample artefact, not real distortion.
+(recovered/injected variance $= 0.9994$ under the AFE-on default, and
+$0.9994$ under bare-ZOH — the exact-baseline residual is independent
+of the AFE since `pulse_true` includes the AFE response by
+construction), while the estimated distortion RMS sits a factor
+$\sqrt{K}\approx 89$ below it and scales linearly with $\sigma$ —
+i.e. it is a finite-sample artefact, not real distortion.
 
 **Why distortion is not *exactly* zero.** With $e = n$ the per-pattern
 mean of $K$ noise samples is itself random with variance $\sigma^2/K$.
@@ -848,51 +919,52 @@ interest, use the shortest context that still covers the channel memory**
 ($P \gtrsim M$, §7.8) — every extra UI of context beyond that trades real
 noise for spurious distortion at rate $1/K$.
 
-### 7.11  Wiener vs Exact Linear Baseline (ZOH input model)
+### 7.11  Wiener vs Exact Linear Baseline (AFE-on model)
 
 Every validation in §7.1–§7.10 used the **exact** (oracle) planted IR
 as the linear baseline.  Real captures use the **Wiener** estimate via
 [`estimate_channel`](../../../optical-serdes/src/optical_serdes/utils/channel_estimation.py),
-which under the unified ZOH input model (§2) returns the channel IR
-$\hat h_\text{ch}$.  Its fit error
-$\varepsilon_W = \hat y_\text{exact}-\hat y_\text{Wiener}$ is a mix of
-*deterministic, symbol-correlated* content (pattern averaging will push
-this into $\hat d_W$) and *broadband, symbol-uncorrelated* content from
-the ZOH input's sinc nulls (pattern averaging leaves this in $\hat n_W$).
+which under the AFE-on input model (§2) returns the channel IR
+$\hat h_\text{ch}$ fit against $x_\text{afe}$.  Its fit error
+$\varepsilon_W = \hat y_\text{exact}-\hat y_\text{Wiener}$ is a mix
+of *deterministic, symbol-correlated* content (pattern averaging
+attributes this to $\hat d_W$) and *broadband, symbol-uncorrelated*
+content from the residual ZOH sinc nulls (this falls into
+$\hat n_W$).  The AFE strongly suppresses the broadband component
+relative to the bare-ZOH model.
+
 This section calibrates the leakage of each with a synthetic where
 ground truth is known: $y = y_\text{lin}+d_\text{true}+n_\text{true}$
 is decomposed twice on the same alignment grid (PRBS13, weak tanh
-$\alpha=0.1$ giving $d_\text{true,RMS}\approx 4.7\times10^{-4}$, 51-UI
-Wiener IR window).
+$\alpha=0.1$ giving $d_\text{true,RMS}\approx 8.5\times10^{-4}$,
+51-UI Wiener IR window).
 
 [`figures/wiener_vs_exact_baseline.png`](figures/wiener_vs_exact_baseline.png)
 
-![Wiener vs exact baseline](figures/wiener_vs_exact_baseline.png)
+![Wiener vs exact baseline (AFE-on)](figures/wiener_vs_exact_baseline.png)
 
-**Panel A — vs injected $\sigma$, in-window channel ($M=7$ UI), default
-reg $=10^{-4}$.**  The exact-baseline distortion error scales linearly
-with $\sigma$ (the $\sigma/\sqrt{K}$ averaging artefact, §7.10) and stays
-well below $d_\text{true,RMS}$.  The Wiener distortion error sits at a
-floor of $\sim 1.5\times10^{-2}$ — about **30× the true distortion RMS**
-— and is ~independent of $\sigma$.  The noise-variance ratio
-$\text{var}(\hat n_W)/\sigma^2$ tells the new story: at low $\sigma$ the
-Wiener-noise component of $\varepsilon_W$ dwarfs the AWGN, inflating
-$\hat n_W$ by factors of hundreds; once $\sigma\gtrsim\varepsilon_W$
-($\sigma\gtrsim 3\times10^{-2}$ here) the ratio is back to ~unity.
+**Panel A — vs injected $\sigma$, in-window channel ($M=9$ UI, AFE
+included), default reg $=10^{-4}$.**  The exact-baseline distortion
+error scales linearly with $\sigma$ (the $\sigma/\sqrt{K}$ averaging
+artefact, §7.10) and stays well below $d_\text{true,RMS}$.  The
+Wiener distortion error sits at a floor of $\sim 9.1\times10^{-3}$
+and is independent of $\sigma$ across 3 decades.  The
+noise-variance ratio $\text{var}(\hat n_W)/\sigma^2$:
 
 | $\sigma$ | $\varepsilon_W$ RMS | $d_\text{err}$ (exact) | $d_\text{err}$ (Wiener) | $\text{var}(\hat n_W)/\sigma^2$ |
 |---|---|---|---|---|
-| $10^{-4}$ | $1.58\times10^{-2}$ | $2.0\times10^{-5}$ | $1.53\times10^{-2}$ | **1639** |
-| $10^{-3}$ | $1.58\times10^{-2}$ | $3.0\times10^{-5}$ | $1.52\times10^{-2}$ | **17.4** |
-| $10^{-2}$ | $1.57\times10^{-2}$ | $2.2\times10^{-4}$ | $1.51\times10^{-2}$ | **1.17** |
-| $10^{-1}$ | $1.86\times10^{-2}$ | $2.2\times10^{-3}$ | $1.48\times10^{-2}$ | **1.01** |
+| $10^{-4}$ | $9.15\times10^{-3}$ | $5.0\times10^{-5}$ | $9.09\times10^{-3}$ | 120 |
+| $10^{-3}$ | $9.16\times10^{-3}$ | $5.5\times10^{-5}$ | $9.09\times10^{-3}$ | **2.19** |
+| $10^{-2}$ | $9.23\times10^{-3}$ | $2.3\times10^{-4}$ | $9.14\times10^{-3}$ | **1.02** |
+| $10^{-1}$ | $1.22\times10^{-2}$ | $2.2\times10^{-3}$ | $1.01\times10^{-2}$ | **1.00** |
 
-This is the principal qualitative change from the old Dirac-train
-factorization: under Dirac drive, $\varepsilon_W$ was almost entirely
-symbol-correlated (cursor-tap bias) and pattern averaging absorbed
-~100 % of it into $\hat d_W$, leaving $\hat n_W$ clean.  Under the ZOH
-drive, $\varepsilon_W$ now has a broadband component from the sinc
-nulls — *this is why $\hat n_W$ no longer tracks $\sigma$ at low SNR*.
+The AFE has *halved* $\varepsilon_W$ at default reg (from 1.57e-2
+in the bare-ZOH model to 9.15e-3) and *transformed* the
+noise-variance recovery: $\text{var}(\hat n_W)/\sigma^2$ at
+σ=1e-3 drops from 17.4 (bare ZOH) to 2.2; at σ=1e-2 it pulls in
+from 1.17 to 1.02.  The remaining inflation at very low σ
+($\sigma=10^{-4}$) is the residual sinc-null Wiener noise — still
+present, but ~14× lower in absolute magnitude than under bare ZOH.
 
 **Panel B — fixed $\sigma=10^{-2}$, sweep channel memory $M$.**  With
 the 51-UI Wiener window, $M\in\{7,13,25,51\}$ UI all fit (the longest
@@ -900,18 +972,15 @@ just barely):
 
 | $M$ | $\varepsilon_W$ RMS | $d_\text{err}$ (Wiener) | $\text{var}(\hat n_W)/\sigma^2$ | $d_\text{true,RMS}$ |
 |---|---|---|---|---|
-| 7  | $1.62\times10^{-2}$ | $1.57\times10^{-2}$ | 1.18 | $4.6\times10^{-4}$ |
-| 13 | $1.33\times10^{-2}$ | $1.27\times10^{-2}$ | 1.14 | $5.4\times10^{-4}$ |
-| 25 | $1.06\times10^{-2}$ | $1.01\times10^{-2}$ | 1.09 | $6.5\times10^{-4}$ |
-| 51 | $9.11\times10^{-3}$ | $6.17\times10^{-3}$ | 1.44 | $1.1\times10^{-3}$ |
+| 7  | $9.34\times10^{-3}$ | $9.25\times10^{-3}$ | 1.02 | $8.3\times10^{-4}$ |
+| 13 | $8.54\times10^{-3}$ | $8.47\times10^{-3}$ | 1.01 | $9.7\times10^{-4}$ |
+| 25 | $7.65\times10^{-3}$ | $7.58\times10^{-3}$ | 1.01 | $1.2\times10^{-3}$ |
+| 51 | $9.68\times10^{-3}$ | $6.16\times10^{-3}$ | **1.55** | $2.2\times10^{-3}$ |
 
-Unlike the old Dirac-train numbers (where $\varepsilon_W$ was flat in
-$M$), the ZOH ε_W *decreases* with $M$.  Intuition: a longer
-channel has more energy at low frequencies and less at the ZOH's
-spectral nulls, so the regularised-noise component of $\varepsilon_W$
-shrinks.  At $M=51$ (right at the window edge) IR truncation starts
-to leak unstructured energy into $\hat n_W$
-($\text{var}(\hat n_W)/\sigma^2:1.18\to1.44$) — the symbol-correlated
+ε_W shrinks gently with $M$ as the channel pulls Wiener-recoverable
+energy down from the sinc nulls; at $M=51$ (right at the window edge)
+IR truncation starts to leak unstructured energy into $\hat n_W$
+($\text{var}(\hat n_W)/\sigma^2:1.02\to1.55$) — the symbol-correlated
 component drops but the broadband component creeps back up.
 
 **Panel C — sweep Wiener Tikhonov regularisation `reg` (in-window, fixed
@@ -919,49 +988,52 @@ $\sigma=10^{-2}$).**  The `reg`-sweep pins the mechanism:
 
 | `reg` | $h_0$ (W) | $\varepsilon_W$ RMS | $d_\text{err}$ (Wiener) | $\text{var}(\hat n_W)/\sigma^2$ |
 |---|---|---|---|---|
-| $10^{-3}$ | 0.503 | $6.04\times10^{-2}$ | $6.02\times10^{-2}$ | 1.30 |
-| $10^{-4}$ **(default)** | 0.631 | $1.57\times10^{-2}$ | $1.51\times10^{-2}$ | 1.17 |
-| $10^{-5}$ | 0.687 | $4.32\times10^{-3}$ | $2.81\times10^{-3}$ | 1.11 |
-| $10^{-6}$ **(recommended)** | 0.707 | $2.98\times10^{-3}$ | $8.68\times10^{-4}$ | 1.08 |
-| $10^{-7}$ | 0.713 | $2.59\times10^{-3}$ | $9.82\times10^{-4}$ | 1.06 |
-| $10^{-8}$ | 0.714 | $3.31\times10^{-3}$ | $1.07\times10^{-3}$ | 1.10 |
+| $10^{-3}$ | 0.226 | $2.93\times10^{-2}$ | $2.93\times10^{-2}$ | 1.05 |
+| $10^{-4}$ **(default)** | 0.284 | $9.23\times10^{-3}$ | $9.14\times10^{-3}$ | 1.02 |
+| $10^{-5}$ | 0.359 | $3.37\times10^{-3}$ | $3.16\times10^{-3}$ | 1.01 |
+| $10^{-6}$ **(recommended)** | 0.466 | $2.41\times10^{-3}$ | $1.19\times10^{-3}$ | 1.04 |
+| $10^{-7}$ | 0.688 | $9.39\times10^{-3}$ | $9.40\times10^{-4}$ | **1.87** |
+| $10^{-8}$ | 0.850 | $1.65\times10^{-2}$ | $9.50\times10^{-4}$ | **3.73** |
 
 The `reg`-sweep shrinks $\varepsilon_W$ to a floor of
-$\sim 2.6\times10^{-3}$ around `reg`$=10^{-7}$; below that
-noise-amplification re-inflates it.  The optimum
-*distortion-recovery* point is `reg`$=10^{-6}$, giving
-$d_\text{err,W}\approx 9\times10^{-4}$ — a **17×** improvement on
-the default reg.  The noise-variance ratio also pulls in toward
-unity (1.17 → 1.08).
+$\sim 2.4\times10^{-3}$ at `reg`$=10^{-6}$; below that
+noise-amplification re-inflates $\varepsilon_W$ much more sharply
+than under bare ZOH (under bare ZOH, the noise-amp regime started
+around `reg`$=10^{-8}$; under AFE-on it kicks in at `reg`$=10^{-7}$
+because the AFE-attenuated high-frequency bands now have very small
+$|X|^2$ that the lower reg can no longer cope with).
 
-In ratio terms against signal RMS $\approx 0.95$, the achievable
+The optimum *distortion-recovery* point is `reg`$=10^{-6}$, giving
+$d_\text{err,W}\approx 1.2\times10^{-3}$ — an **8×** improvement on
+the default reg.  Pushing to `reg`$=10^{-7}/10^{-8}$ shaves
+$d_\text{err,W}$ a hair more (to ~9.4e-4) at the cost of inflating
+$\hat n_W$ by ~2–4×; not worth it in practice.
+
+In ratio terms against signal RMS $\approx 0.85$, the achievable
 SDR ceilings are roughly:
 
 | `reg` | $d_\text{err,W}$ | SDR ceiling |
 |---|---|---|
-| $10^{-3}$ | $6.0\times10^{-2}$ | 24 dB |
-| $10^{-4}$ | $1.5\times10^{-2}$ | 36 dB |
-| $10^{-5}$ | $2.8\times10^{-3}$ | 51 dB |
-| $10^{-6}$ | $8.7\times10^{-4}$ | 60 dB |
-| $10^{-7}$ | $9.8\times10^{-4}$ | 60 dB |
+| $10^{-3}$ | $2.9\times10^{-2}$ | 29 dB |
+| $10^{-4}$ | $9.1\times10^{-3}$ | 39 dB |
+| $10^{-5}$ | $3.2\times10^{-3}$ | 48 dB |
+| $10^{-6}$ | $1.2\times10^{-3}$ | 57 dB |
+| $10^{-7}$ | $9.4\times10^{-4}$ | 59 dB |
 
-So the **Wiener-baseline SDR ceiling** is $\sim 36$ dB at default reg
-and $\sim 60$ dB at `reg=1e-6`.  These numbers replace the old "40 dB
-@ reg=1e-4, 60 dB @ reg=1e-6, $\sim -20\log_{10}(\text{reg})$ dB" rule
-of thumb from the Dirac-train factorization — the ceiling at default
-reg has dropped by $\sim 4$ dB because more of $\varepsilon_W$ now
-leaks into $\hat n_W$ rather than fully landing in $\hat d_W$.
+So the **Wiener-baseline SDR ceiling** under AFE-on is $\sim 39$ dB
+at default reg and $\sim 57$ dB at `reg=1e-6` — a few dB *better*
+than the bare-ZOH ceiling at default reg, and on par at
+`reg=1e-6`, with substantially better $\hat n_W$ in both cases.
 
-> Aside on $h_0$: the reported Wiener cursor tap settles around 0.71
-> as reg shrinks.  This is **not** a residual bias — it is the cursor
-> sample of the channel IR $h_\text{ch}$, which for this PAM4 / NRZ
-> setup with a 5th-order Bessel pulse and a smooth electrical channel
-> is intrinsically below unity (the planted pulse has peak 1 spanning
-> several samples; deconvolving by the rectangular ZOH spreads that
-> peak over $L$ samples, leaving the cursor at ~$1/L$ times an
-> integrated weight).  The OLD Dirac-train factorization recovered
-> $h_0\approx 1$ because it returned the SBR cursor, not the IR
-> cursor.
+> Aside on $h_0$: the reported Wiener cursor tap is now ~0.47 at
+> the recommended `reg=1e-6` (and ~0.69 at `reg=1e-7`).  This is
+> *not* a bias — it is the cursor sample of the channel IR
+> $h_\text{ch}$ recovered by deconvolving the AFE-shaped input.
+> Because the AFE has no spectral content above ~$f_\text{baud}/2$,
+> the Wiener cannot recover the high-frequency taps of $h_\text{ch}$
+> there; the recovered IR is therefore a low-pass-filtered version
+> of $h_\text{ch}$, with a smaller cursor sample and slightly more
+> spread tails.  Total integrated weight is preserved.
 
 **Operating guidance (closes the §1 motivation):**
 
@@ -969,11 +1041,12 @@ leaks into $\hat n_W$ rather than fully landing in $\hat d_W$.
   default `reg=1e-4` is fine — the Wiener floor is well under the signal.
 * For fine measurements (SDR target 35–60 dB), **lower `reg` to
   $10^{-6}$** *when the channel comfortably fits the Wiener window*
-  (§7.11.1); $d_\text{err,W}$ drops by 17× and
-  $\text{var}(\hat n_W)/\sigma^2$ pulls into unity.
+  (§7.11.1); $d_\text{err,W}$ drops by an order of magnitude with
+  no penalty in $\hat n_W$.
 * For **noise-variance recovery**, require $\sigma\gtrsim\varepsilon_W$
-  — i.e. for `reg=1e-6` the trusted floor is $\sigma\gtrsim 3\times10^{-3}$
-  (RMS).  Below that, the broadband Wiener noise dominates $\hat n_W$.
+  — i.e. for `reg=1e-6` the trusted floor is $\sigma\gtrsim 2.4\times10^{-3}$
+  (RMS).  Below that, the residual broadband Wiener noise dominates
+  $\hat n_W$.
 * The §7.8 collapse law and §7.9 IR-prediction were validated against the
   exact baseline and are unchanged.  Under the Wiener baseline, the
   pre-collapse floors in those experiments are **clipped from below**
@@ -981,7 +1054,7 @@ leaks into $\hat n_W$ rather than fully landing in $\hat d_W$.
 * The **exact-baseline** path remains the right tool for any quantitative
   ground-truth synthetic validation.
 
-### 7.11.1  §7.9 IR-prediction under the Wiener (ZOH) baseline
+### 7.11.1  §7.9 IR-prediction under the Wiener (AFE-on) baseline
 
 §7.9 validated the IR-predicted leftover-noise floor against the exact
 baseline; §7.11 calibrated the Wiener clip at default reg.  Tying the two
@@ -989,81 +1062,65 @@ together: can the Wiener pipeline recover the §7.9 descent if we use the
 recommended low reg?  Re-running the §7.9 measurement (IID source, weak
 tanh $\alpha=0.05$, no noise, 51-UI Wiener IR window) at both
 `reg`$=10^{-4}$ and `reg`$=10^{-6}$ for two channels — $M=7$ UI (well
-in-window) and $M=51$ UI (right at the window edge) — gives:
+in-window, AFE included) and $M=51$ UI (right at the window edge) — gives:
 
 [`figures/predicted_floor_wiener_recovers_ir.png`](figures/predicted_floor_wiener_recovers_ir.png)
 
-![Wiener IR recovery (ZOH model)](figures/predicted_floor_wiener_recovers_ir.png)
+![Wiener IR recovery (AFE-on)](figures/predicted_floor_wiener_recovers_ir.png)
 
 | channel | `reg` | $\varepsilon_W$ RMS | floor at $L=3$ | floor at $L=15$ |
 |---|---|---|---|---|
-| $M=7$ (in-window) | $10^{-4}$ | $4.2\times10^{-3}$ | $4.0\times10^{-3}$ | $3.6\times10^{-3}$ |
-| $M=7$ (in-window) | $10^{-6}$ | $1.4\times10^{-3}$ | $1.4\times10^{-3}$ | $1.3\times10^{-3}$ |
-| $M=51$ (window-edge) | $10^{-4}$ | $6.6\times10^{-3}$ | $6.6\times10^{-3}$ | $6.2\times10^{-3}$ |
-| $M=51$ (window-edge) | $10^{-6}$ | $6.4\times10^{-3}$ | $6.4\times10^{-3}$ | $6.0\times10^{-3}$ |
+| $M=7$ (in-window) | $10^{-4}$ | $2.3\times10^{-3}$ | $1.3\times10^{-3}$ | $8.9\times10^{-4}$ |
+| $M=7$ (in-window) | $10^{-6}$ | $8.1\times10^{-4}$ | $7.7\times10^{-4}$ | $7.2\times10^{-4}$ |
+| $M=51$ (window-edge) | $10^{-4}$ | $7.6\times10^{-3}$ | $7.5\times10^{-3}$ | $7.0\times10^{-3}$ |
+| $M=51$ (window-edge) | $10^{-6}$ | $7.6\times10^{-3}$ | $7.5\times10^{-3}$ | $7.1\times10^{-3}$ |
 
-This is the corner of the experiment design where the ZOH model
-loses the most ground to the old Dirac-train code: with σ=0 and a
-weak nonlinearity, the only thing in the Wiener residual is the
-ZOH sinc-null noise itself.  Pattern averaging cannot capture that
-broadband component, so essentially the entire $\varepsilon_W$ now
-appears as leftover (the Wiener curves in the figure are *flat in
-$L$* at the $\varepsilon_W$ level — no descent at all).  For
-comparison, the old Dirac-train numbers had a much smaller
-$\varepsilon_W$ in this regime ($\sim 8\times10^{-4}$ at reg=1e-4,
-$\sim 10^{-4}$ at reg=1e-6) **and** pattern averaging absorbed
-~90 % of it into $\hat d_W$, so the old leftover was $\sim 10^{-4}$
-range — 10–30× lower than the new numbers.
+Compared with the bare-ZOH numbers from earlier revisions, the
+AFE-on Wiener floor is **down 2–3×** in the in-window regime
+(was $\sim 4\times10^{-3}$ at reg=1e-4, $\sim 1.4\times10^{-3}$
+at reg=1e-6; now $\sim 1.3\times10^{-3}$ and $\sim 7.7\times10^{-4}$
+respectively).  The improvement comes from the AFE suppressing
+the ZOH sinc sidelobes between the nulls — most of the broadband
+Wiener-regularisation noise that the bare ZOH was producing is
+now blocked at the source.
 
-That sounds like a regression, and in this synthetic corner it is.
-But it is a *physical* one — the old number was wrong in two ways
-at once:
+Two regimes:
 
-1. It returned the SBR cursor, not the channel IR cursor, so $h_0$
-   reflected the full per-symbol gain (this is what the user
-   asked us to fix).
-2. Its $\varepsilon_W$ was symbol-correlated (cursor-tap bias under
-   Dirac drive) so it cleanly landed in $\hat d_W$ — but that
-   meant any *real* distortion below $\varepsilon_W$ was
-   indistinguishable from the Wiener bias.
-
-The new model has a higher leftover *floor* but a lower bias on
-$\hat d_W$ — the Wiener bias is now mostly broadband noise, not a
-synthetic distortion comb, and lowering reg removes it.  Two regimes:
-
-* **In-window $M$ (left panel).**  Lowering reg from $10^{-4}$ to $10^{-6}$
-  drops the Wiener floor ~3× (from $\sim 4\times10^{-3}$ to $\sim
-  1.4\times10^{-3}$), consistent with the noise-amplification model of
-  §7.11 Part C.  At reg=1e-6 the floor is still 100× above the IR
-  prediction (which descends to $\sim 10^{-5}$ by $L=7$); there is no
-  reg low enough to push the ZOH sinc-null noise below that.  The exact
-  baseline remains the only path that follows the prediction to machine
-  epsilon.
+* **In-window $M$ (left panel).**  Lowering `reg` from $10^{-4}$ to
+  $10^{-6}$ drops the Wiener floor ~2× (from $\sim 1.3\times10^{-3}$
+  to $\sim 7.7\times10^{-4}$).  Pattern averaging now captures a
+  meaningful fraction of $\varepsilon_W$ at `reg=1e-4`
+  (floor 1.3e-3 vs ε_W 2.3e-3 → ~45 % absorbed into $\hat d_W$);
+  at `reg=1e-6` the ratio is 95 % → almost all of $\varepsilon_W$
+  is symbol-correlated and absorbed.  Even so the absolute floor
+  is still ~35× above the IR prediction at $L=3$ (which descends
+  to $\sim 5\times10^{-13}$ by $L=15$).  Only the **exact** baseline
+  follows the descent to machine epsilon.
 * **Near-window $M$ (right panel).**  When $M$ approaches the Wiener
-  window length, **IR truncation** dominates $\varepsilon_W$ — both reg
-  values give an identical floor of $6.4\times10^{-3}$, flat in $L$.
-  Tightening reg cannot recover the missing IR tail.
+  window length, **IR truncation** dominates $\varepsilon_W$ — both
+  `reg` values give an identical floor of $7.5\times10^{-3}$, flat
+  in $L$.  Tightening `reg` cannot recover the missing IR tail.
 
 So the Wiener floor is set by the larger of two independent terms:
 
 | failure mode | symptom | fix |
 |---|---|---|
-| ZOH sinc-null noise | $\varepsilon_W$ shrinks with `reg`, bottoms out at `reg=1e-7`; broadband, leaks into $\hat n_W$ | lower `reg` (§7.11 Panel C) — bottoms out at $\sim 2.6\times10^{-3}$ in this setup |
+| residual sinc-null noise (post-AFE) | $\varepsilon_W$ shrinks with `reg`, bottoms out at `reg=1e-6`; broadband, leaks into $\hat n_W$ | lower `reg` (§7.11 Panel C) — bottoms out at $\sim 2.4\times10^{-3}$ in this setup |
 | IR truncation | $\varepsilon_W$ independent of `reg`, scales with channel energy beyond window | **widen the Wiener window** ($n_\text{pre}, n_\text{post}$ each $\gtrsim M$) |
 
 For pkctrl3-class channels (skin-and-dielectric $\sim 5$–$10$ dB,
-$M\lesssim 20$–$30$ UI), the default 51-UI window covers $M$ comfortably
-and lowering reg is the productive lever.  If a longer channel pushes $M$
-toward the window edge, widen the window first — *then* tighten reg.
+$M\lesssim 20$–$30$ UI including the TX AFE), the default 51-UI
+window covers $M$ comfortably and lowering reg is the productive
+lever.  If a longer channel pushes $M$ toward the window edge,
+widen the window first — *then* tighten reg.
 
 **Practical implication.**  When the goal is precision **distortion
 recovery** of structure above $\sim 10^{-3}$ RMS (i.e. real captures
-with anything resembling realistic σ), the new ZOH model with
+with anything resembling realistic σ), the AFE-on Wiener model with
 `reg=1e-6` is sufficient and physically correct.  When the goal is
 to chase the IR-predicted descent of leftover noise below
 $\sim 10^{-3}$, only the **exact baseline** (oracle IR) gets you
-there under either factorization — and the new factorization is
-honest about it.
+there — the AFE-on model is honest about that.
 
 ---
 
@@ -1075,25 +1132,27 @@ points along the link (TX → DRV_OUT → MZM_IN → Pout → Pin_PD → TIA_OUT
 `examples/waveform_decomposition_demo.py` reproduces both flavours of
 the decomposition.
 
-> **Pre-ZOH-change snapshot.**  The numbers in §8.1 below were computed
-> under the *old* Dirac-train factorization.  Under the new ZOH input
-> model (§2):
+> **Pre-AFE-change snapshot.**  The numbers in §8.1 below were computed
+> under the *old* Dirac-train factorization.  Under the current ZOH +
+> TX-AFE model (§2):
 >
 > * **Per-block** results (§8.2, §8.3) are **unchanged**.  The
 >   per-block code path has always used the measured upstream waveform
->   as $x$, so the ZOH change is a no-op there.
+>   as $x$, so the AFE/ZOH change is a no-op there.
 > * **From-symbols** results (§8.1) will **shift modestly**.  The
->   Wiener residual differs because the ZOH input has sinc nulls (§2)
->   that the Dirac drive did not.  SNDR (which sees only the residual
->   magnitude) is expected to be similar; SDR and SNR will re-split
->   because the symbol-correlated vs broadband content of
->   $\varepsilon_W$ rebalances.  The desired/ISI cosmetic will also
->   look different — $h_0$ is now the channel-IR cursor, so it is
->   sub-unit and $y_\text{ISI}$ carries more weight (this is the
->   §9.1 cosmetic, not a real defect).  Re-running on the pkctrl3
->   dataset is needed to refresh the precise numbers; it has not
->   been done in this round because the dataset is not in the
->   current workspace.
+>   Wiener residual differs because the synthetic $x_\text{afe}$ is
+>   now a Bessel-shaped ZOH, not an impulse train.  SNDR (which sees
+>   only the residual magnitude) is expected to be similar; SDR and
+>   SNR will re-split because the symbol-correlated vs broadband
+>   content of $\varepsilon_W$ rebalances (the AFE makes the
+>   symbol-correlated piece dominate, which actually *helps*
+>   pattern averaging).  The desired/ISI cosmetic will also look
+>   different — $h_0$ is now the band-limited channel-IR cursor, so
+>   it is sub-unit and $y_\text{ISI}$ carries more weight (§9.1
+>   cosmetic, not a real defect).  Re-running on the pkctrl3 dataset
+>   is needed to refresh the precise numbers; it has not been done
+>   in this round because the dataset is not in the current
+>   workspace.
 
 ### 8.1  From-Symbols, TIA_OUT  *(pre-ZOH snapshot)*
 
@@ -1157,34 +1216,39 @@ benefit from a quieter front end before a nonlinear canceller is added.
 
 ## 9  Limitations and Caveats
 
-1. **Band-limited cursor-tap and the Wiener-baseline SDR floor (ZOH
-   model).** Eq. (7)'s $h_0$ is the *cursor sample* of the recovered
-   channel impulse response under a ZOH input — *not* the cursor
-   sample of the single-bit response and *not* the block's true scalar
-   per-symbol gain.  For a smooth band-limited channel and the
-   default `reg=1e-4`,
+1. **Band-limited cursor-tap and the Wiener-baseline SDR floor
+   (AFE-on model).** Eq. (7)'s $h_0$ is the *cursor sample* of the
+   recovered channel impulse response under an AFE-shaped ZOH input —
+   *not* the cursor sample of the single-bit response and *not* the
+   block's true scalar per-symbol gain.  For a smooth band-limited
+   channel and the default `reg=1e-4`,
    [`estimate_channel`](../../../optical-serdes/src/optical_serdes/utils/channel_estimation.py)
-   gives an $h_0$ that sits well below unity (e.g. 0.63 for the
-   reference Bessel-channel test in §7.11) because the ZOH input
-   already carries the rectangular pulse shape; the per-symbol gain
-   would be the *integral* of $\hat h$ across the UI, not the
+   gives an $h_0$ that sits well below unity (e.g. 0.28 at default
+   reg, 0.47 at `reg=1e-6` for the reference Bessel-AFE + Bessel-channel
+   test in §7.11) because the AFE-shaped input already carries the
+   per-UI pulse shape and lacks high-frequency content; the per-symbol
+   gain would be the *integral* of $\hat h$ across the UI, not the
    single-sample $h_0$.
 
    The Wiener fit error
-   $\varepsilon_W = \hat y_\text{exact}-\hat y_\text{W}$ under ZOH
-   drive has **two distinct components**:
+   $\varepsilon_W = \hat y_\text{exact}-\hat y_\text{W}$ under the
+   AFE-shaped ZOH input has **two distinct components**:
 
    * *Symbol-correlated cursor-tap effect.*  The Wiener cursor tap of
      $\hat h_\text{ch}$ is biased by a regularisation-dependent amount.
      This component is correlated with the local symbol and is
-     attributed by pattern averaging to $\hat d_W$.  Magnitude at
-     default reg: a small fraction of $\varepsilon_W$.
-   * *Broadband Wiener noise from ZOH sinc nulls.*  The ZOH input has
-     spectral nulls at integer baud-rate harmonics.  Tikhonov
-     regularisation dominates there, returning a small broadband noise
-     in $\hat h_\text{ch}$ and therefore in $\hat y_W$.  This component
-     is symbol-uncorrelated and lands in $\hat n_W$.  Magnitude at
-     default reg: the bulk of $\varepsilon_W$.
+     attributed by pattern averaging to $\hat d_W$.  **Under the
+     AFE-on model this is the *dominant* component of
+     $\varepsilon_W$** (the AFE suppresses the broadband piece, so
+     this one is left behind).
+   * *Residual broadband Wiener noise from sinc nulls.*  The ZOH
+     input has spectral nulls at integer baud-rate harmonics, which
+     the AFE cannot remove (it multiplies zero by a finite gain).
+     Tikhonov regularisation dominates there, returning a small
+     broadband noise in $\hat h_\text{ch}$ and therefore in
+     $\hat y_W$.  This component is symbol-uncorrelated and lands in
+     $\hat n_W$.  Magnitude at default reg under AFE-on: $\sim 10^{-3}$
+     RMS, i.e. ~order-of-magnitude smaller than under bare ZOH.
 
    Two distinct consequences:
 
@@ -1196,12 +1260,14 @@ benefit from a quieter front end before a nonlinear canceller is added.
    * *Quantitative effect on $\hat d$ and $\hat n$.*  Pattern
      averaging absorbs the symbol-correlated piece into $\hat d_W$
      and leaves the broadband piece in $\hat n_W$.  The §7.11 data
-     give an **SDR ceiling of $\sim 36$ dB at `reg=1e-4`** and
-     $\sim 60$ dB at `reg=1e-6`, and a **noise-variance bias** that
-     inflates $\text{var}(\hat n_W)/\sigma^2$ for $\sigma$ comparable
-     to or smaller than $\varepsilon_W$.  Lower `reg` to $10^{-6}$
-     for SDR target $\gtrsim 50$ dB; below `reg`$\sim 10^{-7}$ a
-     noise-amplification floor takes over.
+     give an **SDR ceiling of $\sim 39$ dB at `reg=1e-4`** and
+     $\sim 57$ dB at `reg=1e-6`, with $\text{var}(\hat n_W)/\sigma^2$
+     pulling into unity at any σ comfortably above the broadband
+     Wiener floor (~$\varepsilon_W$ at the chosen reg).  Lower `reg`
+     to $10^{-6}$ for SDR target $\gtrsim 50$ dB; below
+     `reg`$\sim 10^{-7}$ the noise-amplification regime takes over
+     (faster than under bare ZOH because the AFE-attenuated
+     high-frequency bands have smaller $|X|^2$).
 
    An alternative split is the projection coefficient
    $g_\text{eff} = \langle \hat y, x\rangle / \langle x, x\rangle$,
