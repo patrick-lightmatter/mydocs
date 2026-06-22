@@ -2716,6 +2716,730 @@ def figure_predicted_floor_vs_ir(
     print(f"saved → {out}")
 
 
+def figure_null_case_noise_recovery(
+    *,
+    noise_sigmas: list[float] | None = None,
+    context_uis: list[int] | None = None,
+    bias_sigma: float = 0.01,
+) -> None:
+    """Null-case validation: known channel, no nonlinearity, noise only.
+
+    With ``distortion_gain = 0`` and the exact (planted) linear baseline, the
+    LTI residual is *pure* AWGN.  The pattern-conditioned split should then
+    return a distortion estimate of ≈ 0 and recover the injected noise
+    variance.  It does, up to the unavoidable averaging penalty: the per-bin
+    conditional mean of ``K`` noise samples has variance ``σ²/K``, so
+
+        P_distortion = σ²/K,   P_noise = σ²(1 − 1/K),   K = N_analysed / N_patterns.
+
+    Panel 1 (P = 5, lots of hits) shows the recovered noise RMS tracking the
+    injected ``σ`` (unity diagonal) while the distortion RMS sits a factor
+    ``√K`` below it.  Panel 2 fixes ``σ`` and sweeps the context: the residual
+    *mis-split* fraction (distortion power, equivalently the noise-variance
+    deficit) grows as ``1/K = 2^P / N_analysed`` — the price of over-long
+    context with finite data.
+    """
+    sps = 8
+    n_sym = 500 * 512
+    ir_ui = 25
+    pmh = 4
+    guard_ui = 20
+
+    noise_sigmas = list(
+        noise_sigmas if noise_sigmas is not None
+        else [1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1]
+    )
+    contexts = list(context_uis if context_uis is not None else [3, 5, 7, 9, 11, 13])
+    for c in contexts:
+        if c < 1 or c % 2 == 0:
+            raise ValueError(f"context window must be a positive odd UI count, got {c}")
+
+    def _exact_residual(symbols, y, pulse):
+        d = decompose_waveform(
+            y, symbols, sps=sps, n_pre=ir_ui, n_post=ir_ui,
+            pattern_n_pre=2, pattern_n_post=2,
+            pattern_min_hits=pmh, guard_ui=guard_ui,
+        )
+        ya = d.y_aligned
+        n = len(ya)
+        lag = int(d.channel_estimate.lag_samples)
+        cur = int(d.channel_estimate.cursor)
+        xd = np.zeros(len(symbols) * sps, dtype=np.float64)
+        xd[::sps] = symbols
+        yl = np.convolve(xd, pulse)[: len(xd)]
+        yh = np.zeros(n, dtype=np.float64)
+        if lag < len(yl):
+            nc = min(len(yl) - lag, n)
+            yh[:nc] = yl[lag : lag + nc]
+        return ya - yh, np.asarray(symbols, dtype=np.float64), cur, n
+
+    g = guard_ui * sps
+    ms = lambda arr, n: float(np.mean(arr[g : n - g] ** 2))  # noqa: E731
+
+    # Panel 1: noise recovery vs injected sigma (fixed short context P=5).
+    noise_rms: list[float] = []
+    dist_rms: list[float] = []
+    k_p1 = 1.0
+    for sg in noise_sigmas:
+        symbols, y, _, _, pulse = _synthesise(
+            n_sym=n_sym, sps=sps, pulse_span_ui=2 * ir_ui,
+            distortion_gain=0.0, noise_sigma=sg, source="prbs", prbs_order=13,
+        )
+        res, sym, cur, n = _exact_residual(symbols, y, pulse)
+        yd, npat, _, analy = _pattern_average_distortion(
+            res, sym, sps=sps, cursor_phase=cur % sps, cursor_ui_offset=cur // sps,
+            pattern_n_pre=2, pattern_n_post=2, pattern_min_hits=pmh,
+        )
+        noise_rms.append(float(np.sqrt(ms(res - yd, n))))
+        dist_rms.append(float(np.sqrt(ms(yd, n))))
+        k_p1 = analy / npat
+    print(f"panel1 K~{k_p1:.0f}; noise est/inj ~ {(noise_rms[2]/noise_sigmas[2])**2:.5f}")
+
+    # Panel 2: residual mis-split vs context, fixed sigma, IID source.
+    symbols, y, _, _, pulse = _synthesise(
+        n_sym=n_sym, sps=sps, pulse_span_ui=2 * ir_ui,
+        distortion_gain=0.0, noise_sigma=bias_sigma, source="iid",
+    )
+    res, sym, cur, n = _exact_residual(symbols, y, pulse)
+    p_res = ms(res, n)
+    dist_frac: list[float] = []
+    noise_deficit: list[float] = []
+    inv_k: list[float] = []
+    for L in contexts:
+        W = (L - 1) // 2
+        yd, npat, _, analy = _pattern_average_distortion(
+            res, sym, sps=sps, cursor_phase=cur % sps, cursor_ui_offset=cur // sps,
+            pattern_n_pre=W, pattern_n_post=(L - 1) - W, pattern_min_hits=pmh,
+        )
+        yn = res - yd
+        dist_frac.append(ms(yd, n) / p_res)
+        noise_deficit.append(1.0 - ms(yn, n) / p_res)
+        inv_k.append(npat / analy)
+    print(f"panel2 contexts={contexts} dist_frac={['%.2e'%v for v in dist_frac]} "
+          f"1/K={['%.2e'%v for v in inv_k]}")
+
+    fig = make_subplots(
+        rows=1, cols=2, horizontal_spacing=0.12,
+        subplot_titles=[
+            "Noise recovered, distortion ≈ 0  (P=5 context, vs injected σ)",
+            "Residual mis-split = σ²/K bias  (fixed σ, vs context)",
+        ],
+    )
+
+    # Panel 1: unity reference + sigma/sqrt(K) reference, then measured points.
+    sg_arr = np.array(noise_sigmas)
+    fig.add_trace(
+        go.Scatter(x=noise_sigmas, y=noise_sigmas, mode="lines",
+                   name="noise = injected σ (unity)",
+                   line={"color": "black", "width": 1.3, "dash": "dash"}),
+        row=1, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=noise_sigmas, y=(sg_arr / np.sqrt(k_p1)).tolist(), mode="lines",
+                   name="distortion floor σ/√K", legendgroup="df",
+                   line={"color": "gray", "width": 1.3, "dash": "dot"}),
+        row=1, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=noise_sigmas, y=noise_rms, mode="markers",
+                   name="noise RMS estimated",
+                   marker={"size": 11, "color": "#1f77b4",
+                           "line": {"color": "black", "width": 1}}),
+        row=1, col=1,
+    )
+    fig.add_trace(
+        go.Scatter(x=noise_sigmas, y=dist_rms, mode="markers",
+                   name="distortion RMS estimated",
+                   marker={"size": 11, "color": "#d62728", "symbol": "diamond",
+                           "line": {"color": "black", "width": 1}}),
+        row=1, col=1,
+    )
+
+    # Panel 2: 1/K theory + measured distortion fraction and noise deficit.
+    fig.add_trace(
+        go.Scatter(x=contexts, y=inv_k, mode="lines",
+                   name="theory 1/K = 2ᴾ/N_analysed",
+                   line={"color": "black", "width": 1.3, "dash": "dash"}),
+        row=1, col=2,
+    )
+    fig.add_trace(
+        go.Scatter(x=contexts, y=dist_frac, mode="markers",
+                   name="distortion power fraction",
+                   marker={"size": 11, "color": "#d62728", "symbol": "diamond",
+                           "line": {"color": "black", "width": 1}}),
+        row=1, col=2,
+    )
+    fig.add_trace(
+        go.Scatter(x=contexts, y=noise_deficit, mode="markers",
+                   name="noise-variance deficit (1 − est/inj)",
+                   marker={"size": 9, "color": "#1f77b4", "symbol": "circle-open",
+                           "line": {"color": "#1f77b4", "width": 2}}),
+        row=1, col=2,
+    )
+
+    fig.update_xaxes(title_text="injected noise σ (log)", type="log", row=1, col=1)
+    fig.update_yaxes(title_text="estimated RMS (log)", type="log", row=1, col=1)
+    fig.update_xaxes(title_text="context window P (UI)", dtick=2, row=1, col=2)
+    fig.update_yaxes(title_text="fraction of residual power (log)", type="log", row=1, col=2)
+    fig.update_layout(
+        title=(
+            "Null-case validation: known channel, no nonlinearity, noise only  |  "
+            "exact baseline, PRBS13 / IID<br>"
+            "<sup>distortion estimate ≈ 0 (a σ/√K artefact); noise variance recovered "
+            "to within the σ²/K averaging penalty (1/K shrinks with shorter context)</sup>"
+        ),
+        template="plotly_white", height=540, width=1300, margin={"t": 110},
+        legend={"orientation": "h", "y": -0.18},
+    )
+
+    out = OUT_DIR / "null_case_noise_recovery.png"
+    fig.write_image(str(out), scale=1.6)
+    print(f"saved → {out}")
+
+
+def figure_wiener_vs_exact_baseline(
+    *,
+    noise_sigmas_partA: list[float] | None = None,
+    loss_scales_partB: list[float] | None = None,
+    regs_partC: list[float] | None = None,
+    distortion_gain: float = 0.1,
+    partA_loss_scale: float = 0.22,
+    partB_noise_sigma: float = 0.01,
+    partC_noise_sigma: float = 0.01,
+) -> None:
+    """Wiener vs exact linear baseline — quantify Wiener fit-error leakage.
+
+    All §7 ground-truth validations used the **exact** (oracle) planted pulse
+    as the linear baseline.  Real captures use the **Wiener** estimate via
+    :func:`estimate_channel`, whose fit error ``ε_W = y_hat_exact − y_hat_W``
+    is deterministic and symbol-correlated; pattern-averaging will then
+    misattribute part of it to distortion.
+
+    This experiment generates one synthetic waveform ``y = y_lin + d_true +
+    n_true`` (known weak tanh + known AWGN), aligns it via
+    :func:`decompose_waveform` once, and reconstructs **both** linear
+    baselines on that aligned grid:
+
+    * exact:  ``y_hat_E = align(conv(symbols, pulse_true))``
+    * Wiener: ``y_hat_W = decomp.y_hat``
+
+    The conditional-average split is then run on each residual with the same
+    pattern context, and recovery is compared against ground truth
+    (``d_true_aligned``, injected ``σ²``).
+
+    Part A — fixed in-window channel (``M`` small), sweep noise σ.
+        Probes the Wiener fit error vs SNR when the channel comfortably fits
+        the Wiener window.  Expectation: ``ε_W`` small at all SNRs, exact and
+        Wiener splits nearly coincide.
+
+    Part B — fixed σ, sweep channel memory ``M`` from in-window to beyond
+        the Wiener window.  Probes the failure boundary: the IR truncates
+        once ``M`` approaches the window length, ``ε_W`` climbs and Wiener
+        distortion-recovery degrades while exact-baseline recovery stays
+        flat.
+
+    Part C — fixed in-window channel and σ, sweep Wiener Tikhonov
+        regularisation ``reg``.  Diagnostic that pins the in-window Wiener
+        fit error on the regularisation-induced **cursor-tap underestimate**
+        (``h_0`` biased by ``≈ reg`` for a Dirac drive).  Smaller ``reg``
+        drives ``ε_W`` toward the exact-baseline residual at a small
+        low-SNR cost.
+
+    Headline numbers go into printed tables and the three-panel figure
+    ``wiener_vs_exact_baseline.png``.
+    """
+    sps = 8
+    n_sym = 500 * 512
+    ir_ui = 25
+    n_pre = ir_ui  # 50-UI symmetric Wiener IR window (n_pre + 1 + n_post)
+    n_post = ir_ui
+    pmh = 4
+    guard_ui = 20
+    prbs_order = 13
+
+    pattern_n_pre = 3
+    pattern_n_post = 3  # P = 7-symbol context (covers M up through 7)
+
+    noise_sigmas_partA = list(
+        noise_sigmas_partA if noise_sigmas_partA is not None
+        else [1e-4, 3e-4, 1e-3, 3e-3, 1e-2, 3e-2, 1e-1]
+    )
+    loss_scales_partB = list(
+        loss_scales_partB if loss_scales_partB is not None
+        else [0.20, 0.33, 0.50, 1.00]
+    )
+    regs_partC = list(
+        regs_partC if regs_partC is not None
+        else [1e-3, 1e-4, 1e-5, 1e-6, 1e-7, 1e-8]
+    )
+    default_reg = 1e-4  # decompose_waveform's default Tikhonov regularisation
+
+    g_samp = guard_ui * sps
+
+    def _run_case(scale: float, sigma: float, reg: float = default_reg) -> dict:
+        skin = 4.0 * scale
+        diel = 2.0 * scale
+        symbols, y, dist_true, noise_true, pulse_true = _synthesise(
+            n_sym=n_sym, sps=sps, pulse_span_ui=2 * ir_ui,
+            distortion_gain=distortion_gain, noise_sigma=sigma,
+            source="prbs", prbs_order=prbs_order,
+            skin_loss_db=skin, dielectric_loss_db=diel,
+        )
+        m_ui = _pulse_memory_ui(pulse_true, sps=sps, max_ui=ir_ui, tol=1e-6)
+
+        # Wiener-baseline decomposition (alignment is fixed here for both paths).
+        decomp = decompose_waveform(
+            y, symbols, sps=sps, n_pre=n_pre, n_post=n_post, reg=reg,
+            pattern_n_pre=pattern_n_pre, pattern_n_post=pattern_n_post,
+            pattern_min_hits=pmh, guard_ui=guard_ui,
+        )
+        ya = decomp.y_aligned
+        n = len(ya)
+        lag = int(decomp.channel_estimate.lag_samples)
+        cursor = int(decomp.channel_estimate.cursor)
+        y_hat_W = decomp.y_hat
+        d_hat_W = decomp.y_distortion
+        n_hat_W = decomp.y_noise
+
+        # Exact baseline reconstructed on the SAME aligned grid.
+        x_dirac = np.zeros(len(symbols) * sps, dtype=np.float64)
+        x_dirac[::sps] = symbols
+        y_lin_full = np.convolve(x_dirac, pulse_true)[: len(x_dirac)]
+
+        def _align(full: np.ndarray) -> np.ndarray:
+            out = np.zeros(n, dtype=np.float64)
+            if lag < len(full):
+                nc = min(len(full) - lag, n)
+                out[:nc] = full[lag : lag + nc]
+            return out
+
+        y_hat_E = _align(y_lin_full)
+        d_true_aligned = _align(dist_true)
+
+        res_E = ya - y_hat_E
+        sym = np.asarray(symbols, dtype=np.float64)
+        d_hat_E, _, _, _ = _pattern_average_distortion(
+            res_E, sym, sps=sps,
+            cursor_phase=cursor % sps, cursor_ui_offset=cursor // sps,
+            pattern_n_pre=pattern_n_pre, pattern_n_post=pattern_n_post,
+            pattern_min_hits=pmh,
+        )
+        n_hat_E = res_E - d_hat_E
+
+        interior = slice(g_samp, n - g_samp)
+        ms = lambda a: float(np.mean(a[interior] ** 2))  # noqa: E731
+        rms = lambda a: float(np.sqrt(ms(a)))  # noqa: E731
+
+        eps_W = y_hat_E - y_hat_W
+        sigma2 = float(sigma) ** 2 if sigma > 0 else float("nan")
+        return {
+            "scale": scale, "skin": skin, "sigma": sigma, "reg": reg, "M": m_ui,
+            "h0_W": float(decomp.h_0),
+            "d_true_rms": rms(d_true_aligned),
+            "eps_W_rms": rms(eps_W),
+            "d_err_E_rms": rms(d_hat_E - d_true_aligned),
+            "d_err_W_rms": rms(d_hat_W - d_true_aligned),
+            "n_var_ratio_E": ms(n_hat_E) / sigma2 if sigma > 0 else float("nan"),
+            "n_var_ratio_W": ms(n_hat_W) / sigma2 if sigma > 0 else float("nan"),
+        }
+
+    # ===== Part A: fixed in-window channel, sweep σ =====
+    print(f"\n[Part A] in-window channel (loss_scale={partA_loss_scale:.2f}), "
+          "sweeping noise σ")
+    recs_A = [_run_case(partA_loss_scale, sg) for sg in noise_sigmas_partA]
+    print(f"  {'σ':>9} {'M':>3} {'ε_W RMS':>12} {'d_err_E':>12} {'d_err_W':>12} "
+          f"{'n²/σ² E':>9} {'n²/σ² W':>9}  (d_true RMS={recs_A[0]['d_true_rms']:.2e})")
+    for r in recs_A:
+        print(f"  {r['sigma']:9.2e} {r['M']:3d} {r['eps_W_rms']:12.2e} "
+              f"{r['d_err_E_rms']:12.2e} {r['d_err_W_rms']:12.2e} "
+              f"{r['n_var_ratio_E']:9.4f} {r['n_var_ratio_W']:9.4f}")
+
+    # ===== Part B: fixed σ, sweep channel memory =====
+    print(f"\n[Part B] sweeping channel memory at σ={partB_noise_sigma:.2e}, "
+          f"Wiener window = {n_pre + n_post + 1} UI")
+    recs_B = [_run_case(s, partB_noise_sigma) for s in loss_scales_partB]
+    print(f"  {'scale':>6} {'M':>3} {'ε_W RMS':>12} {'d_err_E':>12} {'d_err_W':>12} "
+          f"{'n²/σ² E':>9} {'n²/σ² W':>9}  {'d_true RMS':>12}")
+    for r in recs_B:
+        print(f"  {r['scale']:6.2f} {r['M']:3d} {r['eps_W_rms']:12.2e} "
+              f"{r['d_err_E_rms']:12.2e} {r['d_err_W_rms']:12.2e} "
+              f"{r['n_var_ratio_E']:9.4f} {r['n_var_ratio_W']:9.4f} "
+              f"{r['d_true_rms']:12.2e}")
+
+    # ===== Part C: in-window channel + fixed σ, sweep Wiener reg =====
+    print(f"\n[Part C] sweeping Wiener regularisation at "
+          f"loss_scale={partA_loss_scale:.2f}, σ={partC_noise_sigma:.2e}")
+    recs_C = [_run_case(partA_loss_scale, partC_noise_sigma, reg=r) for r in regs_partC]
+    print(f"  {'reg':>9} {'h_0_W':>9} {'h_0 bias':>11} {'ε_W RMS':>12} "
+          f"{'d_err_W':>12} {'n²/σ² W':>9}")
+    for r in recs_C:
+        print(f"  {r['reg']:9.0e} {r['h0_W']:9.5f} {r['h0_W'] - 1:+11.3e} "
+              f"{r['eps_W_rms']:12.3e} {r['d_err_W_rms']:12.2e} "
+              f"{r['n_var_ratio_W']:9.4f}")
+
+    # ===== Figure =====
+    fig = make_subplots(
+        rows=1, cols=3, horizontal_spacing=0.085,
+        subplot_titles=[
+            f"Part A: in-window channel (M={recs_A[0]['M']} UI), "
+            f"reg={default_reg:.0e}, sweep injected σ",
+            f"Part B: fixed σ={partB_noise_sigma:g}, reg={default_reg:.0e}, "
+            "sweep channel memory M",
+            f"Part C: M={recs_C[0]['M']} UI, σ={partC_noise_sigma:g}, "
+            "sweep Wiener Tikhonov reg",
+        ],
+    )
+
+    # ---- Panel 1: vs σ ----
+    sigmas = [r["sigma"] for r in recs_A]
+    fig.add_trace(go.Scatter(
+        x=sigmas, y=[r["d_err_E_rms"] for r in recs_A], mode="lines+markers",
+        name="distortion-recovery RMS (exact baseline)",
+        line={"color": "#1f77b4", "width": 2},
+        marker={"size": 9, "line": {"color": "black", "width": 1}},
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=sigmas, y=[r["d_err_W_rms"] for r in recs_A], mode="lines+markers",
+        name="distortion-recovery RMS (Wiener baseline)",
+        line={"color": "#d62728", "width": 2},
+        marker={"size": 10, "symbol": "diamond", "line": {"color": "black", "width": 1}},
+    ), row=1, col=1)
+    fig.add_trace(go.Scatter(
+        x=sigmas, y=[r["eps_W_rms"] for r in recs_A], mode="lines+markers",
+        name="Wiener fit error RMS(ε_W)",
+        line={"color": "#7f7f7f", "width": 1.5, "dash": "dot"},
+        marker={"size": 8, "symbol": "x-thin", "line": {"color": "#7f7f7f", "width": 2}},
+    ), row=1, col=1)
+    d_true_rms_A = recs_A[0]["d_true_rms"]
+    fig.add_hline(
+        y=d_true_rms_A,
+        line={"color": "black", "dash": "dash", "width": 1.0},
+        row=1, col=1,
+    )
+    fig.add_annotation(
+        x=sigmas[0], y=d_true_rms_A, xref="x1", yref="y1",
+        text=f"true distortion RMS = {d_true_rms_A:.1e}",
+        showarrow=False, yshift=10, xanchor="left",
+        font={"color": "black", "size": 10},
+    )
+
+    # ---- Panel 2: vs M ----
+    Ms = [r["M"] for r in recs_B]
+    fig.add_trace(go.Scatter(
+        x=Ms, y=[r["d_err_E_rms"] for r in recs_B], mode="lines+markers",
+        name="exact: d_err",
+        line={"color": "#1f77b4", "width": 2},
+        marker={"size": 9, "line": {"color": "black", "width": 1}},
+        showlegend=False,
+    ), row=1, col=2)
+    fig.add_trace(go.Scatter(
+        x=Ms, y=[r["d_err_W_rms"] for r in recs_B], mode="lines+markers",
+        name="Wiener: d_err",
+        line={"color": "#d62728", "width": 2},
+        marker={"size": 10, "symbol": "diamond", "line": {"color": "black", "width": 1}},
+        showlegend=False,
+    ), row=1, col=2)
+    fig.add_trace(go.Scatter(
+        x=Ms, y=[r["eps_W_rms"] for r in recs_B], mode="lines+markers",
+        name="ε_W",
+        line={"color": "#7f7f7f", "width": 1.5, "dash": "dot"},
+        marker={"size": 8, "symbol": "x-thin", "line": {"color": "#7f7f7f", "width": 2}},
+        showlegend=False,
+    ), row=1, col=2)
+    fig.add_vline(
+        x=n_pre + n_post + 1,
+        line={"color": "purple", "dash": "dot", "width": 1.2},
+        row=1, col=2,
+    )
+    fig.add_annotation(
+        x=n_pre + n_post + 1, y=1.0, xref="x2", yref="paper",
+        text=f"Wiener window<br>(n_pre+n_post+1 = {n_pre + n_post + 1} UI)",
+        showarrow=False, yshift=-2, xshift=-4, xanchor="right",
+        font={"color": "purple", "size": 10},
+    )
+
+    # ---- Panel 3: vs reg ----
+    regs = [r["reg"] for r in recs_C]
+    fig.add_trace(go.Scatter(
+        x=regs, y=[r["d_err_E_rms"] for r in recs_C], mode="lines+markers",
+        name="exact: d_err",
+        line={"color": "#1f77b4", "width": 2},
+        marker={"size": 9, "line": {"color": "black", "width": 1}},
+        showlegend=False,
+    ), row=1, col=3)
+    fig.add_trace(go.Scatter(
+        x=regs, y=[r["d_err_W_rms"] for r in recs_C], mode="lines+markers",
+        name="Wiener: d_err",
+        line={"color": "#d62728", "width": 2},
+        marker={"size": 10, "symbol": "diamond", "line": {"color": "black", "width": 1}},
+        showlegend=False,
+    ), row=1, col=3)
+    fig.add_trace(go.Scatter(
+        x=regs, y=[r["eps_W_rms"] for r in recs_C], mode="lines+markers",
+        name="ε_W",
+        line={"color": "#7f7f7f", "width": 1.5, "dash": "dot"},
+        marker={"size": 8, "symbol": "x-thin", "line": {"color": "#7f7f7f", "width": 2}},
+        showlegend=False,
+    ), row=1, col=3)
+    fig.add_vline(
+        x=default_reg, line={"color": "purple", "dash": "dot", "width": 1.2},
+        row=1, col=3,
+    )
+    fig.add_annotation(
+        x=default_reg, y=1.0, xref="x3", yref="paper",
+        text=f"default reg = {default_reg:.0e}", showarrow=False,
+        yshift=-2, xshift=4, xanchor="left",
+        font={"color": "purple", "size": 10},
+    )
+    d_true_rms_C = recs_C[0]["d_true_rms"]
+    fig.add_hline(
+        y=d_true_rms_C, line={"color": "black", "dash": "dash", "width": 1.0},
+        row=1, col=3,
+    )
+    fig.add_annotation(
+        x=regs[-1], y=d_true_rms_C, xref="x3", yref="y3",
+        text=f"d_true RMS = {d_true_rms_C:.1e}",
+        showarrow=False, yshift=10, xanchor="right",
+        font={"color": "black", "size": 10},
+    )
+
+    fig.update_yaxes(title_text="RMS (log)", type="log", row=1, col=1)
+    fig.update_xaxes(title_text="injected noise σ (log)", type="log", row=1, col=1)
+    fig.update_yaxes(title_text="RMS (log)", type="log", row=1, col=2)
+    fig.update_xaxes(title_text="channel memory M (UI)", row=1, col=2)
+    fig.update_yaxes(title_text="RMS (log)", type="log", row=1, col=3)
+    fig.update_xaxes(
+        title_text="Wiener Tikhonov reg (log)", type="log", autorange="reversed",
+        row=1, col=3,
+    )
+    fig.update_layout(
+        title=(
+            "Wiener vs exact linear baseline: how much fit error leaks into "
+            f"the split  |  PRBS{prbs_order}, weak tanh (gain={distortion_gain:.2f})<br>"
+            f"<sup>Wiener IR window {n_pre + n_post + 1} UI; pattern context P="
+            f"{pattern_n_pre + 1 + pattern_n_post}; ε_W = y_hat_exact − y_hat_W; "
+            "distortion error vs ground-truth d_true</sup>"
+        ),
+        template="plotly_white", height=560, width=1600, margin={"t": 110},
+        legend={"orientation": "h", "y": -0.22},
+    )
+
+    out = OUT_DIR / "wiener_vs_exact_baseline.png"
+    fig.write_image(str(out), scale=1.6)
+    print(f"saved → {out}")
+
+
+def figure_predicted_floor_wiener_recovers_ir(
+    *,
+    distortion_gain: float = 0.05,
+    loss_scales: list[float] | None = None,
+    context_uis: list[int] | None = None,
+    regs: list[float] | None = None,
+) -> None:
+    """Show the Wiener pipeline recovers the §7.9 IR prediction at small reg.
+
+    §7.9 validated that the pre-collapse leftover RMS is predictable from the
+    IR taps alone, using the **exact** baseline.  §7.11 calibrated the
+    Wiener-baseline floor at $\\approx \\rho \\cdot \\text{signal}$.  This
+    figure ties the two together: re-running the §7.9 measurement under the
+    Wiener pipeline at two regularisation values shows that
+
+    * the default ``reg = 1e-4`` clips the floor at the cursor-tap-bias level
+      and is *blind* to the IR-predicted physics below it, while
+    * ``reg = 1e-6`` drives the clip below the IR prediction so the Wiener
+      pipeline tracks the §7.9 prediction down to its small-reg floor.
+
+    Two IID-source channels (M = 7 and M = 51 UI) are run with the same
+    weak-tanh parameters as §7.9, and each baseline's measurement is overlaid
+    against the analytic IR-predicted floor.
+    """
+    sps = 8
+    n_sym = 500 * 512
+    ir_ui = 25
+    n_pre = ir_ui
+    n_post = ir_ui
+    pmh = 4
+    guard_ui = 20
+
+    loss_scales = list(loss_scales if loss_scales is not None else [0.20, 1.0])
+    contexts = list(
+        context_uis if context_uis is not None else [3, 5, 7, 9, 11, 13, 15]
+    )
+    for c in contexts:
+        if c < 1 or c % 2 == 0:
+            raise ValueError(f"context window must be a positive odd UI count, got {c}")
+    regs = list(regs if regs is not None else [1e-4, 1e-6])
+
+    alpha = float(distortion_gain)
+    tanh_a = float(np.tanh(alpha))
+
+    g_samp = guard_ui * sps
+    interior = None  # bound per-case
+    ms = lambda arr: float(np.mean(arr[interior] ** 2))  # noqa: E731
+    rms = lambda arr: float(np.sqrt(ms(arr)))  # noqa: E731
+
+    def _pat_avg_residual_rms(residual, sym, cursor, L):
+        W = (L - 1) // 2
+        pre = W
+        post = (L - 1) - pre
+        y_dist, _, _, _ = _pattern_average_distortion(
+            residual, sym, sps=sps,
+            cursor_phase=cursor % sps, cursor_ui_offset=cursor // sps,
+            pattern_n_pre=pre, pattern_n_post=post,
+            pattern_min_hits=pmh,
+        )
+        return float(np.sqrt(ms(residual - y_dist)))
+
+    records: list[dict] = []
+    for scale in loss_scales:
+        skin = 4.0 * scale
+        diel = 2.0 * scale
+        symbols, y, _, _, pulse_true = _synthesise(
+            n_sym=n_sym, sps=sps, pulse_span_ui=2 * ir_ui,
+            distortion_gain=alpha, noise_sigma=0.0, source="iid",
+            skin_loss_db=skin, dielectric_loss_db=diel,
+        )
+        m_ui = _pulse_memory_ui(pulse_true, sps=sps, max_ui=ir_ui, tol=1e-6)
+        sym = np.asarray(symbols, dtype=np.float64)
+
+        # Anchor alignment from a default Wiener decomposition.
+        decomp0 = decompose_waveform(
+            y, symbols, sps=sps, n_pre=n_pre, n_post=n_post,
+            pattern_n_pre=2, pattern_n_post=2,
+            pattern_min_hits=pmh, guard_ui=guard_ui,
+        )
+        ya = decomp0.y_aligned
+        n = len(ya)
+        lag = int(decomp0.channel_estimate.lag_samples)
+        cursor = int(decomp0.channel_estimate.cursor)
+        interior = slice(g_samp, n - g_samp)
+
+        # Exact baseline residual and IR-predicted-floor inputs.
+        x_dirac = np.zeros(len(symbols) * sps, dtype=np.float64)
+        x_dirac[::sps] = symbols
+        y_lin_full = np.convolve(x_dirac, pulse_true)[: len(x_dirac)]
+
+        def _align(full: np.ndarray) -> np.ndarray:
+            out = np.zeros(n, dtype=np.float64)
+            if lag < len(full):
+                nc = min(len(full) - lag, n)
+                out[:nc] = full[lag : lag + nc]
+            return out
+
+        y_hat_E = _align(y_lin_full)
+        residual_E = ya - y_hat_E
+        gprime = (alpha / tanh_a) / np.cosh(alpha * y_hat_E) ** 2 - 1.0
+        pk = int(np.argmax(np.abs(pulse_true)))
+        ui_off_pulse = np.round((np.arange(len(pulse_true)) - pk) / sps).astype(int)
+
+        measured_E: list[float] = []
+        predicted: list[float] = []
+        for L in contexts:
+            W = (L - 1) // 2
+            measured_E.append(_pat_avg_residual_rms(residual_E, sym, cursor, L))
+            pulse_tail = pulse_true.copy()
+            pulse_tail[np.abs(ui_off_pulse) <= W] = 0.0
+            u = _align(np.convolve(x_dirac, pulse_tail)[: len(x_dirac)])
+            predicted.append(rms(gprime * u))
+
+        # Wiener baseline residuals at each reg.
+        measured_W: dict[float, list[float]] = {}
+        eps_W_rms: dict[float, float] = {}
+        for reg in regs:
+            decomp_r = decompose_waveform(
+                y, symbols, sps=sps, n_pre=n_pre, n_post=n_post, reg=reg,
+                pattern_n_pre=2, pattern_n_post=2,
+                pattern_min_hits=pmh, guard_ui=guard_ui,
+            )
+            y_hat_W = decomp_r.y_hat
+            residual_W = ya - y_hat_W
+            eps_W_rms[reg] = rms(y_hat_E - y_hat_W)
+            measured_W[reg] = [
+                _pat_avg_residual_rms(residual_W, sym, cursor, L) for L in contexts
+            ]
+
+        records.append({
+            "scale": scale, "M": m_ui,
+            "contexts": contexts,
+            "predicted": predicted,
+            "measured_E": measured_E,
+            "measured_W": measured_W,
+            "eps_W_rms": eps_W_rms,
+        })
+        print(f"\nscale={scale:4.2f}  M={m_ui:2d}  ε_W: " +
+              "  ".join(f"reg={r:.0e}→{eps_W_rms[r]:.2e}" for r in regs))
+        print(f"  contexts:       " + " ".join(f"{L:>8d}" for L in contexts))
+        print(f"  IR predicted:   " + " ".join(f"{v:8.2e}" for v in predicted))
+        print(f"  exact measured: " + " ".join(f"{v:8.2e}" for v in measured_E))
+        for reg in regs:
+            print(f"  Wiener reg={reg:.0e}: " +
+                  " ".join(f"{v:8.2e}" for v in measured_W[reg]))
+
+    titles = [f"M = {rec['M']} UI  (skin = {4*rec['scale']:.1f} dB)" for rec in records]
+    fig = make_subplots(rows=1, cols=len(records), horizontal_spacing=0.10,
+                        subplot_titles=titles)
+
+    reg_colors = {1e-4: "#d62728", 1e-6: "#f4a300"}
+    for col, rec in enumerate(records, start=1):
+        showleg = col == 1
+        fig.add_trace(go.Scatter(
+            x=contexts, y=rec["predicted"], mode="lines",
+            name="IR prediction (§7.9)",
+            line={"color": "black", "width": 2, "dash": "dash"},
+            showlegend=showleg,
+        ), row=1, col=col)
+        fig.add_trace(go.Scatter(
+            x=contexts, y=rec["measured_E"], mode="markers",
+            name="measured (exact baseline)",
+            marker={"size": 10, "color": "#1f77b4",
+                    "line": {"color": "black", "width": 1}},
+            showlegend=showleg,
+        ), row=1, col=col)
+        for reg in regs:
+            col_hex = reg_colors.get(reg, "#7f7f7f")
+            fig.add_trace(go.Scatter(
+                x=contexts, y=rec["measured_W"][reg], mode="markers+lines",
+                name=f"measured (Wiener, reg={reg:.0e})",
+                marker={"size": 9, "symbol": "diamond", "color": col_hex,
+                        "line": {"color": "black", "width": 1}},
+                line={"color": col_hex, "width": 1.4, "dash": "dot"},
+                showlegend=showleg,
+            ), row=1, col=col)
+            # Horizontal reference at the ε_W floor.
+            fig.add_hline(
+                y=rec["eps_W_rms"][reg],
+                line={"color": col_hex, "dash": "dashdot", "width": 1},
+                row=1, col=col,
+            )
+            fig.add_annotation(
+                x=contexts[0], y=rec["eps_W_rms"][reg],
+                xref=f"x{col}", yref=f"y{col}",
+                text=f"ε_W floor (reg={reg:.0e}) = {rec['eps_W_rms'][reg]:.1e}",
+                showarrow=False, yshift=10, xanchor="left",
+                font={"color": col_hex, "size": 9},
+            )
+
+    for col in range(1, len(records) + 1):
+        fig.update_yaxes(title_text="leftover RMS (log)", type="log", row=1, col=col)
+        fig.update_xaxes(title_text="context window (UI)", dtick=2, row=1, col=col)
+
+    fig.update_layout(
+        title=(
+            "Wiener-baseline floor under the §7.9 IR-prediction test  |  "
+            f"IID source, weak tanh (gain={alpha:.2f}), no noise<br>"
+            "<sup>in-window M (left): lowering reg from 1e-4 to 1e-6 "
+            "drops the floor ~60× toward the IR prediction.  Near-window "
+            "M (right): IR truncation dominates; reg has no effect</sup>"
+        ),
+        template="plotly_white", height=560, width=1300, margin={"t": 110},
+        legend={"orientation": "h", "y": -0.22},
+    )
+
+    out = OUT_DIR / "predicted_floor_wiener_recovers_ir.png"
+    fig.write_image(str(out), scale=1.6)
+    print(f"saved → {out}")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2737,3 +3461,6 @@ if __name__ == "__main__":
     figure_channel_memory_context_iid()
     figure_channel_memory_context_prbs31()
     figure_predicted_floor_vs_ir()
+    figure_null_case_noise_recovery()
+    figure_wiener_vs_exact_baseline()
+    figure_predicted_floor_wiener_recovers_ir()

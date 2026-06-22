@@ -385,7 +385,13 @@ distortion from noise is the smaller of the channel memory $M$ and the
 source-state order $N$, bounded by data starvation. §7.1–§7.7 build up
 the evidence; §7.8 states and verifies the law, and §7.9 shows the
 pre-collapse floor *value* is itself predicted by the IR taps. Readers
-after the punchline can jump to §7.8.
+after the punchline can jump to §7.8. §7.10 closes the loop with the dual
+null case — known channel, no nonlinearity, noise only — confirming
+distortion $\approx 0$ and exact noise-variance recovery up to the
+$\sigma^2/K$ averaging penalty.  §7.11 calibrates the **Wiener-baseline
+SDR floor**: the default Tikhonov reg $=10^{-4}$ introduces a $\sim 1.4\%$
+cursor-tap bias that lands in $\hat d$, giving an effective SDR floor of
+$\sim 40$ dB; lowering reg to $10^{-6}$ recovers $\sim 60$ dB.
 
 ### 7.1  Current Synthetic Setup
 
@@ -653,6 +659,179 @@ Three things confirm the mechanism:
 2. **The measured floor lands on the $N_\text{sym}$-independent IR prediction** once the data permits ($2.5\times10^{-5}$ at $L=17$, matching the prediction exactly) — the IR said where the floor *should* be; 256k was too starved to reach it, 2.56M does.
 3. **The wall moves by exactly $\log_2(10)\approx 3.3$ UI** (from $\sim$16 to $\sim$19.3 UI), relocating the climb to $L=19$–$21$ where hits-per-pattern fall back through $N_\text{min}=4$. A channel-physics floor cannot move when only data is added; a starvation floor must — and does, by the predicted amount.
 
+### 7.10  Null Case: Known Channel, No Nonlinearity, Noise Only
+
+The dual of §7.6–§7.9 (distortion, no noise) is the pure-noise case: known
+channel, $\alpha = 0$, AWGN only. The LTI residual is then *pure noise*, so
+the split should return distortion $\approx 0$ and recover the injected
+noise variance.
+
+[`figures/null_case_noise_recovery.png`](figures/null_case_noise_recovery.png)
+
+![Null-case validation: noise recovered, distortion ≈ 0](figures/null_case_noise_recovery.png)
+
+**Panel 1 (vs injected $\sigma$, short $P=5$ context).** The estimated
+noise RMS lands on the unity diagonal across three decades of $\sigma$
+(recovered/injected variance $= 0.9994$), while the estimated distortion
+RMS sits a factor $\sqrt{K}\approx 89$ below it and scales linearly with
+$\sigma$ — i.e. it is a finite-sample artefact, not real distortion.
+
+**Why distortion is not *exactly* zero.** With $e = n$ the per-pattern
+mean of $K$ noise samples is itself random with variance $\sigma^2/K$.
+Power conservation $P_e = P_{\hat d} + P_{\hat n}$ then splits as
+
+$$
+P_{\hat d} = \frac{\sigma^2}{K}, \qquad
+P_{\hat n} = \sigma^2\Big(1 - \frac{1}{K}\Big), \qquad
+K = \frac{N_\text{analysed}}{N_\text{patterns}}
+$$
+
+so the distortion soaks up exactly the fraction $1/K$ of the noise and the
+noise estimate is biased *low* by the same $1/K$. This is Eq. (17)/§5.4
+made concrete: $\hat d$ is unbiased ($\mathbb E[\bar e_\pi]=0$ here) with
+per-bin variance $\sigma^2/|\mathcal M_\pi|$.
+
+**Panel 2 (vs context, fixed $\sigma$).** Sweeping $P$ with an IID source,
+the residual mis-split fraction — equivalently the distortion power
+*and* the noise-variance deficit, which are equal by power conservation —
+tracks the prediction $1/K = 2^P/N_\text{analysed}$ across three decades:
+$3\times10^{-5}$ at $P=3$ rising to $3.2\times10^{-2}$ at $P=13$. The
+engineering rule follows directly: **when only the noise floor is of
+interest, use the shortest context that still covers the channel memory**
+($P \gtrsim M$, §7.8) — every extra UI of context beyond that trades real
+noise for spurious distortion at rate $1/K$.
+
+### 7.11  Wiener vs Exact Linear Baseline
+
+Every validation in §7.1–§7.10 used the **exact** (oracle) planted pulse
+as the linear baseline.  Real captures use the **Wiener** estimate via
+[`estimate_channel`](../../../optical-serdes/src/optical_serdes/utils/channel_estimation.py),
+whose fit error $\varepsilon_W = \hat y_\text{exact}-\hat y_\text{Wiener}$
+is *deterministic and symbol-correlated*: pattern-averaging will then push
+part of it into $\hat d$, inflating the apparent distortion floor.  This
+section calibrates that leakage with a synthetic where ground truth is
+known: $y = y_\text{lin}+d_\text{true}+n_\text{true}$ is decomposed twice
+on the same alignment grid (PRBS13, weak tanh $\alpha=0.1$ giving
+$d_\text{true,RMS}\approx 4.7\times10^{-4}$, 50-UI Wiener IR window).
+
+[`figures/wiener_vs_exact_baseline.png`](figures/wiener_vs_exact_baseline.png)
+
+![Wiener vs exact baseline](figures/wiener_vs_exact_baseline.png)
+
+**Panel A — vs injected $\sigma$, in-window channel ($M=7$ UI), default
+reg $=10^{-4}$.**  The exact-baseline distortion error scales linearly
+with $\sigma$ (the $\sigma/\sqrt{K}$ averaging artefact, §7.10) and stays
+well below $d_\text{true,RMS}$.  The Wiener distortion error sits at a
+floor of $1.35\times10^{-2}$ — **30× the true distortion RMS** — and is
+~independent of $\sigma$.  The leakage is dominated by a deterministic,
+SNR-independent Wiener fit error.
+
+| $\sigma$ | $\varepsilon_W$ RMS | $d_\text{err}$ (exact) | $d_\text{err}$ (Wiener) |
+|---|---|---|---|
+| $10^{-4}$ | $1.35\times10^{-2}$ | $2.2\times10^{-6}$ | $1.35\times10^{-2}$ |
+| $10^{-3}$ | $1.35\times10^{-2}$ | $2.2\times10^{-5}$ | $1.35\times10^{-2}$ |
+| $10^{-2}$ | $1.36\times10^{-2}$ | $2.2\times10^{-4}$ | $1.35\times10^{-2}$ |
+| $10^{-1}$ | $2.03\times10^{-2}$ | $2.2\times10^{-3}$ | $1.47\times10^{-2}$ |
+
+**Panel B — fixed $\sigma=10^{-2}$, sweep channel memory $M$.**  As long as
+$M$ fits inside the Wiener window ($M\in\{7, 13, 25\}$ UI within a 51-UI
+window), $\varepsilon_W$ and the Wiener distortion error are essentially
+constant: the leakage is *not* IR-truncation, the IR fits.  At $M=51$ UI
+(right at the window edge) $\varepsilon_W$ ticks up modestly ($1.31\to
+1.46\times10^{-2}$) and the noise-variance ratio jumps
+($\text{var}(\hat n_W)/\sigma^2: 1.04\to 1.44$) — the small truncation
+*does* leak some unstructured energy into $\hat n$.  But the bulk of the
+floor is set elsewhere.
+
+**Panel C — sweep Wiener Tikhonov regularisation `reg` (in-window, fixed
+$\sigma$).**  This pins the mechanism: the Wiener cursor tap $h_0$ is
+systematically *biased low* by an amount $\approx\text{reg}$ for a Dirac
+drive, and $\varepsilon_W$ shrinks linearly with `reg`:
+
+| `reg` | $h_0$ bias | $\varepsilon_W$ RMS | $d_\text{err}$ (Wiener) |
+|---|---|---|---|
+| $10^{-3}$ | $-8.1\times10^{-2}$ | $7.7\times10^{-2}$ | $7.7\times10^{-2}$ |
+| $10^{-4}$ **(default)** | $-1.4\times10^{-2}$ | $1.4\times10^{-2}$ | $1.4\times10^{-2}$ |
+| $10^{-5}$ | $-1.8\times10^{-3}$ | $2.6\times10^{-3}$ | $2.0\times10^{-3}$ |
+| $10^{-6}$ | $+1.3\times10^{-4}$ | $2.2\times10^{-3}$ | $8.9\times10^{-4}$ |
+| $10^{-7}$ | $+4.0\times10^{-4}$ | $2.3\times10^{-3}$ | $1.0\times10^{-3}$ |
+
+So $\varepsilon_W$ is dominated by a **regularisation-induced
+cursor-tap underestimate** — exactly the band-limited cursor-tap effect
+noted in §9.1, now quantified.  Because the bias is symbol-correlated
+(it's $\Delta h_0\cdot a[m]$ at the cursor sample), pattern-averaging
+attributes it to $\hat d_W$, not $\hat n_W$.  This sets a **Wiener-baseline
+SDR floor of $\approx -20\log_{10}(\text{reg})$ dB**: 40 dB at default
+reg $=10^{-4}$, 60 dB at $10^{-6}$.  Below $\text{reg}\sim 10^{-6}$ a
+noise-amplification floor takes over and further reduction stops helping.
+
+**Operating guidance (closes the §1 motivation):**
+
+* For coarse measurements where the *real* SDR is far below 40 dB, the
+  default `reg=1e-4` is fine — the Wiener floor is well under the signal.
+* For fine measurements (SDR target 40–60 dB), **lower `reg` to $10^{-6}$**
+  *when the channel comfortably fits the Wiener window* (§7.11.1);
+  $d_\text{err}$ drops by an order of magnitude with no penalty in our
+  tests.
+* The §7.8 collapse law and §7.9 IR-prediction were validated against the
+  exact baseline and are unchanged.  Under the Wiener baseline, the
+  pre-collapse floors in those experiments would be **clipped from below**
+  at $\varepsilon_W$; collapse locations are unaffected.
+* The **exact-baseline** path remains the right tool for any quantitative
+  ground-truth synthetic validation.
+
+### 7.11.1  §7.9 IR-prediction under the Wiener baseline
+
+§7.9 validated the IR-predicted leftover-noise floor against the exact
+baseline; §7.11 calibrated the Wiener clip at default reg.  Tying the two
+together: can the Wiener pipeline recover the §7.9 descent if we use the
+recommended low reg?  Re-running the §7.9 measurement (IID source, weak
+tanh $\alpha=0.05$, no noise, 50-UI Wiener IR window) at both reg
+$=10^{-4}$ and reg $=10^{-6}$ for two channels — $M=7$ UI (well
+in-window) and $M=51$ UI (right at the window edge) — gives:
+
+[`figures/predicted_floor_wiener_recovers_ir.png`](figures/predicted_floor_wiener_recovers_ir.png)
+
+![Wiener IR recovery](figures/predicted_floor_wiener_recovers_ir.png)
+
+| channel | reg | $\varepsilon_W$ RMS | floor at $L=3$ | floor at $L=15$ |
+|---|---|---|---|---|
+| $M=7$ (in-window) | $10^{-4}$ | $8.2\times10^{-4}$ | $1.27\times10^{-4}$ | $1.49\times10^{-4}$ |
+| $M=7$ (in-window) | $10^{-6}$ | $1.13\times10^{-4}$ | $1.49\times10^{-5}$ | $1.28\times10^{-5}$ |
+| $M=51$ (window-edge) | $10^{-4}$ | $6.42\times10^{-3}$ | $6.36\times10^{-3}$ | $5.96\times10^{-3}$ |
+| $M=51$ (window-edge) | $10^{-6}$ | $6.37\times10^{-3}$ | $6.35\times10^{-3}$ | $5.95\times10^{-3}$ |
+
+Two failure modes, two regimes:
+
+* **In-window $M$ (left panel).**  Lowering reg from $10^{-4}$ to $10^{-6}$
+  drops the Wiener floor ~10× (from $\sim 1.2\times10^{-4}$ to $\sim
+  1.4\times10^{-5}$), consistent with the cursor-tap-bias model of §7.11.
+  Wiener at reg $=10^{-6}$ now sits within 14 % of the IR prediction at
+  $L=3$.  It still cannot follow the rapid IR-prediction descent below
+  its own clip — a residual $\varepsilon_W\sim 10^{-4}$ remains, and
+  pattern-averaging absorbs ~90 % of it into $\hat d_W$, leaving a flat
+  Wiener floor at $\sim 10^{-5}$ across $L$.  The exact baseline is the
+  only path that follows the prediction down to machine epsilon.
+* **Near-window $M$ (right panel).**  When $M$ approaches the Wiener
+  window length (51 UI vs a 51-UI IR window), the dominant $\varepsilon_W$
+  term is no longer the cursor-tap bias but **IR truncation**: the
+  missing tail beyond the window cannot be recovered by tightening reg.
+  Both reg values give an identical floor of $6.4\times10^{-3}$, flat in
+  $L$.  The IR-predicted descent visible cleanly under the exact baseline
+  is invisible to the Wiener path at this $M$.
+
+So the Wiener floor is set by the larger of two independent terms:
+
+| failure mode | symptom | fix |
+|---|---|---|
+| cursor-tap bias | $\varepsilon_W \propto$ reg $\cdot \lvert y_\text{lin}\rvert$, flat at default reg | lower `reg` (§7.11 Panel C) |
+| IR truncation | $\varepsilon_W$ independent of `reg`, scales with channel energy beyond window | **widen the Wiener window** ($n_\text{pre}, n_\text{post}$ each $\gtrsim M$) |
+
+For pkctrl3-class channels (skin-and-dielectric $\sim 5$–$10$ dB,
+$M\lesssim 20$–$30$ UI), the default 51-UI window covers $M$ comfortably
+and lowering reg is the productive lever.  If a longer channel pushes $M$
+toward the window edge, widen the window first — *then* tighten reg.
+
 ---
 
 ## 8  Worked Example: pkctrl3 PAM4 at 106.25 GBaud
@@ -716,16 +895,34 @@ benefit from a quieter front end before a nonlinear canceller is added.
 
 ## 9  Limitations and Caveats
 
-1. **Band-limited cursor-tap (per-block mode).** Eq. (8)'s
+1. **Band-limited cursor-tap and the Wiener-baseline SDR floor.** Eq. (8)'s
    $h_{0,\text{block}}$ is the *cursor sample* of the Wiener IR, not the
-   block's true scalar gain. When $x$ is bandwidth-limited (typical for
-   per-block analysis, e.g. Pin_PD or TIA_OUT as inputs), the
-   regularised Wiener IR is a band-limited delta whose peak tap is
-   below the true gain, with the missing weight spread into the IR
-   tails. The result is a non-zero $y_\text{ISI}$ even for a memoryless
-   block — but this is a cosmetic artifact of the cursor-tap split; the
-   total LTI fit $\hat y$ and all scalar metrics
-   (SNDR/SDR/SNR/closure) are unaffected.
+   block's true scalar gain. The Tikhonov regularisation of
+   [`estimate_channel`](../../../optical-serdes/src/optical_serdes/utils/channel_estimation.py)
+   biases $h_0$ low by approximately the regularisation fraction
+   $\rho$ (quantified in §7.11): default $\rho=10^{-4}$ gives a
+   $-1.4\%$ $h_0$ bias and an $\sim 1.4\%$ RMS Wiener fit error
+   $\varepsilon_W$.  When $x$ is bandwidth-limited (typical for
+   per-block analysis, e.g. Pin_PD or TIA_OUT as inputs), the same
+   effect manifests as a band-limited delta whose peak tap is below
+   the true gain, with the missing weight spread into the IR tails.
+
+   Two distinct consequences:
+
+   * *Cosmetic effect on the desired/ISI split.* A non-zero
+     $y_\text{ISI}$ appears even for a memoryless block.  This is an
+     artefact of the cursor-tap split; the total LTI fit $\hat y$ and
+     the SNDR / closure are unaffected.
+   * *Quantitative effect on $\hat d$.* Because $\varepsilon_W$ is
+     deterministic and symbol-correlated, pattern-averaging attributes
+     it to $\hat d$, not $\hat n$ — so the Wiener-baseline SDR has an
+     **effective floor of $\approx -20\log_{10}(\rho)$ dB** (40 dB at
+     $\rho=10^{-4}$, 60 dB at $\rho=10^{-6}$).  Real distortion above
+     this floor is resolved correctly; below it, $\hat d$ is dominated
+     by the regularisation artefact and SDR cannot be trusted to be
+     measurement-limited.  Lower $\rho$ to $10^{-6}$ for SDR target
+     $\gtrsim 40$ dB; below $\rho\sim 10^{-6}$ a noise-amplification
+     floor takes over.
 
    An alternative split is the projection coefficient
    $g_\text{eff} = \langle \hat y, x\rangle / \langle x, x\rangle$,
