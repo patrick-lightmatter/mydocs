@@ -7,6 +7,82 @@
 
 ---
 
+## TL;DR
+
+**What this is.**  A method that takes one captured waveform + the
+transmitted symbols and splits the result into four physically distinct
+components:
+$r = \underbrace{a[m]h_0}_\text{desired} + \underbrace{\sum_{k\neq m}a[k]h_{m-k}}_\text{ISI} + \underbrace{d(t)}_\text{distortion} + \underbrace{n(t)}_\text{noise}$
+The linear half is Wiener-Hopf channel estimation (§3–§4); the new piece
+is **pattern-conditional averaging** of the residual that separates the
+deterministic distortion from the random noise (§5).
+
+**The one number that governs everything: $L_\text{collapse} = \min(M, N)$.**
+The leftover-noise floor of the estimator collapses to machine epsilon
+exactly when the context window $L$ reaches the smaller of the channel
+memory $M$ (in UI) and the source entropy $N$ (PRBS order, or $\infty$
+for IID).  This is derived, swept across both axes, and validated to
+sub-percent agreement in §7.8.
+
+**Pre-collapse, the floor is not free either — the IR predicts it.**  For
+$L < L_\text{collapse}$ the leftover RMS is
+$\;\text{RMS}(g'(y_\text{lin})\cdot u_W)\;$ where $u_W$ is the
+out-of-window IR tail and $g'$ is the nonlinearity slope.  Synthetic data
+with a known IR, a weak tanh, and 2.5 M symbols matches this prediction
+across $M\in\{7,13,51\}$ UI to within a few % (§7.9).  No mystery floor.
+
+**Two baselines, two regimes:**
+
+| baseline | use | floor |
+|---|---|---|
+| **exact** (oracle IR) | synthetic validation only | machine $\epsilon$; matches IR prediction down to $10^{-18}$ (§7.9, §7.10) |
+| **Wiener** (real captures) | production | clipped from below by $\varepsilon_W \approx \text{reg}\cdot\lvert y_\text{lin}\rvert$ (in-window) **or** by IR truncation when $M\approx$ window length (§7.11, §7.11.1) |
+
+The Wiener clip is *deterministic and symbol-correlated*, so pattern
+averaging attributes it to $\hat d_W$ — Wiener leaks fit error into the
+distortion estimate.  This bounds the achievable SDR floor at
+$\approx-20\log_{10}(\text{reg})$ dB (40 dB at the default
+$\text{reg}=10^{-4}$, 60 dB at $10^{-6}$).
+
+**Operating guidance for real captures (§7.11):**
+
+1. Use Wiener IR window $n_\text{pre}=n_\text{post}\gtrsim M$.  For
+   pkctrl3-class channels ($M\lesssim 20$–$30$ UI) the default 51-UI
+   window is fine.
+2. Pick context $L \geq \min(M, N)$ for collapse, or use the §7.9
+   IR-predicted floor to know how much distortion is unresolved at
+   smaller $L$.
+3. For coarse measurements (real SDR $\ll 40$ dB) keep the default
+   `reg=1e-4`.  For fine measurements (40–60 dB target), drop to
+   `reg=1e-6` — only useful when $M$ fits the window (§7.11.1).
+4. Distortion bins need $\gtrsim 4$ hits each; for context $L$ this
+   demands a record of at least $\sim4\cdot 2^L$ UI (data-starvation
+   wall in §7.9.1).
+
+**What's been validated end-to-end (§7):**
+
+* Pattern coverage at the symbol-spaced cursor (§7.2).
+* Distortion-recovery and noise-variance recovery vs injected $\sigma$ —
+  exact baseline gives $\sigma_\hat n/\sigma\to 1$ and
+  $d_\text{err}\propto\sigma/\sqrt K$ across 4 decades (§7.3, §7.10).
+* Null case: known channel, no nonlinearity, noise only — exact baseline
+  recovers $\hat d_\text{RMS}\sim 10^{-7}$ and
+  $\sigma_\hat n/\sigma=1.000$ (§7.10).
+* Static-nonlinearity sweep, PRBS-order sweep, channel-memory sweep —
+  all line up on the $\min(M,N)$ collapse law (§7.6–§7.8).
+* Wiener baseline calibrated against the exact baseline (§7.11), and
+  the §7.9 IR prediction re-tested through the Wiener pipeline
+  (§7.11.1).
+
+**Confidence.**  The estimator is now well-understood: every observed
+floor is predicted by an analytic model, every failure mode has a
+quantified fix, and the synthetic validation chain reaches machine
+epsilon when the assumptions are met.  The Wiener baseline is the only
+non-trivial bias in production, and its magnitude is bounded and
+controllable.
+
+---
+
 ## 1  Motivation
 
 A captured serial-link waveform is the sum of several physically distinct
