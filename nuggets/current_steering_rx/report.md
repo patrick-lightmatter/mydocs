@@ -67,7 +67,7 @@ The architecture is documented in three reference figures (reproduced in this di
 | Block | Function | Physical realisation |
 |---|---|---|
 | **A** | Photonic interface | Photodiode anode dumps $I_\text{pd}(t)\in[I_\text{low},I_\text{high}]$ (unipolar) into the shared analog rail; the rail has a parasitic $C_\text{rail}$ that we model but treat as quasi-static in this report. |
-| **B** | 8-phase sampling matrix | Eight pass-gate switches with $R_\text{on}\approx 200\,\Omega$ and $R_\text{off}\to\infty$, driven by raised-cosine 25%-duty clocks; each switch feeds an integration cap $C_\text{int,n}$ (10 fF nominal). |
+| **B** | 8-phase sampling matrix | Eight pass-gate switches with $R_\text{on}\approx 200 \Omega$ and $R_\text{off}\to\infty$, driven by raised-cosine 25%-duty clocks; each switch feeds an integration cap $C_\text{int,n}$ (10 fF nominal). |
 | **C** | Speculative slicer array | Two parallel comparators per arm at $\pm h_1$; provides both possible decisions for $D_n$ ahead of time. |
 | **D** | MUX tree + digital core | Bit-$n-1$ flop selects between Arm-$n$'s two speculations; the critical path stretches over $N\cdot T_\text{UI}=75.3$ ps instead of a single UI. |
 
@@ -80,8 +80,8 @@ Blocks A+B (the *analog state engine*) are the subject of this report — they a
 | Baud rate | 106.25 GBaud | $T_\text{UI}=9.412$ ps |
 | Sim oversample | 32 sps | $\mathrm{d}t=294.1$ fs |
 | Number of arms $N$ | 8 | One-bit interleaved per UI, 8-UI superframe |
-| Aperture | $2\,T_\text{UI}=18.82$ ps | $D_{n-1}$ (Zone 1) + $D_n$ (Zone 2) |
-| Clock overlap | $1\,T_\text{UI}=9.412$ ps | Raised-cosine (sinusoidal) |
+| Aperture | $2 T_\text{UI}=18.82$ ps | $D_{n-1}$ (Zone 1) + $D_n$ (Zone 2) |
+| Clock overlap | $1 T_\text{UI}=9.412$ ps | Raised-cosine (sinusoidal) |
 | $R_\text{on}$ / $R_\text{off}$ | 200 Ω / 1 GΩ | $G_\text{on}=5$ mS, $G_\text{off}=1$ nS |
 | $C_\text{int}$ | 10 fF (default) | $\tau_\text{on}=R_\text{on}C_\text{int}=2.00$ ps |
 | $I_\text{low}/I_\text{high}$ | 5 µA / 100 µA | Photocurrent swing $\Delta I = 95$ µA |
@@ -96,22 +96,22 @@ This section reproduces the disclosure's pitch as a baseline, so the next sectio
 Treat each arm as an isolated integrator while its switch is closed (a strong, but disclosed, assumption).  During Arm $n$'s 2-UI aperture, the cap accumulates charge from the rail driven by $I_\text{pd}(t)$.  Decompose the aperture into the two UIs:
 
 $$
-Q_n \;=\; \underbrace{\int_{\text{Zone 1}} I_\text{pd}(t)\,\mathrm{d}t}_{I(D_{n-1})\,T_\text{UI}}
-       \;+\;\underbrace{\int_{\text{Zone 2}} I_\text{pd}(t)\,\mathrm{d}t}_{I(D_n)\,T_\text{UI}}.
+Q_n  =  \underbrace{\int_{\text{Zone 1}} I_\text{pd}(t) \mathrm{d}t}_{I(D_{n-1}) T_\text{UI}}
+        + \underbrace{\int_{\text{Zone 2}} I_\text{pd}(t) \mathrm{d}t}_{I(D_n) T_\text{UI}}.
 $$
 
 If the bit current $I_\text{pd}$ for bit $D_k$ is $I(D_k) \in \{I_\text{low},I_\text{high}\}$ and the cap charges essentially to "$V=Q/C$" (full settling assumption: $\tau_\text{on}\ll T_\text{UI}$), then
 
 $$
-V_n \;=\; \frac{T_\text{UI}}{C_\text{int}}\,I(D_n) \;+\; \frac{T_\text{UI}}{C_\text{int}}\,I(D_{n-1})
-\;\equiv\; h_0\,D_n + h_1\,D_{n-1}.
+V_n  =  \frac{T_\text{UI}}{C_\text{int}} I(D_n)  +  \frac{T_\text{UI}}{C_\text{int}} I(D_{n-1})
+ \equiv  h_0 D_n + h_1 D_{n-1}.
 $$
 
 The disclosure then makes three claims, in order:
 
 1. **Edge alignment ⇒ $h_{-1}=0$.**  The aperture closes at the $D_n/D_{n+1}$ boundary, so no $D_{n+1}$ ever leaks into $V_n$.  This is geometrically true and is rigorously confirmed by simulation.
 2. **Constant input conductance.**  A raised-cosine ramp on each clock plus 1-UI overlap makes $\Sigma_k G_k(t)=$ const.  Also true (numerically, to 1e-12 S ripple).
-3. **The pair $(h_0, h_1)$ is the *entire* response.**  $h_0\approx h_1\approx T_\text{UI}/C_\text{int}$ (≈ 941 V/A at 10 fF), and **Mode A** can null $h_1$ with a closed-form 2-tap TX FFE $c_1=-c_0\,h_1/h_0$, while **Mode B** can resolve $h_1$ with a 1-tap speculative DFE.
+3. **The pair $(h_0, h_1)$ is the *entire* response.**  $h_0\approx h_1\approx T_\text{UI}/C_\text{int}$ (≈ 941 V/A at 10 fF), and **Mode A** can null $h_1$ with a closed-form 2-tap TX FFE $c_1=-c_0 h_1/h_0$, while **Mode B** can resolve $h_1$ with a 1-tap speculative DFE.
 
 Claim (3) hides the architecture's failure mode.  The "isolated integrator" assumption is wrong — at any time at least *two* arms are connected to the shared rail (because the apertures overlap by 1 UI), so the per-arm KCL must include the other arm's $V_\text{int}$ as a source term.  That is the next section.
 
@@ -138,17 +138,17 @@ The simplified topology (Fig. 1.2) is a single circuit node — call it $V_\text
 The shared rail has no charge storage in this analysis (we set $C_\text{rail}=0$ ⇒ quasi-static rail; a finite $C_\text{rail}$ adds a pole that is straightforward to include and that does not change the qualitative result).  Sum of currents into the node = sum of currents out:
 
 $$
-I_\text{pd}(t) \;=\; \sum_{n=0}^{N-1} I_n(t)
+I_\text{pd}(t)  =  \sum_{n=0}^{N-1} I_n(t)
 \quad\text{where}\quad
-I_n(t) \;=\; G_n(t)\,\bigl(V_\text{sh}(t) - V_{\text{int},n}(t)\bigr).
+I_n(t)  =  G_n(t) \bigl(V_\text{sh}(t) - V_{\text{int},n}(t)\bigr).
 $$
 
 Solving for $V_\text{sh}$:
 
 $$
-\boxed{\;
-V_\text{sh}(t) \;=\;
-\frac{I_\text{pd}(t) \;+\; \sum_{n} G_n(t)\,V_{\text{int},n}(t)}{\sum_{n} G_n(t)}\;}
+\boxed{ 
+V_\text{sh}(t)  = 
+\frac{I_\text{pd}(t)  +  \sum_{n} G_n(t) V_{\text{int},n}(t)}{\sum_{n} G_n(t)} }
 \quad(\star)
 $$
 
@@ -162,7 +162,7 @@ This is the core equation.  Two things are worth pointing out:
 By the definition of the branch current and Ohm's law across $S_n$:
 
 $$
-V_\text{sh}(t) - V_{\text{int},n}(t) \;=\; I_n(t)\,/\,G_n(t).
+V_\text{sh}(t) - V_{\text{int},n}(t)  =  I_n(t) / G_n(t).
 $$
 
 This is trivially satisfied by construction in ($\star$), but stating it makes the next step (the cap equation) explicit.
@@ -172,17 +172,17 @@ This is trivially satisfied by construction in ($\star$), but stating it makes t
 Sum of currents into the cap node = the charging current of the cap:
 
 $$
-G_n(t)\,\bigl(V_\text{sh}(t) - V_{\text{int},n}(t)\bigr)
-\;=\; C_{\text{int},n}\,\frac{\mathrm{d}V_{\text{int},n}}{\mathrm{d}t}.
+G_n(t) \bigl(V_\text{sh}(t) - V_{\text{int},n}(t)\bigr)
+ =  C_{\text{int},n} \frac{\mathrm{d}V_{\text{int},n}}{\mathrm{d}t}.
 $$
 
 Rearranging into a per-arm first-order ODE:
 
 $$
-\boxed{\;
+\boxed{ 
 \frac{\mathrm{d}V_{\text{int},n}(t)}{\mathrm{d}t}
-\;=\; \frac{G_n(t)}{C_{\text{int},n}}\,\bigl(V_\text{sh}(t) - V_{\text{int},n}(t)\bigr).
-\;}
+ =  \frac{G_n(t)}{C_{\text{int},n}} \bigl(V_\text{sh}(t) - V_{\text{int},n}(t)\bigr).
+ }
 \quad(\dagger)
 $$
 
@@ -216,7 +216,7 @@ The conductance superframe `g_frame` of shape `(n_arms, period_steps)` is precom
 
 ### 4.1 $\Sigma G(t)$ is genuinely flat
 
-The clock model uses $\sin^2(\pi i / 2\,\mathrm{ramp})$ on the rising edge and the matching $\cos^2$ on the falling edge, with `ramp = aperture - stride = 1 UI`.  The neighbouring arms' rise and fall are complementary, so the column sum of the conductance matrix is constant.
+The clock model uses $\sin^2(\pi i / 2 \mathrm{ramp})$ on the rising edge and the matching $\cos^2$ on the falling edge, with `ramp = aperture - stride = 1 UI`.  The neighbouring arms' rise and fall are complementary, so the column sum of the conductance matrix is constant.
 
 ![Clock physics: 8-phase clocks + ΣG(t) flat to numerical zero + single-arm zoom showing Zone 1/Zone 2](figures/sim_clock_physics_sinusoidal.png)
 *Figure 4.1 — Clock physics (sinusoidal model).  Top: the eight 25%-duty bandlimited clocks running over one 8-UI superframe.  Middle: $\Sigma_n G_n(t)$ flat to $\sim 10^{-15}$ S (the floor is the floating-point summation noise on `g_off ≈ 1 nS` across 8 channels).  Bottom: a single arm's $G_n(t)$ with the rising sin² edge (start of Zone 1), the flat-on top (handing off charge with the previous arm in its Zone 2), and the falling cos² edge (Zone 2 fading as the next arm rises).  This validates Claim 2 of the disclosure: input impedance into the rail is constant to numerical precision.*
@@ -236,7 +236,7 @@ These two are real, beautiful, and worth preserving in any follow-on architectur
 
 ### 5.1 What the engine actually measures
 
-Extract the response taps at the nominal operating point (sinusoidal clock, $C_\text{int}=10$ fF, $R_\text{on}=200\,\Omega$) and print them out:
+Extract the response taps at the nominal operating point (sinusoidal clock, $C_\text{int}=10$ fF, $R_\text{on}=200 \Omega$) and print them out:
 
 ```
 h0  = +1.000000   ( = 390.82 V/A )
@@ -285,7 +285,7 @@ Bottom: frozen per-UI samples; the visible "tilt" of the samples relative to a c
 
 ### 5.5 Per-clock-shape and per-$C_\text{int}$ table
 
-| Clock | $C_\text{int}$ | $h_0$ | $h_1/h_0$ | $h_k/h_{k-1}$ (k≥2) | tail length | $\sum_{k≥1}|h_k|/h_0$ |
+| Clock | $C_\text{int}$ | $h_0$ | $h_1/h_0$ | $h_k/h_{k-1}$ (k≥2) | tail length | $\sum_{k\ge 1}\vert h_k\vert/h_0$ |
 |---|---|---|---|---|---|---|
 | ideal | 10 fF | 470.6 V/A | 0.5031 | **0.497 ≈ 1/2** | 30 | 1.000 |
 | sinusoidal | 5 fF | 727.7 V/A | 0.8587 | 0.459 | 28 | 1.587 |
@@ -316,24 +316,24 @@ Compare to the kT/C noise:
 
 $$
 \sigma_\text{kT/C} = \sqrt{kT/C_\text{int}}, \qquad
-\sigma_\text{kT/C}(10\,\text{fF})=643\,\mu\text{V},\quad
-\sigma_\text{kT/C}(100\,\text{fF})=204\,\mu\text{V}.
+\sigma_\text{kT/C}(10 \text{fF})=643 \mu\text{V},\quad
+\sigma_\text{kT/C}(100 \text{fF})=204 \mu\text{V}.
 $$
 
 So $\sigma_\text{kT/C}\propto 1/\sqrt{C_\text{int}}$.  In the slow-charging regime $V_\text{sig}\propto 1/C_\text{int}$, faster than the noise improves.  **The SNR at the sample node *worsens* with larger $C_\text{int}$ until we leave the slow-charging regime**, and the operating point we care about for high baud rates is exactly that regime.
 
 In the slow-charging regime:
 $$
-\mathrm{SNR}_\text{sample} \;\sim\; \frac{V_\text{sig}}{\sigma_\text{kT/C}}
-\;\propto\; \frac{1/(R_\text{on}\,C_\text{int})}{1/\sqrt{C_\text{int}}}
-\;=\; \frac{1}{R_\text{on}\sqrt{C_\text{int}}}.
+\mathrm{SNR}_\text{sample}  \sim  \frac{V_\text{sig}}{\sigma_\text{kT/C}}
+ \propto  \frac{1/(R_\text{on} C_\text{int})}{1/\sqrt{C_\text{int}}}
+ =  \frac{1}{R_\text{on}\sqrt{C_\text{int}}}.
 $$
 
 Smaller $C_\text{int}$ helps the *ratio* but each fF you remove makes the absolute eye more sensitive to comparator offset, clock-feedthrough kickback and PD shot noise.  In silicon, $C_\text{int}$ has a floor: bond pad + photodiode + offset-trim DAC + comparator input.  10 fF is already optimistic.
 
 ### 6.2 The hard numbers
 
-| $C_\text{int}$ | $h_0$ (V/A) | raw eye $h_0\,\Delta I$ (mV) | $\sigma_\text{kT/C}$ (µV) | $V_\text{sig}/\sigma_\text{kT/C}$ |
+| $C_\text{int}$ | $h_0$ (V/A) | raw eye $h_0 \Delta I$ (mV) | $\sigma_\text{kT/C}$ (µV) | $V_\text{sig}/\sigma_\text{kT/C}$ |
 |---|---|---|---|---|
 | 5 fF | 727.7 | 69.1 | 911 | 75.9 |
 | 10 fF | 390.8 | 37.1 | 643 | 57.7 |
@@ -349,10 +349,10 @@ The numbers in §6.2 are the *raw* eye, before any equalisation.  Once the geome
 
 The §5 / §6 analysis above all assumes the disclosure's 2-UI aperture, which is presented in the disclosure as a *given* — a 2-UI window is the smallest aperture that captures both the post-cursor $D_{n-1}$ and the main bit $D_n$, so naïvely it is also the cleanest.  The reasoning is: any wider aperture adds *more* prior bits ($D_{n-2}, D_{n-3}, \dots$) directly into the sample, multiplying the equaliser depth.
 
-**Simulation flatly disagrees.**  Sweeping `aperture_ui` ∈ {2.0, 2.25, …, 6.0} at fixed $C_\text{int}=10$ fF and $R_\text{on}=200\,\Omega$ shows that **3 UI is the optimum** and that 2 UI is in fact the *worst* operating point on the curve.  Reproduction script: [`examples/charge_steering_aperture_sweep.py`](../../../optical-serdes/examples/charge_steering_aperture_sweep.py).
+**Simulation flatly disagrees.**  Sweeping `aperture_ui` ∈ {2.0, 2.25, …, 6.0} at fixed $C_\text{int}=10$ fF and $R_\text{on}=200 \Omega$ shows that **3 UI is the optimum** and that 2 UI is in fact the *worst* operating point on the curve.  Reproduction script: [`examples/charge_steering_aperture_sweep.py`](../../../optical-serdes/examples/charge_steering_aperture_sweep.py).
 
 ![Aperture sweep: h0, h1/h0, L1-penalty, σ@1e-12 vs aperture — 3 UI is the optimum](figures/sim_aperture_sweep.png)
-*Figure 6.4 — Aperture sweep at $C_\text{int}=10$ fF, $R_\text{on}=200\,\Omega$, sinusoidal clock.  All four panels point to the same conclusion: the 2-UI choice in the disclosure is a local minimum, the optimum is at 2.75–3.5 UI, and the curve is fairly flat across that plateau.  $K$ values printed above each L1-penalty point are the optimal TX-FFE tap counts; they collapse from 6 (at 2 UI) to 2 (everywhere else) — the disclosure's original closed-form 2-tap design is the right answer, but only at the right aperture.*
+*Figure 6.4 — Aperture sweep at $C_\text{int}=10$ fF, $R_\text{on}=200 \Omega$, sinusoidal clock.  All four panels point to the same conclusion: the 2-UI choice in the disclosure is a local minimum, the optimum is at 2.75–3.5 UI, and the curve is fairly flat across that plateau.  $K$ values printed above each L1-penalty point are the optimal TX-FFE tap counts; they collapse from 6 (at 2 UI) to 2 (everywhere else) — the disclosure's original closed-form 2-tap design is the right answer, but only at the right aperture.*
 
 ### 6.4.1 Numbers
 
@@ -388,7 +388,7 @@ In other words, **the wider aperture acts as a longer settling window — it giv
 
 ### 6.4.3 Why not arbitrarily wide
 
-There is still a competing effect.  With aperture $\geq 3$ UI and 1-UI stride, $\geq 3$ arms are simultaneously connected to the rail.  The KCL equation (★) gives $V_\text{sh} = (I_\text{pd}+\Sigma G\,V_\text{int})/\Sigma G$, and the magnitude of $V_\text{sh}$ responding to $I_\text{pd}$ alone is $\sim I_\text{pd}/(N_\text{active}\,G_\text{on})$.  More arms simultaneously on the rail $\Rightarrow$ smaller $V_\text{sh}$ swing per arm $\Rightarrow$ smaller $h_0$.
+There is still a competing effect.  With aperture $\geq 3$ UI and 1-UI stride, $\geq 3$ arms are simultaneously connected to the rail.  The KCL equation (★) gives $V_\text{sh} = (I_\text{pd}+\Sigma G V_\text{int})/\Sigma G$, and the magnitude of $V_\text{sh}$ responding to $I_\text{pd}$ alone is $\sim I_\text{pd}/(N_\text{active} G_\text{on})$.  More arms simultaneously on the rail $\Rightarrow$ smaller $V_\text{sh}$ swing per arm $\Rightarrow$ smaller $h_0$.
 
 These two effects cross at 3.0–3.25 UI: the cap is well-settled, but only 3 arms share the rail.  At 6 UI, six arms share the rail and $h_0$ has fallen 41% (from 473 V/A back down to 280 V/A) — the kT/C-noise floor catches up with the shrunken signal again.
 
@@ -425,17 +425,17 @@ The disclosure-as-written is doomed; the disclosure-with-3-UI-aperture is not.  
 
 ### 7.1 Closed-form Mode A and its extension
 
-The 2-tap version is in the disclosure: $c_1 = -c_0\,h_1/h_0$ nulls $h_1$ in the effective channel $g = c \otimes h$.  For a $K$-tap TX FFE that nulls $h_1,\dots,h_{K-1}$, we solve recursively from the convolution definition $g_k = \sum_j c_j\,h_{k-j}$ for $k=1,\dots,K-1$:
+The 2-tap version is in the disclosure: $c_1 = -c_0 h_1/h_0$ nulls $h_1$ in the effective channel $g = c \otimes h$.  For a $K$-tap TX FFE that nulls $h_1,\dots,h_{K-1}$, we solve recursively from the convolution definition $g_k = \sum_j c_j h_{k-j}$ for $k=1,\dots,K-1$:
 
 $$
-c_k = -\frac{1}{h_0}\sum_{j=0}^{k-1} c_j\,h_{k-j}, \qquad c_0 = 1\text{ (normalised below)}.
+c_k = -\frac{1}{h_0}\sum_{j=0}^{k-1} c_j h_{k-j}, \qquad c_0 = 1\text{ (normalised below)}.
 $$
 
 This is a triangular zero-forcing solve; it is implemented in `tx/charge_steering_cooptim.py`.
 
 ### 7.2 The L1 constraint and the swing penalty
 
-The TX is current-limited: it can output between $I_\text{low}$ and $I_\text{high}$.  The pre-emphasised current is $i[n] = (\sum_k c_k\,a[n-k]) / Z$ where $Z$ is whatever scaling we choose.  For the symbol stream $a[n]\in\{-1,+1\}$ to stay inside the physical envelope $[I_\text{low}, I_\text{high}]$ we need $\sum_k|c_k| \le 1$ (L1 normalisation).
+The TX is current-limited: it can output between $I_\text{low}$ and $I_\text{high}$.  The pre-emphasised current is $i[n] = (\sum_k c_k a[n-k]) / Z$ where $Z$ is whatever scaling we choose.  For the symbol stream $a[n]\in\{-1,+1\}$ to stay inside the physical envelope $[I_\text{low}, I_\text{high}]$ we need $\sum_k|c_k| \le 1$ (L1 normalisation).
 
 Choose $Z = \sum_k|c_k^{\text{raw}}|$ so $\sum_k|c_k|=1$.  This *attenuates the main cursor*:
 
@@ -445,9 +445,9 @@ $$
 
 Define the *swing penalty* $\eta = 20\log_{10}(Z)$ dB.  This is the loss of cursor amplitude (in dB) that buys you the post-cursor nulling.
 
-### 7.3 Measured penalties (sinusoidal clock, $R_\text{on}=200\,\Omega$, $C_\text{int}=10$ fF)
+### 7.3 Measured penalties (sinusoidal clock, $R_\text{on}=200 \Omega$, $C_\text{int}=10$ fF)
 
-| $K$ (TX taps) | $\sum_k|c_k^{\text{raw}}|$ | swing penalty | $g_0$ post-FFE (V/A) | full eye $g_0\,\Delta I$ (mV) |
+| $K$ (TX taps) | $\sum_k\vert c_k^{\text{raw}}\vert$ | swing penalty | $g_0$ post-FFE (V/A) | full eye $g_0 \Delta I$ (mV) |
 |---|---|---|---|---|
 | 2 | 1.914 | 5.64 dB | 204.2 | **19.40** |
 | 3 | 2.429 | 7.71 dB | 160.9 | 15.29 |
@@ -493,7 +493,7 @@ This is the empirical demonstration of the architecture's noise budget.  We inje
 ### 9.1 $C_\text{int} = 10$ fF (the nominal point)
 
 ![AWGN sweep: BER vs sigma for n_tx in {2,3,4,6} at C_int=10 fF — only 6-tap reaches 1e-12](figures/sim_awgn_sweep_cint10f.png)
-*Figure 9.1 — BER vs sample-node $\sigma$ at $C_\text{int}=10$ fF, $R_\text{on}=200\,\Omega$, sinusoidal clock.  The four curves are TX-FFE tap counts $K\in\{2,3,4,6\}$.  Both counted BER (dots) and Gaussian-fit extrapolation (lines) are shown.  Key takeaways:*
+*Figure 9.1 — BER vs sample-node $\sigma$ at $C_\text{int}=10$ fF, $R_\text{on}=200 \Omega$, sinusoidal clock.  The four curves are TX-FFE tap counts $K\in\{2,3,4,6\}$.  Both counted BER (dots) and Gaussian-fit extrapolation (lines) are shown.  Key takeaways:*
 
 | $K$ | analytical $\sigma$@$10^{-12}$ (mV) | counted-fit $\sigma$@$10^{-12}$ (mV) | regime |
 |---|---|---|---|
@@ -526,7 +526,7 @@ Why are $K=4,6$ worse than $K=3$ at 100 fF?  The L1 sum grows fast as the equali
 
 ### 9.3 The map
 
-Putting both panels together: the design space has *no good operating point* on the $C_\text{int}$ axis given fixed $R_\text{on}=200\,\Omega$ and $T_\text{ap}=2$ UI.  Lowering $C_\text{int}$ helps SNR but bottoms out at silicon parasitics.  Raising $C_\text{int}$ shrinks the eye faster than it lowers noise.  The architecture's degree of freedom is gone.
+Putting both panels together: the design space has *no good operating point* on the $C_\text{int}$ axis given fixed $R_\text{on}=200 \Omega$ and $T_\text{ap}=2$ UI.  Lowering $C_\text{int}$ helps SNR but bottoms out at silicon parasitics.  Raising $C_\text{int}$ shrinks the eye faster than it lowers noise.  The architecture's degree of freedom is gone.
 
 ---
 
@@ -622,9 +622,9 @@ The `conductance_frame` (shape `(N, period_steps)`) is precomputed once with rai
 Consider two adjacent arms during their 1-UI overlap (Arm $n-1$ in its Zone 2, Arm $n$ in its Zone 1).  Both have $G_\text{on}$; all others have $G_\text{off}\approx 0$.  Equation (★) becomes
 
 $$
-V_\text{sh}(t) \;=\;
-\frac{I_\text{pd}(t) + G_\text{on}\,V_{\text{int},n-1}(t) + G_\text{on}\,V_{\text{int},n}(t)}{2\,G_\text{on}}
-\;=\; \tfrac{1}{2}\Bigl(\tfrac{I_\text{pd}}{G_\text{on}} + V_{\text{int},n-1} + V_{\text{int},n}\Bigr).
+V_\text{sh}(t)  = 
+\frac{I_\text{pd}(t) + G_\text{on} V_{\text{int},n-1}(t) + G_\text{on} V_{\text{int},n}(t)}{2 G_\text{on}}
+ =  \tfrac{1}{2}\Bigl(\tfrac{I_\text{pd}}{G_\text{on}} + V_{\text{int},n-1} + V_{\text{int},n}\Bigr).
 $$
 
 So the rail is the *average* of (i) the virtual-ground voltage $I_\text{pd}/G_\text{on}$ that drives $V_{\text{int},n}$ if Arm $n$ were alone, (ii) Arm $(n-1)$'s present cap voltage (carrying $D_{n-2}$ from its Zone 1), and (iii) Arm $n$'s own present cap voltage.
@@ -642,8 +642,8 @@ Unless stated otherwise, every figure in this report was generated with:
 - Baud rate 106.25 GBaud, 32 sps.
 - 8 arms, 2 UI aperture, 1 UI stride.
 - Sinusoidal clock with 1-UI raised-cosine overlap.
-- $R_\text{on}=200\,\Omega$, $R_\text{off}=1\,\text{G}\Omega$, $C_\text{int}=10$ fF (default) or 100 fF (where noted).
-- $I_\text{low}=5\,\mu$A, $I_\text{high}=100\,\mu$A (95 µA swing).
+- $R_\text{on}=200 \Omega$, $R_\text{off}=1 \text{G}\Omega$, $C_\text{int}=10$ fF (default) or 100 fF (where noted).
+- $I_\text{low}=5 \mu$A, $I_\text{high}=100 \mu$A (95 µA swing).
 - Linear current chain (raw symbol stream times photocurrent levels; MZM/MRM disabled), unless a figure is explicitly the MRM variant.
 - PRBS-13 patterns, 4096–200 000 bits per run depending on BER target.
 - TX FFE designed with `design_tx_ffe_null_postcursors`, L1-normalised.
