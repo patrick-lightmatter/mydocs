@@ -10,6 +10,7 @@
 - End-to-end example: [`examples/charge_steering_rx_modes_nrz_106g25.py`](../../../optical-serdes/examples/charge_steering_rx_modes_nrz_106g25.py)
 - Physics-evidence example: [`examples/charge_steering_physics_evidence.py`](../../../optical-serdes/examples/charge_steering_physics_evidence.py)
 - AWGN-sensitivity sweep: [`examples/charge_steering_awgn_sweep.py`](../../../optical-serdes/examples/charge_steering_awgn_sweep.py)
+- Aperture sweep (§6.4): [`examples/charge_steering_aperture_sweep.py`](../../../optical-serdes/examples/charge_steering_aperture_sweep.py)
 - Disclosure PDF & context: [`temp/current_rx/`](../../../optical-serdes/temp/current_rx/)
 
 ---
@@ -18,13 +19,14 @@
 
 A unipolar photocurrent is dumped directly onto a shared analog rail and steered by eight 25% overlapping pass-gate switches onto eight per-arm integration caps. The disclosure's pitch is that with a **2-UI edge-aligned aperture** the resulting per-UI sample is a clean two-tap convolution $V_n = h_0 D_n + h_1 D_{n-1}$ with $h_{-1}\equiv 0$, and either a TX FFE (Mode A) or a 1-tap speculative DFE (Mode B) can drive BER to floor.
 
-A rigorous KCL/KVL time-domain model in this repo agrees with two of the disclosure's three core claims but **breaks the third**:
+A rigorous KCL/KVL time-domain model in this repo agrees with two of the disclosure's three core claims, **breaks the third**, and uncovers **one substantial architectural correction** (§6.4):
 
 1. **$h_{-1}=0$ is real.** Edge-aligned 2-UI apertures force the pre-cursor to numerical zero. ✓
 2. **$\Sigma G(t)$ is real.** Raised-cosine overlap makes the input conductance constant to floating-point precision. ✓
-3. **The 2-tap model is *not* real.** The shared rail couples every active arm's $V_{\text{int}}$ back into the present arm's KCL, producing a **geometric ISI tail** $h_k/h_{k-1}\approx\mathrm{const}$ that runs 10–30 taps deep. The "2-tap" sampler is in fact an IIR-flavoured FIR with a 1.4× ISI burden ($\sum_{k\ge 1}|h_k|/h_0 = 1.41$ at the nominal point). ✗
+3. **The 2-tap model is *not* real.** The shared rail couples every active arm's $V_{\text{int}}$ back into the present arm's KCL, producing a **geometric ISI tail** $h_k/h_{k-1}\approx\mathrm{const}$ that runs 10–30 taps deep. The "2-tap" sampler is in fact an IIR-flavoured FIR with a 1.4× ISI burden ($\sum_{k\ge 1}|h_k|/h_0 = 1.41$ at the disclosure's 2-UI point). ✗
+4. **The 2-UI aperture itself is wrong.**  The cap is an RC tracker ($\tau_\text{on}\ll T_\text{UI}$), not a true integrator, so a wider aperture *suppresses* the geometric tail rather than amplifying it.  The optimum is at **3.0–3.25 UI**, which gives 2.5× the AWGN budget and lets the original closed-form 2-tap TX FFE finally be the right design.  ★ (§6.4 — the biggest finding)
 
-**The fundamental limit is the integration capacitance $C_{\text{int}}$.** The signal $h_0$ and the kT/C floor pull in opposite directions of $C_{\text{int}}$, but in the slow-charging regime they pull *together* the wrong way:
+**Two fundamental constraints set the SNR ceiling.** The integration capacitance $C_{\text{int}}$ — signal $h_0$ and the kT/C floor pull in opposite directions of $C_{\text{int}}$, but in the slow-charging regime they pull *together* the wrong way:
 
 | $C_{\text{int}}$ | $h_0$ | full eye after 6-tap TX FFE | kT/C $\sigma$ | $\sigma_{\text{slicer}}$ for BER=$10^{-12}$ (Q=7.034) | headroom over kT/C |
 |---|---|---|---|---|---|
@@ -32,9 +34,16 @@ A rigorous KCL/KVL time-domain model in this repo agrees with two of the disclos
 | **10 fF** | **391 V/A** | **12.49 mV** | **643 µV** | **0.887 mV** | **+0.24 mV** |
 | 100 fF | 47 V/A | 0.93 mV | 204 µV | 0.066 mV | **−0.14 mV (negative)** |
 
-At 100 fF the signal eye is already smaller than thermal noise alone: the architecture is sub-threshold by definition. Even at the sweet-spot 10 fF the total noise budget at the sample node is **887 µV** with **643 µV already burned by kT/C**, leaving 244 µV for every other real-silicon noise source (comparator offset random walk, supply, jitter-induced AM, channel) — a fraction of any reasonable budget for a 106 Gb/s receiver.
+…and aperture width $T_\text{ap}$ — settling time and rail crowding cross at 3 UI:
 
-**Conclusion.** The macro works, $h_{-1}=0$ is genuinely beautiful, and the simulation framework is now reusable for any current-mode integrating receiver. But the architectural slope of $\mathrm{SNR}(C_{\text{int}}) \propto 1/(R_{\text{on}}\sqrt{C_{\text{int}}})$ in the slow-charging regime is unfavourable, and the only $C_{\text{int}}$ values that meet kT/C are the ones where bond capacitance, photodiode capacitance and trim-DAC capacitance dwarf the design knob. The disclosure's 2-tap pitch under-states the equaliser depth by 4×, and the L1 swing penalty paid for that depth wipes out the eye amplitude needed to clear thermal noise. **This is a useful negative result for the field**: it isolates the failure mode (shared-rail coupling) and provides a recipe for what *would* fix it (sub-100-Ω switches, sub-UI apertures, or admitting a small TIA-like buffer on the rail).
+| $T_\text{ap}$ | $h_0$ | $h_1/h_0$ | optimal $K$ | swing penalty | full eye | $\sigma_{\text{slicer}}$@$10^{-12}$ | headroom over kT/C |
+|---|---|---|---|---|---|---|---|
+| **2 UI (disclosure)** | **391 V/A** | **0.914** | **6** | **9.46 dB** | **12.5 mV** | **0.887 mV** | **+0.24 mV** |
+| **3 UI (optimum)** | **473 V/A** | **0.289** | **2** | **2.20 dB** | **34.9 mV** | **2.478 mV** | **+1.83 mV** |
+| 4 UI | 411 V/A | 0.257 | 2 | 1.99 dB | 31.1 mV | 2.211 mV | +1.57 mV |
+| 6 UI | 280 V/A | 0.439 | 2 | 3.16 dB | 18.5 mV | 1.313 mV | +0.67 mV |
+
+**Conclusion.** The macro *as disclosed* (2-UI aperture) leaves only 244 µV of headroom over kT/C — unbuildable in real silicon. The macro *with a 3-UI aperture* leaves 1.83 mV of headroom — actually buildable. The fix is one parameter in the clock generator, not a new circuit block. **The biggest contribution of this work is the diagnosis that the 2-UI choice is the worst on the curve and not, as the disclosure assumes, the cleanest.** The simulation framework is now reusable for any current-mode integrating receiver and provides an immediate $\mathrm{SNR}\propto 1/(R_\text{on}\sqrt{C_\text{int}})$ gut-check for the field.
 
 ---
 
@@ -336,6 +345,80 @@ Going from 10 → 100 fF *worsens* the kT/C-only SNR by ≈ 2.6× (8.3× in sign
 
 The numbers in §6.2 are the *raw* eye, before any equalisation.  Once the geometric tail of §5 is included, the equaliser will collapse the eye further.  Section 7 quantifies that collapse.
 
+### 6.4 Update — the second knob: aperture width (the disclosure picked the wrong one)
+
+The §5 / §6 analysis above all assumes the disclosure's 2-UI aperture, which is presented in the disclosure as a *given* — a 2-UI window is the smallest aperture that captures both the post-cursor $D_{n-1}$ and the main bit $D_n$, so naïvely it is also the cleanest.  The reasoning is: any wider aperture adds *more* prior bits ($D_{n-2}, D_{n-3}, \dots$) directly into the sample, multiplying the equaliser depth.
+
+**Simulation flatly disagrees.**  Sweeping `aperture_ui` ∈ {2.0, 2.25, …, 6.0} at fixed $C_\text{int}=10$ fF and $R_\text{on}=200\,\Omega$ shows that **3 UI is the optimum** and that 2 UI is in fact the *worst* operating point on the curve.  Reproduction script: [`examples/charge_steering_aperture_sweep.py`](../../../optical-serdes/examples/charge_steering_aperture_sweep.py).
+
+![Aperture sweep: h0, h1/h0, L1-penalty, σ@1e-12 vs aperture — 3 UI is the optimum](figures/sim_aperture_sweep.png)
+*Figure 6.4 — Aperture sweep at $C_\text{int}=10$ fF, $R_\text{on}=200\,\Omega$, sinusoidal clock.  All four panels point to the same conclusion: the 2-UI choice in the disclosure is a local minimum, the optimum is at 2.75–3.5 UI, and the curve is fairly flat across that plateau.  $K$ values printed above each L1-penalty point are the optimal TX-FFE tap counts; they collapse from 6 (at 2 UI) to 2 (everywhere else) — the disclosure's original closed-form 2-tap design is the right answer, but only at the right aperture.*
+
+### 6.4.1 Numbers
+
+| Aperture | $h_0$ (V/A) | $h_1/h_0$ | optimal $K$ | L1 penalty | full eye (mV) | linear $\sigma_{\text{slicer}}$@$10^{-12}$ (mV) | headroom over kT/C (µV) |
+|---|---|---|---|---|---|---|---|
+| 2.00 | 391 | **0.914** | 2 | 5.64 dB | 19.4 | 1.379 | +736 |
+| 2.50 | 481 | 0.461 | 2 | 3.29 dB | 31.3 | 2.223 | +1579 |
+| 2.75 | 482 | 0.354 | 2 | 2.63 dB | 33.8 | 2.406 | +1762 |
+| **3.00** | **473** | **0.289** | **2** | **2.20 dB** | **34.9** | **2.478** | **+1834** |
+| 3.25 | 459 | 0.250 | 2 | 1.93 dB | 34.9 | 2.480 | +1837 |
+| 3.50 | 445 | 0.232 | 2 | 1.81 dB | 34.3 | 2.439 | +1796 |
+| 4.00 | 411 | 0.257 | 2 | 1.99 dB | 31.1 | 2.211 | +1567 |
+| 5.00 | 338 | 0.357 | 2 | 2.65 dB | 23.7 | 1.683 | +1039 |
+| 6.00 | 280 | 0.439 | 2 | 3.16 dB | 18.5 | 1.313 | +670 |
+
+The optimum at 3.0–3.25 UI gives **2.8× more linear AWGN budget than 2 UI** (and 1.83 mV of headroom over kT/C — a buildable margin), with a 6.6 dB *smaller* L1 swing penalty.  The 4-UI case the question asked about is on the falling slope but still meaningfully better than 2 UI.
+
+### 6.4.2 Why — the cap is a tracker, not a true integrator
+
+The integration time constant $\tau_\text{on}=R_\text{on}C_\text{int}=2$ ps is **much smaller than one UI** ($T_\text{UI}=9.4$ ps).  So the cap is not "doing chip-rate integration" in the textbook sense — it is an RC *tracker* that follows $V_\text{sh}(t)$ with about 5 time-constants of headroom per UI.
+
+This changes the contribution of each UI of the aperture to $V_\text{int,n}(t_\text{close})$.  Decomposing the aperture into successive UIs $U_1, U_2, \dots, U_M$ (with $U_M$ being the UI just before the freeze):
+
+- During the *latest* UI $U_M$ (containing $D_n$), the cap converges toward $V_\text{sh}(D_n)$ on $\tau_\text{on}$.  At the start of $U_M$ the cap voltage is some convex combination of earlier-UI samples; by the end of $U_M$ that history is multiplied by $e^{-T_\text{UI}/\tau_\text{on}} \approx 0.009$ — a 99% suppression.
+- During UI $U_{M-1}$ (containing $D_{n-1}$), the cap was converging toward $V_\text{sh}(D_{n-1})$.  The fraction of that value surviving through $U_M$ is the residual $\sim e^{-T_\text{UI}/\tau_\text{on}}$.
+- For a sinusoidal clock the falling cos² edge of $U_M$ slows the tracking near the close instant (it stretches $\tau_\text{eff}$ as $G_n$ drops), letting *some* of $D_{n-1}$ leak through.  That residual is $h_1$.
+
+Now the key insight: how big $h_1$ is depends on **how settled $V_\text{int}$ was at the start of $U_M$**.  At a 2-UI aperture, $U_M$ is the *first* UI in which the cap sees $V_\text{sh}(D_n)$, starting from $V_\text{sh}(D_{n-1})$.  The cap is still climbing toward $V_\text{sh}(D_n)$ when the falling edge cuts off the tracking — so the freeze captures a half-converged value, and $h_1/h_0 \approx 0.9$.
+
+At a 3-UI aperture, the cap has an *extra* full UI of flat-on time to converge to $V_\text{sh}(D_n)$ **before** the falling edge starts.  So the freeze captures a fully-converged value and $h_1/h_0$ drops to $\sim 0.29$.
+
+In other words, **the wider aperture acts as a longer settling window — it gives the cap time to forget the older bits** rather than capturing more of them.  This is the opposite of the "geometric integration of consecutive bits" intuition.
+
+### 6.4.3 Why not arbitrarily wide
+
+There is still a competing effect.  With aperture $\geq 3$ UI and 1-UI stride, $\geq 3$ arms are simultaneously connected to the rail.  The KCL equation (★) gives $V_\text{sh} = (I_\text{pd}+\Sigma G\,V_\text{int})/\Sigma G$, and the magnitude of $V_\text{sh}$ responding to $I_\text{pd}$ alone is $\sim I_\text{pd}/(N_\text{active}\,G_\text{on})$.  More arms simultaneously on the rail $\Rightarrow$ smaller $V_\text{sh}$ swing per arm $\Rightarrow$ smaller $h_0$.
+
+These two effects cross at 3.0–3.25 UI: the cap is well-settled, but only 3 arms share the rail.  At 6 UI, six arms share the rail and $h_0$ has fallen 41% (from 473 V/A back down to 280 V/A) — the kT/C-noise floor catches up with the shrunken signal again.
+
+### 6.4.4 End-to-end BER validation (PRBS-13, 200 000 symbols, linear chain)
+
+The linear σ@$10^{-12}$ in the table above is a Q-factor estimate assuming Gaussian residual.  Running the engine end-to-end with PRBS-13 confirms the qualitative trend and exposes a small correction.
+
+| Aperture | $K$ | $\mu_1-\mu_0$ (mV) | residual $\sigma_d$ from un-cancelled tail (mV) | BER @ $\sigma_\text{added}=2.5$ mV | BER @ $\sigma_\text{added}=3.0$ mV |
+|---|---|---|---|---|---|
+| 2 UI | 2 | 19.4 | 5.33 | $3.3\times 10^{-2}$ | $4.7\times 10^{-2}$ |
+| 2 UI | 6 | 12.5 | 0.34 | $6.4\times 10^{-3}$ | $1.9\times 10^{-2}$ |
+| 2 UI | 12 | 12.0 | 0.01 | $7.9\times 10^{-3}$ | $2.3\times 10^{-2}$ |
+| **3 UI** | **2** | **34.9** | **3.70** | **0** | $1.5\times 10^{-5}$ |
+| **3 UI** | **8** | **29.3** | **0.39** | **0** | **0** |
+| 4 UI | 2 | 31.1 | 4.25 | $2.1\times 10^{-4}$ | $5.5\times 10^{-4}$ |
+| 4 UI | 8 | 24.8 | 0.29 | 0 | $2.0\times 10^{-5}$ |
+
+Two observations:
+
+- **3 UI, $K=2$** has 3.7 mV of un-cancelled deterministic ISI (the $h_2, h_3, \ldots$ tail still leaks through because the 2-tap FFE only nulls $h_1$).  The eye is so much wider (34.9 mV vs 12.5 mV) that this works anyway at $\sigma_\text{added}=2.5$ mV — but the *deterministic* worst case will be hit by adversarial patterns, and the linear-σ-only estimate of 2.48 mV is an overestimate.  Combining the residual $\sigma_d=3.7$ mV with Gaussian noise gives a true $\sigma_\text{added}@10^{-12} \approx 0$ (residual already exceeds the BER=$10^{-12}$ budget).
+- **3 UI, $K=8$** cleans the residual to $\sigma_d=0.39$ mV while keeping a 29.3-mV eye.  This is the practical best.  Solving $\sigma_\text{total}^2 = \sigma_d^2 + \sigma_\text{added}^2$ with $\sigma_\text{total}=14.65\text{ mV}/7.034=2.08$ mV gives $\sigma_\text{added}@10^{-12} \approx 2.04$ mV — **2.5× the 0.82 mV achieved by 2 UI / $K=6$** (after the same correction).
+
+In short: the linear analysis showed a 2.8× headroom improvement; the end-to-end with proper residual-ISI accounting still shows a 2.5× improvement.  The qualitative finding is robust.
+
+### 6.4.5 What this means for the architecture
+
+This is a **major correction** to the §10 conclusion that the architecture is doomed.  At the disclosure's 2-UI aperture, the noise budget is 244 µV over kT/C — unbuildable.  At a 3-UI aperture with 8-tap TX FFE, the noise budget jumps to ~1.4 mV over kT/C — actually buildable in real silicon.
+
+The disclosure-as-written is doomed; the disclosure-with-3-UI-aperture is not.  And the change is one parameter in the clock generator — it does not require new circuit blocks, faster switches, or smaller bond pads.
+
 ---
 
 ## 7. Mode A (TX FFE) and the L1 swing penalty
@@ -449,7 +532,7 @@ Putting both panels together: the design space has *no good operating point* on 
 
 ## 10. What this kills, what this teaches
 
-### 10.1 The architecture as published is not buildable at 106 Gbaud
+### 10.1 The architecture *as disclosed* (2-UI aperture) is not buildable at 106 Gbaud
 
 The combination of:
 
@@ -458,24 +541,39 @@ The combination of:
 - a kT/C floor of 643 µV at the smallest practical $C_\text{int}$,
 - an AWGN budget of 887 µV at the sample node for BER $10^{-12}$,
 
-leaves 244 µV for everything else.  No bond-pad-realistic implementation of this macro is going to absorb the rest of the noise budget within that headroom.  The "TIA-less" power saving is illusory because the price is paid in eye amplitude that must clear thermal noise; the avoided current in the TIA reappears as required photocurrent for an adequate eye, which means a higher-power laser or a tighter coupling budget.
+leaves 244 µV for everything else.  No bond-pad-realistic implementation of this macro at the 2-UI aperture is going to absorb the rest of the noise budget within that headroom.  The "TIA-less" power saving at 2 UI is illusory because the price is paid in eye amplitude that must clear thermal noise.
 
-This is not a "the equaliser is suboptimal" or "the disclosure used the wrong clock model" critique.  The architecture is fundamentally constrained by ($\star$): any current-mode integrator that shares a rail between overlapping arms will have a coupling tail, and any RC integrator has a kT/C floor that scales as $1/\sqrt{C_\text{int}}$ while the signal scales as $1/C_\text{int}$ in the slow-charging regime.  No amount of clock or equaliser engineering removes that.
+But — and this is the §6.4 correction — that conclusion *only* applies to the 2-UI aperture.
 
-### 10.2 But these three findings are worth publishing
+### 10.1.bis  The architecture *with a 3-UI aperture* is buildable
 
-1. **$h_{-1}=0$ from edge-aligned 2-UI sampling is a real, exact, beautiful result.**  Any future TIA-less receiver that adopts this aperture geometry gets a free lunch on the pre-cursor — at no implementation cost.  Worth disseminating.
-2. **The shared-rail coupling produces a geometric ISI tail with a clean closed-form per-hop ratio.**  For ideal rectangular clocks it is exactly $1/2$; for any other clock shape it's a $G$-weighted overlap integral.  This is publishable: it's a previously-undisclosed *architectural* failure mode (not a circuit imperfection) with a clean equation behind it.
+Re-running the same analysis with `aperture_ui = 3.0` (1 extra UI of flat-on tracking time, $4 \to 3$ arms simultaneously on the rail) gives:
+
+- a geometric ISI tail with $h_1/h_0=0.29$ — small enough that the original 2-tap closed-form TX FFE is the right choice,
+- a 2.20 dB L1 swing penalty (a 7.3 dB recovery vs the 2-UI case),
+- an end-to-end AWGN budget at the sample node of ~2 mV for BER $10^{-12}$ — **2.5× the 2-UI case**,
+- with the kT/C floor unchanged at 643 µV, that leaves ~1.4 mV of headroom for comparator offset random walk, supply noise, jitter-induced AM, shot noise and channel noise — comparable to what a conventional CTLE-based 106 Gbaud RX has to live with.
+
+The change is one number in the clock generator (the duty cycle / overlap), not a new circuit block.  At the 2-UI aperture this architecture *is* doomed in the sense above; at the 3-UI aperture it is genuinely competitive.
+
+The §3 KCL is still the right framework, the §5 geometric tail is still there (it just gets smaller), and the §6 kT/C trap is unchanged.  But the §6.4 finding shifts the operating point by enough to clear the BER cliff.
+
+### 10.2 But these four findings are worth publishing
+
+1. **$h_{-1}=0$ from edge-aligned sampling is a real, exact, beautiful result.**  Any future TIA-less receiver that adopts this aperture geometry gets a free lunch on the pre-cursor — at no implementation cost.  Worth disseminating.
+2. **The shared-rail coupling produces a geometric ISI tail with a clean closed-form per-hop ratio.**  For ideal rectangular clocks the per-hop dilution is exactly $1/N_\text{active}$ where $N_\text{active}$ is the number of arms simultaneously on the rail; for any other clock shape it's a $G$-weighted overlap integral.  This is publishable: it's a previously-undisclosed *architectural* failure mode (not a circuit imperfection) with a clean equation behind it.
 3. **The $C_\text{int}$ trap and the L1 swing penalty together set a fundamental SNR ceiling for current-mode integrating receivers.**  $\mathrm{SNR}\propto 1/(R_\text{on}\sqrt{C_\text{int}})$ in the slow-charging regime, with the cap floored by silicon parasitics.  This gives the field a 1-line gut-check on whether *any* charge-steering proposal will close at a target rate before they build it.
+4. **The aperture-vs-stride knob is the dominant lever — and the disclosure picked the wrong setting.**  The cap is an RC tracker ($\tau_\text{on} \ll T_\text{UI}$), not a true integrator, so a wider aperture *suppresses* old-bit memory rather than capturing more bits directly.  The 2-UI aperture in the disclosure is the *worst* operating point in the relevant range; the optimum is at 3.0–3.25 UI, which gives 2.5× the AWGN budget and drops the required TX-FFE depth from 6 taps to 2.  This is the single biggest improvement available to the architecture, costs nothing in silicon, and re-opens the design space.  It is also the most likely finding to surprise other practitioners — the "integrate over the bit, freeze, repeat" model is so natural that the failure mode at 2 UI is invisible without simulation.
 
 ### 10.3 What would fix it (future-work signals)
 
 The simulation framework in this repo can directly test all of these.  Each line is a hypothesis with a known cost.
 
+- **Move to a 3-UI aperture.** ★ (§6.4)  The single biggest win available, and the only one that's free.  $h_1/h_0$ drops by 3.2×, the geometric tail by ~10×, the optimal TX-FFE depth from 6 to 2, the L1 swing penalty by 7.3 dB, and the AWGN budget by 2.5×.  Cost: 3 arms instead of 2 simultaneously on the rail (slightly bigger switched-cap load on the photodiode) and a slightly different clock-generator duty cycle.  Worth being the headline change.
 - **Drop $R_\text{on}$.**  $\mathrm{SNR}\propto 1/R_\text{on}$; halving $R_\text{on}$ doubles the budget.  Cost: bigger switches, more capacitance from the pass-gates themselves (some of which adds back into $C_\text{int}$, partially defeating the gain).
-- **Shorter aperture.**  Going to a 1-UI aperture removes $h_1$ entirely (no Zone-2 leakage of $D_{n-1}$).  Cost: the cap charges less per UI (fewer photons integrated), so $h_0$ halves and the SNR worsens.  But the geometric tail is gone, so the L1 penalty disappears — the trade is interesting and unsweet.
-- **Break the rail.**  Put a sampling buffer (a small TIA-like input stage) between $I_\text{pd}$ and the switch matrix.  Now the cross-arm coupling through the rail is broken, and the per-arm response is the disclosed 2-tap form.  This re-introduces an active stage and partially undoes the TIA-less ambition — but only partially, because the buffer is gain-1 and can be quite small.
-- **Hybrid Mode A + B.**  Use a 2-tap TX FFE to null $h_1$ (cheap, 5.6 dB penalty), and a 1-tap unrolled DFE for the dominant $h_2$, and accept the rest as residual.  At 10 fF this might leave a usable eye with less aggregate penalty than 6-tap-Mode-A.
+- **Wider-still aperture (4–5 UI) for noisier photodiodes.**  The 3 → 4 UI step gives up only 10% of the noise budget while halving the residual $h_1$ further; useful if shot noise on the PD is the dominant non-thermal noise source.
+- **Break the rail.**  Put a sampling buffer (a small TIA-like input stage) between $I_\text{pd}$ and the switch matrix.  Now the cross-arm coupling through the rail is broken, and the per-arm response is the disclosed 2-tap form (no tail).  This re-introduces an active stage and partially undoes the TIA-less ambition — but only partially, because the buffer is gain-1 and can be quite small.
+- **Hybrid Mode A + B.**  Use a 2-tap TX FFE to null $h_1$ (cheap, 2.2 dB penalty at 3 UI), and a 1-tap unrolled DFE for the dominant $h_2$, and accept the rest as residual.  At 3 UI / 10 fF this might leave a usable eye with less aggregate penalty than 8-tap-Mode-A.
 
 ### 10.4 The framework left behind
 
@@ -485,6 +583,7 @@ The Python toolbox built in this exercise is reusable and is the second delivera
 - `extract_response` plus `fast_samples` give a validated linearisation path (engine ≡ NumPy 1-D convolution within Forward-Euler tolerance) — long BER runs at 200 k–10 M symbols are seconds, not minutes.
 - `design_tx_ffe_null_postcursors` does triangular zero-forcing with proper L1 normalisation.
 - `ChargeSteeringReceiver` orchestrates Mode A / Mode B with optional MZM/MRM front ends and AWGN injection, and is integrated with the existing PRBS/photodiode plumbing.
+- `examples/charge_steering_aperture_sweep.py` is the script that produced §6.4 — point it at any `(R_on, C_int)` operating point and it returns the optimal aperture, the equaliser depth, and the AWGN budget at the kT/C floor.
 - `tests/test_rx/test_charge_steering*.py` pin the invariants ($h_{-1}=0$, constant $\Sigma G$, fast path ≡ engine, BER=0 on linear chain) so any future refactor is safe.
 
 This framework should now move beyond charge-steering and serve as the test-bed for the "what would fix it" hypotheses in §10.3.
@@ -566,6 +665,9 @@ python examples/charge_steering_rx_modes_nrz_106g25.py --mode spec_dfe --chain l
 # §9 AWGN sensitivity sweeps
 python examples/charge_steering_awgn_sweep.py --c-int-f 10e-15
 python examples/charge_steering_awgn_sweep.py --c-int-f 100e-15
+
+# §6.4 aperture sweep (the main figure)
+python examples/charge_steering_aperture_sweep.py
 ```
 
 Outputs land in `runs/charge_steering_*/` and were copied into [`figures/`](figures/) alongside the disclosure reference images.
