@@ -3,7 +3,8 @@
 **Author:** Patrick Satarzadeh  
 **Project:** 106.25 Gbps NRZ fully-analog receiver (and eventual full transceiver)  
 **Repository:** `optical-serdes` — branch `construction`  
-**Status:** 🟡 In development
+**Status:** 🟡 In development  
+**Latest milestone:** Milestone 6 (2026-06-22) — CPO-representative electrical channel; current weak-TED phase-lock margin is now the dominant performance limiter on a CPO-class channel.
 
 ---
 
@@ -541,6 +542,167 @@ scripts/dsp_rx/oci_msa_dsp_txrx.py             (updated: ENABLE_SPEC_DFE flag)
 
 ---
 
+### Milestone 6 — 2026-06-22 · CPO-representative electrical channel
+
+#### What was done
+
+**1. Identified the OCI MSA spec gap.**  The [200G OCI Optical PHY Specification v1.0](https://oci-msa.org/assets/files/200G-OCI-Optical-Phy-Specification-v1.0.pdf)
+(March 2026) is **line-side only** — it normatively defines the optical TX/RX
+characteristics and the 500 m SMF-28 reference fiber link, but **deliberately
+leaves the host-side electrical channel between the SerDes ASIC and the
+optical engine unspecified**.  Figure 1 of the spec contemplates three
+implementation models, each with a very different copper budget:
+
+| Spec Fig. 1 flavour | Integration model | Channel scale | Expected IL @ 53 GHz |
+|---|---|---|---|
+| (a) | On-board optics (OBO) | 1-3 cm of PCB stub | ~5-7 dB |
+| (b) | Package integration | A few mm of organic substrate | ~0.5-2 dB |
+| (c) | Interposer / chiplet | Sub-mm silicon interposer | ≲ 0.1 dB |
+
+The whole point of CPO is to shorten the copper enough that signal-integrity
+challenges traditionally associated with copper interconnects are
+"effectively mitigated."
+
+**2. Discovered the legacy S4P was wildly mis-classified.**  The Milestone 5
+S4P, `l20_il15_rl17_90ohms_100ports_v2.s4p`, has **14.88 dB IL at 53 GHz** —
+about 10 dB worse than any CPO scenario.  That file represents a *pluggable
+host channel* (CEI-112G/224G class), not a co-packaged link.  Cross-checking
+against other measured Colossus S4Ps in `/lm/analog/colossus/channels/`:
+
+| File | IL @ 10 GHz | IL @ 27 GHz | IL @ 53 GHz | Interpretation |
+|---|---|---|---|---|
+| `l20_il15_rl17_90ohms_100ports_v2.s4p` | 4.66 dB | 9.10 dB | **14.82 dB** | Pluggable host (legacy) |
+| `l20_pkg_72ohms_1p5mm_v1.s4p` | 0.21 | 0.58 | **0.27** | 1.5 mm pkg trace |
+| `l20_pkg_75ohms_1p5mm_RL17_v1.s4p` | 0.09 | 0.17 | **0.35** | 1.5 mm pkg, RL-controlled |
+| `l20_pkg_bo_150pH_v0.s4p` | 0.03 | 0.14 | **0.44** | Package break-out |
+| `l20_il1p2_rl23_v1.s4p` | 0.40 | 0.74 | **1.18** | Short "transparent" channel |
+
+The measured package S4Ps confirm that a real CPO host channel is essentially
+transparent at the OCI MSA Nyquist (≲ 1 dB IL).
+
+**3. Built a parameterised CPO electrical channel model.**  Added
+`cpo_channel_ir(...)` plus three named factories in
+[`src/optical_serdes/channel/electrical.py`](../../optical-serdes/src/optical_serdes/channel/electrical.py).
+The model composes the existing RLGC ABCD primitives (`rlgc_network`,
+`shunt_capacitor`, `series_inductor`, `cascade_networks`,
+`abcd_to_transfer_function`) into a physically-motivated cascade:
+
+```
+[Vs, Zs] --C_bump_in-- L_via_in -- RLGC line (length, Z₀, ε_r, tanδ, skin) -- L_via_out --C_bump_out-- [Zl]
+```
+
+The complex transfer function is returned via the IFFT path (`phase="measured"`)
+as a causal `DiscreteChannelIR`, drop-in compatible with the existing Touchstone
+loader.  The S21 convention is preserved (matched-source factor of 2) so the
+synthetic IR is directly comparable to S4P-derived IRs.
+
+Three reference configurations cover OCI MSA Figure 1 (a)/(b)/(c):
+
+| Factory | length | Z₀ | ε_r | tan δ | skin (dB/mm @53 GHz) | C_bump | L_via | IL @ 53 GHz |
+|---|---|---|---|---|---|---|---|---|
+| `cpo_interposer()` | 0.5 mm | 90 Ω | 4.0 | 0.002 | 0.05 | 20 fF | 10 pH | **0.06 dB** |
+| `cpo_package()`   | 2.0 mm | 90 Ω | 3.5 | 0.005 | 0.05 | 40 fF | 25 pH | **0.46 dB** |
+| `cpo_obo_short_pcb()` | 25 mm | 92.5 Ω | 3.8 | 0.004 | 0.05 | 60 fF | 40 pH | **6.82 dB** |
+
+The `cpo_package` defaults are tuned to land on top of the measured
+`l20_pkg_*_1p5mm` family (0.27-0.44 dB IL at Nyq).
+
+**4. Channel comparison figure.**  Added
+[`scripts/analog_rx/cpo_channel_compare.py`](../../optical-serdes/scripts/analog_rx/cpo_channel_compare.py)
+which overlays the four-panel diagnostic (IL magnitude, group delay, 1-UI
+ZOH pulse response peak-aligned, eye opening / Q vs sampling phase through
+PRBS-15) for the legacy 15 dB S4P, the measured package S4Ps, and the three
+synthetic CPO references:
+
+![CPO channel comparison](figures/cpo_channel_compare.png)
+
+Key visual takeaways:
+- The legacy 15 dB channel (red) drops linearly to −15 dB at Nyquist; every
+  other candidate is essentially flat through Nyquist.
+- The synthetic `cpo_interposer` (light blue) is indistinguishable from a
+  through-path at the OCI rate.
+- The synthetic `cpo_package` (purple) overlaps the measured Colossus
+  packages in IL magnitude and group delay.
+- The synthetic `cpo_obo_short_pcb` (yellow) is the most lossy CPO candidate
+  but is still 8 dB better than the legacy pluggable-class channel.
+
+**5. Channel selection is now a configuration knob.**  In
+[`scripts/analog_rx/oci_msa_analog_txrx.py`](../../optical-serdes/scripts/analog_rx/oci_msa_analog_txrx.py)
+the hard-coded `S4P_PATH` was replaced with:
+
+```python
+CHANNEL_MODEL = "cpo_package"  # "cpo_interposer" | "cpo_package" | "cpo_obo"
+                               # | "s4p:<absolute path>" | "none"
+```
+
+and a `make_electrical_channel(model)` factory.  Switching channels for a
+study is one line.  The new default — `cpo_package` — is the most
+defensible CPO-host model.
+
+#### Results
+
+End-to-end PRBS-31 (500 000 symbols) through SmfLink + each electrical
+channel, CTLE bypass, sign-error LMS h₀ adaptation, speculative DFE on:
+
+| Channel | IL@Nyq | pi_nat | lock_pi | h₀_conv | h₁_true | open@lk | **Q@lk** | open_max | **Q_max** |
+|---|---|---|---|---|---|---|---|---|---|
+| Legacy 15 dB pluggable | 14.88 dB | 31 | 5 | 0.5835 | +0.000 | 1.151 | **1.96** | 1.153 | **1.97** |
+| `cpo_interposer` | 0.06 dB | 0 | 29 | 0.7535 | +0.042 | 1.503 | **7.02** | 1.546 | **7.40** |
+| `cpo_package`    | 0.46 dB | 18 | 1 | 0.6920 | −0.049 | 1.058 | **1.33** | 1.472 | **5.07** |
+| `cpo_obo`        | 6.82 dB | 7  | 25 | 0.7345 | −0.176 | 1.023 | **1.22** | 1.359 | **3.31** |
+
+`Q@lk` = phase-sweep Q-factor at the CDR's converged sampling phase;
+`Q_max` = Q-factor at the optimal sampling phase (max along the OSR=32 sweep).
+
+Snapshot of the analog simulation with the new default `cpo_package` channel:
+
+![cpo_package eye](figures/eye_prbs31_smflink_cpo_package_pk0dB.png)
+
+#### Key observations
+
+* **The CPO eye is dramatically better — but the CDR cannot fully access it.**
+  `cpo_package` Q_max = 5.07 vs legacy Q_max = 1.97 — a **2.6× channel-quality
+  improvement** just from using the right channel model.  Yet Q@lk for
+  `cpo_package` is **1.33**, *lower than the legacy channel's 1.96*.  The
+  CDR locks at pi=1 while the eye optimum sits at pi≈18 — a ~0.5 UI offset.
+
+* **The "weak-TED" failure mode is now front-and-center.**  Q10 (Milestone 4)
+  raised this as a concern; Q12 (Milestone 5) flagged it as a measurement.
+  With the CPO channel it is the dominant performance limiter.  The
+  Mueller-Muller TED discriminant is proportional to h₁ at the sample
+  phase — and the CPO channels have h₁/h₀ ≲ 5 % at the IR peak, so the
+  zero-crossing of the TED migrates many samples away from the IR peak.
+
+* **The DFE Q-factor improvement seen in Milestone 5 was channel-specific.**
+  On the 15 dB legacy channel the DFE bought +23 % Q (1.97 → 2.43) because
+  there was plenty of postcursor ISI to cancel.  On `cpo_package` the
+  raw-waveform Q at the CDR lock phase is essentially unchanged by enabling
+  the DFE — there is hardly any h₁ to cancel.  DFE remains useful on the
+  OBO scenario where h₁/h₀ = −18 %.
+
+* **`cpo_interposer` is "too clean" — the CDR locks at pi_nat = 0, lock_pi = 29
+  (≈ 0.09 UI offset).**  For a near-transparent channel the IR is essentially
+  a delta and the lock_pi vs pi_nat offset reflects the residual h₁ injected
+  by the SmfLink + RX-frontend chain rather than the electrical channel
+  itself.  Q@lk ≈ Q_max in this case.
+
+* **The right next-up work item is CDR tuning, not channel work.**  Now
+  that the channel is defensible, the path forward is to fix the lock-point
+  migration: asymmetric TED weights (matching what Caribou used:
+  `w_pre = 0.9` shifts the lock toward the FFE-optimal phase), CDR Kp/Ki
+  re-tuning for the weak-TED regime, or a baud-rate phase-offset trim driven
+  by an "eye-monitor"-style helper loop.
+
+#### Simulation code
+
+```
+src/optical_serdes/channel/electrical.py       (new — cpo_channel_ir + 3 factories)
+scripts/analog_rx/oci_msa_analog_txrx.py       (replaces S4P_PATH with CHANNEL_MODEL selector)
+scripts/analog_rx/cpo_channel_compare.py       (new — 4-panel channel overlay)
+```
+
+---
+
 ### Milestone 4 — 2026-06-13 · Full OCI MSA optical link via SmfLink + phase sweep metrics
 
 #### What was done
@@ -745,9 +907,16 @@ These are the unresolved design questions that will drive the next development p
 | Q7 | What CTLE topology and peaking target for the OCI MSA channel? | ISI structure, h₀ level, TED gain | 🟡 **Partial** — Topology: 1z2p (`CtleZPK`).  Peaking must stay below the h₁=0 crossing of the combined IR (≈ 2.7 dB for −6 dB BT; varies by channel loss profile).  Exact target requires per-channel characterisation using SmfLink (Milestone 4) |
 | Q8 | Half-rate (53.125 GHz × 2) or full-rate (106.25 GHz) clocking? | T/H bandwidth, VCO design | Open |
 | Q9 | How is the VGA gain controlled to keep the eye amplitude ≈ h₀_target? | Error slicer accuracy | Open |
-| Q10 | Is Kp = 1.0 appropriate for the OCI MSA channel with h₁/h₀ = −2.9 %? | CDR bandwidth, limit-cycle jitter — weak TED discriminant may require lower Kp | Open (Milestone 4: flag raised) |
+| Q10 | Is Kp = 1.0 appropriate for the OCI MSA channel with h₁/h₀ = −2.9 %? | CDR bandwidth, limit-cycle jitter — weak TED discriminant may require lower Kp | 🟠 **Elevated** (Milestone 6) — On `cpo_package` the lock-point migrates ~0.5 UI from the eye optimum, costing ~75 % of Q_max.  This is the dominant performance limiter once the channel is corrected. |
 | Q11 | With the speculative DFE canceling h₁ at the CDR sample phase, does the TED discriminant weaken over time? | As h₁_est → h₁_true, ISI seen at the *data* slicer decreases — but z[k] uses raw y, so the TED still sees the full channel h₁. In simulation CDR is unaffected (Milestone 5). Confirmed analytically: no blindness in the raw-y architecture. | ✅ **Resolved** — No TED blindness: z[k] = sign(y[k] − d[k]·h₀), raw y regardless of DFE state |
-| Q12 | How does h₁_conv (at CDR lock phase) relate to h₁_true (at IR peak phase)? | Lock phase pi=5 ≠ IR peak phase pi_nat=31; postcursor at pi=5 is non-zero even when IR shows h₁≈0 at the peak | Open — sweep CDR lock phase vs. IR to map the relationship |
+| Q12 | How does h₁_conv (at CDR lock phase) relate to h₁_true (at IR peak phase)? | Lock phase pi=5 ≠ IR peak phase pi_nat=31; postcursor at pi=5 is non-zero even when IR shows h₁≈0 at the peak | 🟠 **Elevated** (Milestone 6) — On all three CPO models the lock-point migration is now characterised: ≈ 0.09 UI for interposer, ≈ 0.5 UI for package, ≈ 0.44 UI for OBO.  Asymmetric TED weights (à la Caribou's `w_pre = 0.9`) are the recommended fix. |
+
+### Electrical channel
+
+| # | Question | Impact | Status |
+|---|---------|--------|--------|
+| Q13 | What electrical channel does OCI MSA specify between SerDes and optical engine? | Determines the entire signal-path loss budget | ✅ **Resolved** (Milestone 6) — Nothing.  OCI MSA v1.0 is line-side only; the host electrical channel is the implementer's choice.  CPO target is 0.1-2 dB IL @ 53 GHz (interposer / package) or 5-7 dB (OBO short PCB) — bracketed by `cpo_interposer`, `cpo_package`, `cpo_obo_short_pcb` factories. |
+| Q14 | Was the Milestone 5 baseline channel representative? | All CDR / DFE / Q-factor numbers before Milestone 6 were taken through a 15 dB channel | ✅ **Resolved** (Milestone 6) — No.  The `l20_il15_rl17_90ohms_100ports_v2.s4p` channel is pluggable-host-class (CEI-112G/224G); CPO actually has 1-2 dB. The default is now `cpo_package`. |
 
 ---
 
@@ -802,6 +971,17 @@ These are the unresolved design questions that will drive the next development p
 - [ ] Characterise h₁_conv vs CDR lock phase (Q12)
 - [ ] Extend to N_DFE_TAPS > 1 (direct-feedback taps h₂…hN)
 - [ ] Add asymmetric h₁ model (`asymmetric_h1=True`) for optical rise/fall asymmetry
+
+### Phase 4d — CPO-representative electrical channel ✅ (Milestone 6)
+- [x] Confirm OCI MSA v1.0 does not normatively specify the host electrical channel
+- [x] Catalogue the realistic CPO IL budgets (interposer ≲ 0.1 dB, package ~0.5 dB, OBO ~6 dB)
+- [x] Build `cpo_channel_ir(...)` from existing RLGC ABCD primitives (length, Z₀, ε_r, tan δ, skin, bump C, via L)
+- [x] Tune `cpo_interposer`, `cpo_package`, `cpo_obo_short_pcb` factories to bracket the spec's three integration flavours
+- [x] Validate `cpo_package` against measured Colossus `l20_pkg_*_1p5mm_v1.s4p` (0.46 dB vs 0.27-0.44 dB at Nyq — within model tolerance)
+- [x] Replace hard-coded `S4P_PATH` with `CHANNEL_MODEL` selector in analog script
+- [x] Record new baseline: lock_pi = 1, h₀_conv = 0.69, Q@lk = 1.33, Q_max = 5.07 for `cpo_package`
+- [ ] CDR tuning for the weak-TED regime that the CPO channel exposes (asymmetric TED weights, lower Kp, baud-rate trim) — see Q10 / Q12
+- [ ] Re-run Caribou-style FFE/DFE comparison on the new default channel (DSP path)
 
 ### Phase 5 — Full analog front-end integration
 - [ ] Integrate VGA model (gain controlled from digital engine)
