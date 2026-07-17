@@ -4,7 +4,7 @@
 **Project:** 106.25 Gbps NRZ fully-analog receiver (and eventual full transceiver)  
 **Repository:** `optical-serdes` — branch `construction`  
 **Status:** 🟡 In development  
-**Latest milestone:** Milestone 8 (2026-07-09) — AWGN injection at the slicer input and end-to-end counted-BER measurement with SNPS Confidence-BER projection.  σ = 0 sweep is backward-compatible with all prior milestones; σ = 0.10 (SNR ≈ 20 dB relative to a unit eye) on `cpo_interposer_3db` counts 4 errors in 400 k symbols (raw BER = 1e-5, conf BER = 8.1e-10 projected to 1e-12 at 95 % CI) with the CDR still locked.
+**Latest milestone:** Milestone 9 (2026-07-17) — root-caused the σ = 0.10 / 0.16 "locked but 33 % / 19 % BER" outliers on `cpo_interposer_3db` as a first-order-loop failure: `EstimatorMmCdr` was instantiated everywhere with `ki = 0`, so under AWGN the phase accumulator random-walks and every ±½-UI excursion produces an integer-UI slip in the recovered stream.  New per-block BER diagnostic (`compute_block_ber` + `render_block_ber`) proves the slicer decisions are clean and 100 % of the "errors" at σ = 0.10 are alignment slips.  Enabling `ki = 1 × 10⁻³` reduces σ = 0.10 BER from 3.32 × 10⁻¹ to 2.5 × 10⁻⁵ (matching Q@lock).  A second-order failure mode (integrator windup) appears at σ ≥ 0.16 — traced to the unrealistically loose `freq_max = 2.0` clamp; feeds concrete constraints into arch-doc Ch. 11-4 (integrator required, tighter `F_max`, LOCK-gated update) and Ch. 11-6 (lock detector needs drift metric on unwrapped phase, not just modulo `lock_frac`).
 
 ---
 
@@ -1220,6 +1220,214 @@ longer required for correct lock.
 
 ---
 
+### Milestone 9 — 2026-07-17 · Root-cause: proportional-only CDR → phase random walk → integer-UI slips
+
+#### What was done
+
+Investigated the two "locked but 33 % / 19 % BER" outliers at σ = 0.10 and σ = 0.16
+on `cpo_interposer_3db` that Milestone 8's BER-vs-SNR sweep surfaced.  The
+`lock_frac` metric (fraction of post-settle pi_codes within ±5 of the modal
+lock code, wrap-aware) declared both operating points **locked** (97 % / 92 %
+respectively), Q@lock ≈ Q_max, and the LMS taps (ĥ₋₁, ĥ₀, ĥ₁) all converged to
+sensible steady-state values — yet global-alignment BER was catastrophic.
+That combination is not a lock-loss and it is not slicer-noise; something
+finer was going on.
+
+**1. Refactored `diagnose_analog_run.py` to sweep multiple operating points
+per invocation** (`SIGMA_LIST = [(σ, ki), …]`).  Single build of the
+`SmfLink` waveform, then each point runs its own CDR and renders the four
+standard PNGs (`_adapt`, `_pizoom`, `_ir`, `_eye`).
+
+**2. New per-block BER diagnostic (`compute_block_ber` in
+`oci_msa_analog_txrx.py`, `render_block_ber` in `diagnose_analog_run.py`).**
+Given a *reference* `(lag, polarity)` from a clean σ = 0 pass on the same
+channel, splits the 500 k-symbol record into 100 equal blocks and reports
+per block:
+
+- `block_ber_fixed[k]` — BER assuming the reference alignment holds through
+  the block.  Spikes ⇒ the CDR drifted or slipped there.
+- `block_ber_local[k]`, `block_lag_local[k]` — BER after re-searching a
+  ±256 UI local lag window (and both polarities) *inside the block*.  If a
+  block reports `block_ber_local ≈ Q-projected BER` while
+  `block_ber_fixed ≫ Q-projected BER`, the slicer decisions are clean but
+  the block is shifted by an integer number of UI relative to the reference
+  — the direct fingerprint of a phase slip.
+
+**3. Ran the diagnostic on σ ∈ {0.02, 0.10, 0.16} at the current
+`ki = 0` setting**, then swept `ki ∈ {0, 1e-3, 5e-3}` at σ = 0.10 to test
+the hypothesised fix.
+
+#### Root cause
+
+**The estimator MM CDR (`EstimatorMmCdr`) has been instantiated everywhere
+with `ki = 0.0`.**  A proportional-only bang-bang loop has no
+frequency-tracking capability: under AWGN, the discriminant sign flips
+randomly and the phase accumulator does a Brownian random walk
+(variance ∝ t).  Whenever the accumulated phase drifts past ±½ UI the
+`pi_code` counter wraps by one full UI in the *unwrapped* sense — the CDR
+emits either one fewer or one more decision than the transmitter emitted a
+symbol.  Each wrap = one integer-UI slip in the recovered stream.
+Between wraps, the local sample phase is still on the eye and the slicer
+outputs remain clean.
+
+Because global-alignment BER minimises errors against *one* `(lag,
+polarity)` pair over the whole record, even a handful of slips catastrophically
+inflates it.  The `pi_code` trajectory looks "locked" because pi is
+displayed mod OSR = 32 — arbitrarily many full-UI wraps in the unwrapped
+counter are hidden by the modulo.
+
+Concretely, on `cpo_interposer_3db` with the current `ki = 0`:
+
+| σ | fixed-lag BER | local-median BER | slipped blocks | max \|Δ lag\| |
+|---|---|---|---|---|
+| 0.02 | 0            | 0        | 0/100 | 0 UI |
+| 0.10 | **3.32 × 10⁻¹** | **0**    | 53/100 | 92 UI |
+| 0.16 | **4.94 × 10⁻¹** | 1.71 × 10⁻³ | 99/100 | 106 UI |
+
+At σ = 0.10 the local-median BER is exactly zero across the record — every
+block's slicer decisions are perfect, and 100 % of the "errors" are
+alignment slips.  At σ = 0.16 the local-median matches the Q@lock = 2.38
+prediction, and again the fixed-lag BER is 3 orders of magnitude worse
+purely because of accumulated drift.
+
+The σ = 0.10 slip diagnostic shows two discrete step events in the residual
+`Δ lag` panel that align exactly with the two visible `pi_code` excursions
+in the phase trajectory (~ symbol 235 k and ~ symbol 265 k) — each hangup
+event at the metastable `pi ≈ 30–31` phase produced a multi-UI slip before
+the loop recovered back to `pi ≈ 6`.
+
+#### First-order fix: enable the integrator (`ki > 0`)
+
+Added `KI_EST` as a module-level knob in `oci_msa_analog_txrx.py` and
+plumbed it through `run_cdr_estimator` and `run_cdr_estimator_with_dfe` as
+a keyword argument (default `ki = 0.0` to preserve backwards compatibility).
+
+Sweep at σ = 0.10 on `cpo_interposer_3db`:
+
+| ki | fixed-lag BER | slipped blocks | max \|Δ lag\| | Notes |
+|---|---|---|---|---|
+| 0.0    | 3.32 × 10⁻¹ | 53 / 100 | 92 UI  | proportional-only — random walk |
+| **1 × 10⁻³** | **2.5 × 10⁻⁵** | **0 / 100** | **0 UI** | drift arrested; residual = Q@lock amplitude noise |
+| 5 × 10⁻³ | 1.71 × 10⁻¹ | 47 / 100 | 251 UI | over-gain — integrator windup |
+
+At `ki = 1 × 10⁻³` the residual is 10 counted errors in 400 k bits — exactly
+consistent with the Q@lk = 2.65 Gaussian tail after speculative-DFE ISI
+cancellation.  The Δ-lag panel is flat at zero across the whole record.
+
+#### Second-order failure mode (open)
+
+Extending the sweep at fixed `ki = 1 × 10⁻³` to higher σ exposes a
+different pathology:
+
+| σ | fixed-lag BER | slipped blocks | max \|Δ lag\| | lock_frac |
+|---|---|---|---|---|
+| 0.02 | 0 | 0 / 100 | 0 UI  | 99.9 % |
+| 0.10 | 2.5 × 10⁻⁵ | 0 / 100 | 0 UI | 99.1 % |
+| 0.16 | **4.33 × 10⁻¹** | 89 / 100 | 256 UI (search-pinned) | **40 %** |
+| 0.22 | 4.96 × 10⁻¹ | 99 / 100 | 256 UI (search-pinned) | 34 % |
+
+At σ ≥ 0.16 the integrator itself runs away — noise-driven bang-bang
+imbalance accumulates in `freq_accum`, drives the loop farther from lock,
+which produces yet more imbalance.  The `EstimatorMmCdr` clamps
+`freq_accum` at `freq_max = 2.0` pi-codes/UI, which corresponds to ~6 %
+sampling-rate error (~60 000 ppm) — vastly looser than any realistic
+clock budget for this receiver.
+
+Fixing this cleanly requires one or more of:
+
+1. A **realistic `freq_max` clamp** based on a physical ppm budget
+   (e.g. ±100 ppm ⇒ ±3.2 × 10⁻³ pi-codes/UI — three orders of magnitude
+   tighter than the current default).
+2. **Anti-windup on the frequency path** — freeze `freq_accum` updates
+   when the lock detector reports unlocked, gate the integrator on the
+   sign-consistency of consecutive bang-bang errors, or leak the
+   integrator toward zero when the proportional error crosses zero.
+3. An **operating-region-dependent `ki` schedule** (large during
+   acquisition, small once locked).
+
+The right answer is (1) + (2): tighten `freq_max` to the ppm budget and
+gate the integrator on `LOCK` (Ch. 11-6 in the arch doc).  That combination
+gives the loop a physical frequency-tracking window and prevents the
+runaway seen at σ ≥ 0.16.
+
+#### Consequences for `Q@lock` interpretation
+
+`phase_sweep_metrics` reports Q at each of the OSR sample phases evaluated
+post-hoc over the whole record.  Since the metric aligns *locally* (per UI
+within the settled window), it is robust to slow phase drift — the CDR is
+still hitting a physically-good sub-UI phase every UI, it just isn't
+preserving symbol count.  So Q@lock ≈ Q_max even when BER is
+catastrophic; the diagnostic value is that **agreement between Q@lock and
+counted BER is now the definitive lock-quality metric**, not `lock_frac`.
+
+Once Ki is enabled with a realistic `freq_max`, `Q@lock`-projected BER and
+counted BER converge (as expected).
+
+#### Implications for the architecture document
+
+* **Ch. 11-4 (Frequency / integrator path)** upgrades from "optional
+  feature, `TBD_from_sim_sweep` for `k_int`" to a **hard requirement** with
+  three concrete constraints:
+  - `k_int` (= `ki` in the sim) must be non-zero.  Working range at σ =
+    0.10 on `cpo_interposer_3db` is centred on `1 × 10⁻³`; too small and
+    drift returns, too large and the loop rings.
+  - `F_max` (= `freq_max` in the sim) must be sized from the realistic ppm
+    budget between local and remote reference clocks, not left at the
+    "large enough to always avoid clipping" value of ±2 codes/UI.
+  - The integrator must be **freezable** (`LMS_GATE_UNLK`-style gate on
+    `LOCK`) to survive the σ = 0.16 windup mode.  This is exactly the
+    knob already reserved in Ch. 10-4 for the tap LMS — the pattern
+    repeats here.
+
+* **Ch. 11-6 (Lock detector)** — the current `lock_frac` metric
+  (fraction of post-settle `pi_code` within ±5 of the modal code,
+  wrap-aware) is **fooled by the modulo wrap**.  With ki = 0 it declares
+  lock at 97 % while accumulated drift is 92 UI.  The RTL lock detector
+  must include a **drift metric** on the *unwrapped* phase (or an
+  integrated-frequency-magnitude test) so that a slowly drifting loop is
+  correctly reported unlocked.  This affects the `T_lock` / `N_lock` /
+  `E_bal` cell defaults for Ch. 11-6.
+
+* **Ch. 14 (Link targets)** — every BER-vs-SNR result gathered before
+  this milestone was measured with `ki = 0`.  All curves need to be
+  re-taken with the corrected loop before they can serve as tolerance
+  targets.
+
+#### Files touched
+
+```
+scripts/analog_rx/oci_msa_analog_txrx.py
+  · New KI_EST module knob (default 0.0 for back-compat).
+  · New compute_block_ber() alongside compute_ber() and _apply_alignment()
+    helper.  Reports fixed-lag BER, per-block local-realigned BER, and
+    residual Δ-lag beyond the reference alignment.
+  · run_cdr_estimator() and run_cdr_estimator_with_dfe() now accept
+    ki=KI_EST as a keyword argument, threaded through the EstimatorMmCdr
+    constructor.
+
+scripts/analog_rx/diagnose_analog_run.py
+  · SIGMA_LIST is now a list of (σ, ki) tuples.
+  · New render_block_ber() produces a three-panel slip diagnostic PNG
+    (pi trajectory + per-block BER (fixed vs local) + Δ-lag bar chart).
+  · main() runs a σ = 0 reference pass to establish the "true" alignment,
+    then each (σ, ki) point renders 5 PNGs (adapt / pizoom / ir / eye /
+    slip) with filenames tagged by both σ and ki.
+```
+
+#### What to run next
+
+1. **Anti-windup / freq_max sweep**: find a `(freq_max, gating policy)`
+   pair that keeps ki = 1 × 10⁻³ locked at σ ≥ 0.16.  Feeds Ch. 11-4 and
+   Ch. 11-6 defaults.
+2. **Ki × σ 2-D sweep** on `cpo_interposer_3db` and `none` channels — the
+   optimal ki likely tracks σ (or, equivalently, is scheduled between
+   acquisition and tracking phases).  Feeds Ch. 10-4 / 11-4 acquire-vs-
+   track prose.
+3. **Re-run the Milestone 8 BER-vs-SNR sweep** on both channels with the
+   corrected loop; deprecate the old curve.
+
+---
+
 ## 5. Open Questions
 
 These are the unresolved design questions that will drive the next development phases.
@@ -1229,7 +1437,7 @@ These are the unresolved design questions that will drive the next development p
 | # | Question | Impact | Status |
 |---|---------|--------|--------|
 | Q1 | What is the CDR bandwidth and jitter peaking for the bang-bang loop? | Jitter tolerance, limit-cycle amplitude | Not yet measured |
-| Q2 | Is a proportional-only (first-order) loop sufficient, or do we need frequency acquisition (integral path)? | Lock range, ppm tolerance | Open |
+| Q2 | Is a proportional-only (first-order) loop sufficient, or do we need frequency acquisition (integral path)? | Lock range, ppm tolerance | ✅ **Resolved** (Milestone 9) — **No.**  Proportional-only (`ki = 0`) fails under AWGN as soon as σ ≳ 0.05 on `cpo_interposer_3db`: phase random walk crosses ±½ UI and the pi_code counter wraps, producing integer-UI slips.  `ki = 1 × 10⁻³` fixes σ ≤ 0.10 completely.  At σ ≥ 0.16 the integrator itself winds up because the current `freq_max = 2.0` clamp is ~60 000 ppm (needs to be tightened to the physical ppm budget) and requires LOCK-gated updates — both feed into arch-doc Ch. 11-4 and Ch. 11-6. |
 | Q3 | How sensitive is the lock point to errors in h₀? | Error slicer miscalibration → phase offset | Open |
 | Q4 | Does the TED remain well-conditioned after CTLE equalizes most of the channel? | TED gain reduction, possible loss of lock | ✅ **Resolved** — Fundamental requirement is \|h₁\| > 0 (not h₁ > 0); CDR polarity must track sign(h₁).  With correct loop_sign the CDR locks at all tested peaking levels.  Lock point migrates ~0.4 UI from IR peak for aggressive CTLE, reducing effective cursor amplitude (Milestone 3) |
 
@@ -1342,9 +1550,20 @@ These are the unresolved design questions that will drive the next development p
 - [x] Report raw errors, raw BER, and SNPS Confidence-BER (`conf_ber_nrz`) projected to 1e-12 @ 95 % CI
 - [x] Encode σ into figure titles and output filenames so noisy / clean runs don't collide
 - [x] Robust PNG export (falls back to HTML-only when kaleido is unavailable)
-- [ ] σ sweep (loop over `NOISE_RMS_V_LIST` analogous to `PEAKING_DB_LIST`) → BER vs SNR curve
-- [ ] Compare counted BER against analytical Gaussian-tail prediction (`ber_from_amplitude_samples`) to isolate CDR-drift vs slicer-noise contributions
-- [ ] Chart σ_break — the noise level at which the CDR falls out of lock (currently ≈ 0.15–0.20 on `cpo_interposer_3db`)
+- [ ] σ sweep (loop over `NOISE_RMS_V_LIST` analogous to `PEAKING_DB_LIST`) → BER vs SNR curve *(re-run with corrected loop; see Milestone 9)*
+- [x] Compare counted BER against analytical Gaussian-tail prediction (`ber_from_amplitude_samples`) — done at Milestone 9 via `compute_block_ber` (local-realigned BER matches Q-projected)
+- [ ] Chart σ_break — the noise level at which the CDR falls out of lock *(re-do with `ki > 0`; ki = 0 curve is contaminated by integer-UI slips, see Milestone 9)*
+
+### Phase 4g — Root-cause of the σ = 0.10 / 0.16 outliers ✅ (Milestone 9)
+- [x] Refactor `diagnose_analog_run.py` to sweep multiple `(σ, ki)` points per invocation
+- [x] Add `compute_block_ber` (fixed-lag BER + local-realigned BER + residual Δ-lag) alongside `compute_ber`
+- [x] Add `render_block_ber` — three-panel slip diagnostic (`pi_hist` + per-block BER + Δ-lag)
+- [x] Prove that at σ = 0.10 on `cpo_interposer_3db`, 100 % of the "errors" are integer-UI alignment slips (local-median BER = 0, `Δ lag` steps by 92 UI over the record)
+- [x] Add `KI_EST` module knob + thread `ki=…` kwarg through `run_cdr_estimator` / `run_cdr_estimator_with_dfe`
+- [x] Validate `ki = 1 × 10⁻³` fully arrests drift at σ = 0.10 (fixed-lag BER 3.32 × 10⁻¹ → 2.5 × 10⁻⁵)
+- [ ] Anti-windup / `freq_max` sweep — find a policy that keeps `ki ≈ 1 × 10⁻³` locked at σ ≥ 0.16 (currently integrator winds up because default `freq_max = 2.0` allows ~60 000 ppm frequency error)
+- [ ] Ki × σ 2-D sweep to characterise the acquisition-vs-tracking Ki schedule
+- [ ] Re-run Milestone 8 BER-vs-SNR sweeps with the corrected loop
 
 ### Phase 5 — Full analog front-end integration
 - [ ] Integrate VGA model (gain controlled from digital engine)
