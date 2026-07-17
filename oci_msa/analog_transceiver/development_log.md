@@ -4,7 +4,7 @@
 **Project:** 106.25 Gbps NRZ fully-analog receiver (and eventual full transceiver)  
 **Repository:** `optical-serdes` — branch `construction`  
 **Status:** 🟡 In development  
-**Latest milestone:** Milestone 9 (2026-07-17) — root-caused the σ = 0.10 / 0.16 "locked but 33 % / 19 % BER" outliers on `cpo_interposer_3db` as a first-order-loop failure: `EstimatorMmCdr` was instantiated everywhere with `ki = 0`, so under AWGN the phase accumulator random-walks and every ±½-UI excursion produces an integer-UI slip in the recovered stream.  New per-block BER diagnostic (`compute_block_ber` + `render_block_ber`) proves the slicer decisions are clean and 100 % of the "errors" at σ = 0.10 are alignment slips.  Enabling `ki = 1 × 10⁻³` reduces σ = 0.10 BER from 3.32 × 10⁻¹ to 2.5 × 10⁻⁵ (matching Q@lock).  A second-order failure mode (integrator windup) appears at σ ≥ 0.16 — traced to the unrealistically loose `freq_max = 2.0` clamp; feeds concrete constraints into arch-doc Ch. 11-4 (integrator required, tighter `F_max`, LOCK-gated update) and Ch. 11-6 (lock detector needs drift metric on unwrapped phase, not just modulo `lock_frac`).
+**Latest milestone:** Milestone 9b (2026-07-17) — proved that all e_k-only anti-windup schemes (freq_max clamp tightening from 2.0 → 1e-3, leaky integrator, up/down-counter dead-zone) are structurally insufficient to rescue σ ≥ 0.16 operation on `cpo_interposer_3db`.  Root cause of the residual failure: once the loop wanders off lock, the bang-bang discriminator becomes persistently biased in the wrong direction, and any integrator that trusts `e_k` accelerates the divergence.  `ki = 1 × 10⁻³` + `freq_max = 1 × 10⁻¹` + `updn_threshold = 128` gives clean lock at σ ≤ 0.10 (BER 1.75 × 10⁻⁵, matching Q@lock).  The σ ≥ 0.16 fix requires a **lock detector on the unwrapped phase** (`phase_unwrap_hist` now captured) that gates integrator updates independently of `e_k` — a distinct piece of design work that feeds arch-doc Ch. 11-6 and Ch. 11-4 as one coupled unit.  New CDR knobs: `KI_EST`, `FREQ_MAX`, `FREQ_LEAK`, `FREQ_UPDN_THRESHOLD` in `oci_msa_analog_txrx.py`; `freq_leak` and `freq_updn_threshold` in `EstimatorMmCdr`.
 
 ---
 
@@ -1416,15 +1416,208 @@ scripts/analog_rx/diagnose_analog_run.py
 
 #### What to run next
 
-1. **Anti-windup / freq_max sweep**: find a `(freq_max, gating policy)`
-   pair that keeps ki = 1 × 10⁻³ locked at σ ≥ 0.16.  Feeds Ch. 11-4 and
-   Ch. 11-6 defaults.
+1. **Anti-windup / freq_max sweep** (see Milestone 9b below — done; conclusion:
+   no e_k-only scheme suffices at σ ≥ 0.16).
 2. **Ki × σ 2-D sweep** on `cpo_interposer_3db` and `none` channels — the
    optimal ki likely tracks σ (or, equivalently, is scheduled between
    acquisition and tracking phases).  Feeds Ch. 10-4 / 11-4 acquire-vs-
-   track prose.
+   track prose.  Blocked on the lock-detector-gated integrator (Milestone 9b's
+   remaining item).
 3. **Re-run the Milestone 8 BER-vs-SNR sweep** on both channels with the
    corrected loop; deprecate the old curve.
+
+---
+
+### Milestone 9b — 2026-07-17 · Anti-windup sweeps — every `e_k`-only fix is structurally insufficient
+
+#### What was done
+
+Instrumented the integrator itself and swept every naive anti-windup knob to
+find one that rescues σ ≥ 0.16 on `cpo_interposer_3db` while keeping σ = 0.10
+clean.
+
+**1. CDR internals capture.**  `run_cdr_estimator` and
+`run_cdr_estimator_with_dfe` now additionally return
+
+- `freq_hist`: `state.freq_accum` per UI (the integrator trajectory);
+- `phase_unwrap_hist`: `state.phase_accum` per UI (unwrapped continuous
+  phase, revealing the modulo-32 drift that `pi_code` hides).
+
+**2. New `render_freq_and_phase` diagnostic** in `diagnose_analog_run.py`
+produces a three-panel PNG:
+
+- wrapped `pi_code` trajectory (unchanged),
+- `freq_accum` trajectory with ±`freq_max` clamps and a ppm-scale y-axis,
+- unwrapped `phase_accum` trajectory.
+
+**3. Two new anti-windup knobs on `EstimatorMmCdr`.**
+
+- `freq_leak ∈ [0, 1)`: leaky-integrator decay per UI.
+  `freq_accum ← (1 − freq_leak)·freq_accum + ki·e_k`.
+  0 = pure accumulator; positive value gives a 1/`freq_leak`-UI time
+  constant so noise-driven random walk decays.
+- `freq_updn_threshold`: classic BBPD up/down-counter dead-zone.
+  A signed counter accumulates `sign(e_k)` each UI; `freq_accum` is
+  updated by ±`ki` only when the counter reaches ±threshold, then the
+  counter resets.  Under balanced noise the counter random-walks in a
+  ±√N band and rarely crosses; a real ppm bias produces persistent
+  same-sign counts and updates freq_accum at a rate ∝ Δppm.
+
+Module-level knobs in `oci_msa_analog_txrx.py` (defaulting to
+back-compat "off" values):
+
+```python
+KI_EST              = 0.0    # integral gain
+FREQ_MAX            = 2.0    # ±60 000 ppm clamp
+FREQ_LEAK           = 0.0    # 0 ⇒ pure accumulator
+FREQ_UPDN_THRESHOLD = 0      # 0 ⇒ direct integrator input
+```
+
+#### Sweep results at σ = 0.16 on `cpo_interposer_3db`
+
+All rows use `ki = 1 × 10⁻³` unless noted; reference lag at σ = 0 is 50.
+
+| Config | fixed-lag BER | local-median BER | slipped blocks | max \|Δ lag\| | lock_frac |
+|---|---|---|---|---|---|
+| baseline `freq_max = 2.0`, no leak, no gate | 4.33e-1 | 4.77e-1 | 89/100 | 256 UI (pinned) | 40 % |
+| `freq_max = 1e-1` | 4.32e-1 | 4.76e-1 | 89/100 | 254 UI | 39 % |
+| `freq_max = 1e-2` | 4.33e-1 | 4.71e-1 | 89/100 | 250 UI | 59 % |
+| `freq_max = 1e-3` (30 ppm, realistic) | 3.41e-1 | 3.29e-3 | 73/100 | 256 UI | 78 % |
+| + `freq_leak = 1e-5` | 3.63e-1 | 6.94e-2 | 77/100 | 256 UI | 73 % |
+| + `freq_leak = 1e-4` | 3.85e-1 | 4.59e-1 | 90/100 | 256 UI | 72 % |
+| + `freq_leak = 1e-3` | 3.78e-1 | 4.61e-1 | 80/100 | 254 UI | 80 % |
+| `ki = 1e-4`, `freq_max = 1e-3`, no leak | 4.70e-1 | 4.64e-1 | 95/100 | 253 UI | 77 % |
+| `ki = 1e-5`, `freq_max = 1e-3`, no leak | 4.28e-1 | 4.68e-1 | 88/100 | 253 UI | 75 % |
+| `updn_threshold = 32`,  `freq_max = 1e-1` | 4.39e-1 | 4.76e-1 | 89/100 | 254 UI | 39 % |
+| `updn_threshold = 128`, `freq_max = 1e-1` | 4.75e-1 | 4.76e-1 | 99/100 | 255 UI | 35 % |
+| `updn_threshold = 512`, `freq_max = 1e-1` | 3.29e-1 | 2.39e-1 | 99/100 | 253 UI | 63 % |
+
+Cross-check that the same anti-windup doesn't kill the already-working
+operating points:
+
+| σ | `ki`, `freq_max`, `updn_th` | fixed-lag BER | slipped blocks | Notes |
+|---|---|---|---|---|
+| 0.02 | 1e-3, 1e-1, 128 | 0            | 0/100 | perfect |
+| 0.10 | 1e-3, 1e-1, 128 | 1.75 × 10⁻⁵ | 0/100 | 7 counted errors — cleaner than direct integrator (10) |
+
+So `updn_threshold = 128` with `freq_max = 1e-1` is the strict *improvement*
+over Milestone 9's `ki = 1e-3 / freq_max = 2.0 / no gate` at σ ≤ 0.10.  But it
+still cannot rescue σ ≥ 0.16.
+
+#### Why every `e_k`-only scheme fails at σ ≥ 0.16
+
+The `freq_hist` panel from the `_loop.png` diagnostic makes the mechanism
+visible.  At σ = 0.16 with `freq_max = 2.0`, `freq_accum` ramps monotonically
+to +2.0 within ~30 000 UI and stays saturated for the rest of the record.
+Unwrapped phase then grows linearly at 2 codes/UI → **1 000 000 codes over
+500 k UI ≈ 31 000 UI of accumulated drift** (visible directly in
+`phase_unwrap_hist`).
+
+Once the loop wanders off lock, the bang-bang discriminator becomes
+persistently biased in the *wrong* direction (because the sample point is
+now on the falling flank of the cursor).  From the integrator's point of
+view, that persistent bias looks exactly like a real frequency offset —
+so any integrator update rule that only inspects `e_k` (whether directly,
+via leak, via counter threshold, or with a smaller `ki`) will accelerate
+the divergence rather than arrest it.
+
+- **Tightening `freq_max`** just bounds the maximum runaway rate; it
+  doesn't stop the loop from wandering off lock.  At `freq_max = 1e-3`
+  the local slicer decisions become clean again (3.3 × 10⁻³ ≈ Q-projected)
+  because the loop no longer runs fast enough to visit truly bad phases,
+  but the alignment still slips by hundreds of UI over the record.
+- **Leaky integrator** cannot pull `freq_accum` back to zero faster than
+  the bang-bang noise pushes it away in the runaway regime.  Random-walk
+  variance grows as `ki²·N`; leak counteracts at rate `freq_leak`.  For
+  σ² < (1 × 10⁻⁴)² we'd need `freq_leak > ki²/(2·σ²) ≈ 50`, which is >>1
+  and unphysical.
+- **Up/down counter** only filters *high-frequency* noise; against a
+  persistent bias, the counter crosses threshold on schedule and drives
+  `freq_accum` further off in the same direction.  Threshold-128 at
+  σ = 0.16 actually locks at `pi = 19` (! — 13 codes off from the true
+  lock at `pi = 6`) with Q@lk = 1.31 (vs Q_max = 2.40).
+- **Smaller `ki`** delays the runaway but doesn't prevent it.  At
+  `ki = 1e-5` and `freq_max = 1e-3`, `freq_accum` still walks to the
+  clamp and stays there.
+
+#### The structural fix
+
+The integrator must be **gated on an off-`e_k`, off-`pi_code`-mod-N lock
+metric** that inspects one of:
+
+- the drift rate of `state.phase_accum` (unwrapped) over a moving window
+  — a real frequency offset produces bounded drift equal to the ppm; a
+  runaway integrator produces sustained large-magnitude drift;
+- the *asymmetry* of the LMS taps ĥ₋₁, ĥ₁ (the same signal used to form
+  the discriminator itself) — when the loop is on lock, |ĥ₋₁| ≈ |ĥ₁|;
+  during runaway they diverge dramatically because the sample is on
+  the flank;
+- a majority-vote lock indicator on the unwrapped `phase_accum`.
+
+Any of these gates the integrator update:
+
+```
+if lock_ok:  freq_accum ← f(freq_accum, e_k)
+else:        freq_accum ← 0     (or preserve; do not update on noise)
+```
+
+This is exactly the `LMS_GATE_UNLK` pattern already reserved in Ch. 10-4
+of the arch doc — the same convention repeats here for the CDR
+integrator.  It also finally gives Ch. 11-6 a **first-class purpose**:
+the lock detector is no longer just a status output, it is a required
+gate on the loop filter itself.
+
+#### Consequences for the architecture document
+
+* **Ch. 11-4 (Frequency / integrator path)** — refine the Milestone 9
+  entry: `k_int`, `F_max`, `F_leak`, `updn_th` are all parameters, but
+  the *update-enable* signal is a hard prerequisite.  Recommended shape
+  of the update rule:
+
+  ```
+  if LOCK == 1 and |Δphase_unwrap over T_win| < ppm_max·T_win:
+      freq_accum ← saturate(F_max, leak_decay(freq_accum) + ki·e_k)
+  else:
+      freq_accum ← 0     # anti-windup on unlock
+  ```
+
+  Working default at σ ≤ 0.10 without the gate: `ki = 1 × 10⁻³`,
+  `F_max = 1 × 10⁻¹` (3000 ppm), `updn_th = 128`.
+* **Ch. 11-6 (Lock detector)** — must expose a **binary LOCK signal
+  computed from unwrapped phase drift** (or LMS-tap asymmetry) that
+  drives the integrator gate.  Its `T_lock` / `N_lock` / `E_bal` cells
+  are consumers of the `updn_th` and `F_max` values above.
+* **Ch. 14 (Link targets)** — the σ ≥ 0.16 tolerance point cannot be
+  measured until the gated integrator is in place; explicitly TBD until
+  Milestone 10.
+
+#### Files touched
+
+```
+src/optical_serdes/rx/mm_cdr.py
+  · EstimatorMmCdr adds freq_leak and freq_updn_threshold fields.
+  · EstimatorMmCdrState adds freq_updn_counter.
+  · step() applies leaky-integrator decay to freq_accum; if
+    freq_updn_threshold > 0, the integrator input is taken from a
+    signed-count dead-zone instead of e_k directly.
+
+scripts/analog_rx/oci_msa_analog_txrx.py
+  · New module knobs: FREQ_MAX, FREQ_LEAK, FREQ_UPDN_THRESHOLD.
+  · run_cdr_estimator{,_with_dfe} accept freq_max/freq_leak/
+    freq_updn_threshold kwargs and thread them into EstimatorMmCdr.
+  · Both runs additionally return freq_hist and phase_unwrap_hist.
+
+scripts/analog_rx/diagnose_analog_run.py
+  · SIGMA_LIST is now (σ, ki, freq_max, freq_leak, updn_threshold) tuples.
+  · New render_freq_and_phase — three-panel diagnostic PNG showing the
+    integrator + unwrapped-phase trajectories.
+  · Filename stems now encode ki / freq_max / freq_leak / updn_th so
+    every sweep entry produces a distinct set of PNGs.
+
+scripts/analog_rx/{ber_vs_snr.py, cdr_lock_vs_channel_loss.py}
+  · Updated to accept the extended CDR return tuples (freq_hist,
+    phase_unwrap_hist trailing).
+```
 
 ---
 
@@ -1555,14 +1748,22 @@ These are the unresolved design questions that will drive the next development p
 - [ ] Chart σ_break — the noise level at which the CDR falls out of lock *(re-do with `ki > 0`; ki = 0 curve is contaminated by integer-UI slips, see Milestone 9)*
 
 ### Phase 4g — Root-cause of the σ = 0.10 / 0.16 outliers ✅ (Milestone 9)
-- [x] Refactor `diagnose_analog_run.py` to sweep multiple `(σ, ki)` points per invocation
+- [x] Refactor `diagnose_analog_run.py` to sweep multiple `(σ, ki, freq_max, freq_leak, updn_th)` tuples per invocation
 - [x] Add `compute_block_ber` (fixed-lag BER + local-realigned BER + residual Δ-lag) alongside `compute_ber`
 - [x] Add `render_block_ber` — three-panel slip diagnostic (`pi_hist` + per-block BER + Δ-lag)
 - [x] Prove that at σ = 0.10 on `cpo_interposer_3db`, 100 % of the "errors" are integer-UI alignment slips (local-median BER = 0, `Δ lag` steps by 92 UI over the record)
 - [x] Add `KI_EST` module knob + thread `ki=…` kwarg through `run_cdr_estimator` / `run_cdr_estimator_with_dfe`
 - [x] Validate `ki = 1 × 10⁻³` fully arrests drift at σ = 0.10 (fixed-lag BER 3.32 × 10⁻¹ → 2.5 × 10⁻⁵)
-- [ ] Anti-windup / `freq_max` sweep — find a policy that keeps `ki ≈ 1 × 10⁻³` locked at σ ≥ 0.16 (currently integrator winds up because default `freq_max = 2.0` allows ~60 000 ppm frequency error)
-- [ ] Ki × σ 2-D sweep to characterise the acquisition-vs-tracking Ki schedule
+- [x] Capture `freq_hist` and `phase_unwrap_hist` from the CDR; new `render_freq_and_phase` diagnostic renders integrator trajectory + unwrapped phase (reveals modulo-wrap hidden drift)
+- [x] Add `freq_leak` (leaky integrator) and `freq_updn_threshold` (up/down counter dead-zone) to `EstimatorMmCdr`; corresponding module knobs `FREQ_MAX`, `FREQ_LEAK`, `FREQ_UPDN_THRESHOLD` in `oci_msa_analog_txrx.py`
+
+### Phase 4h — Anti-windup sweep ✅ (Milestone 9b, exit criterion revised)
+- [x] Sweep `freq_max ∈ {2.0, 1e-1, 1e-2, 1e-3}` at (σ = 0.16, ki = 1e-3, no leak) — none work; tighter clamp reduces max Δlag from 106 UI (ki = 0) to ~250 UI (integrator saturates against the clamp)
+- [x] Sweep `freq_leak ∈ {0, 1e-5, 1e-4, 1e-3}` at (σ = 0.16, ki = 1e-3, freq_max = 1e-3) — no improvement; leak fights the integrator without gaining physical benefit
+- [x] Sweep smaller `ki ∈ {1e-4, 1e-5}` at (σ = 0.16, freq_max = 1e-3, no leak) — no improvement; smaller ki still saturates against the clamp, just slower
+- [x] Sweep `freq_updn_threshold ∈ {0, 32, 128, 512}` at (σ = 0.16, ki = 1e-3, freq_max = 1e-1) — helps at σ ≤ 0.10 (cleaner steady state than direct integrator: 7 errors vs 10) but does not rescue σ = 0.16
+- [ ] **Lock-detector-gated integrator** — the only structural fix that can succeed at σ ≥ 0.16.  Requires a lock metric that inspects the *unwrapped* phase or the LMS-tap asymmetry rather than `e_k`, since `e_k` becomes persistently biased once the loop wanders off lock.  Blocking Ch. 11-4 and Ch. 11-6 in the arch doc.
+- [ ] Ki × σ 2-D sweep to characterise the acquisition-vs-tracking Ki schedule (do after lock-detector-gated integrator lands)
 - [ ] Re-run Milestone 8 BER-vs-SNR sweeps with the corrected loop
 
 ### Phase 5 — Full analog front-end integration
