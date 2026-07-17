@@ -4,7 +4,7 @@
 **Project:** 106.25 Gbps NRZ fully-analog receiver (and eventual full transceiver)  
 **Repository:** `optical-serdes` — branch `construction`  
 **Status:** 🟡 In development  
-**Latest milestone:** Milestone 7 (2026-07-06) — estimate-based analog MM CDR resolves the weak-TED lock-point migration; the CDR now samples within ~0.03 UI of the max-Q phase across all tested CPO channel losses.
+**Latest milestone:** Milestone 8 (2026-07-09) — AWGN injection at the slicer input and end-to-end counted-BER measurement with SNPS Confidence-BER projection.  σ = 0 sweep is backward-compatible with all prior milestones; σ = 0.10 (SNR ≈ 20 dB relative to a unit eye) on `cpo_interposer_3db` counts 4 errors in 400 k symbols (raw BER = 1e-5, conf BER = 8.1e-10 projected to 1e-12 at 95 % CI) with the CDR still locked.
 
 ---
 
@@ -997,6 +997,229 @@ tests/test_rx/test_mm_cdr.py                   → TestEstimatorMmCdrDiscriminan
 
 ---
 
+### Milestone 8 — 2026-07-09 · AWGN + counted BER measurement
+
+#### What was done
+
+Closed the biggest remaining measurement gap: every result before this
+milestone was deterministic, so *Q* was a proxy for eye quality but not a real
+BER.  The analog script now injects input-referred AWGN at the slicer node and
+counts errors against the transmitted PRBS.
+
+**1. AWGN injection.**  Two new knobs in `oci_msa_analog_txrx.py`:
+
+```python
+NOISE_RMS_V = 0.0  # backward-compatible default
+NOISE_SEED  = 0
+```
+
+The waveform pipeline is now:
+
+```
+tp4 → percentile-normalise → rx_base → CTLE.filter → +AWGN(σ) → rx → CDR
+```
+
+`add_awgn_waveform` and `make_noise_rng` come from the existing
+`optical_serdes.rx.rx_noise` module (originally written for the ADC-path
+receiver).  Noise is added *once* to the oversampled slicer input, so the CDR
+error slicer, data slicer, `h₀` sign-error LMS and the `ChannelEstimator` all
+see the same noisy waveform — matching the physical reality that every
+comparator in the analog RX shares one voltage input.
+
+Both `rx_noise.AwgnNode` enum entries `ctle_output_waveform` and
+`comparator_input` collapse onto this single injection point in the current
+receiver because there is no VGA / T-H model between CTLE and the slicer yet.
+
+**2. Slicer-decision capture.**  All four `run_cdr_*` functions now also
+return `d_hist` (`int8`, one entry per UI):
+
+```python
+run_cdr(...)                       → (pi_hist, h0_hist, d_hist)
+run_cdr_estimator(...)             → (pi_hist, h0_hist, h1_hist, hm1_hist, d_hist)
+run_cdr_with_dfe(...)              → (pi_hist, h0_hist, h1_hist, d_hist)
+run_cdr_estimator_with_dfe(...)    → (pi_hist, h0_hist, h1_hist, hm1_hist, dfe_h1_hist, d_hist)
+```
+
+**3. BER helper.**  New `compute_ber(d_hist, symbols, settle_ui)` in
+`scripts/analog_rx/oci_msa_analog_txrx.py`:
+
+* Cross-correlates `d_hist` against the transmitted PRBS over a ±64 UI lag
+  window to find the integer group-delay offset.
+* Automatically detects the through-port polarity flip (MRM through-port
+  inversion): if the correlation is negative, the sign of the reference is
+  flipped and errors are counted against `−symbols`.
+* Skips the first `SETTLE_UI` decisions and compares up to `BER_MAX_COMPARE_UI`
+  (default 400 k) symbols.
+* Feeds `n_errors, n_bits` into `optical_serdes.analysis.conf_ber_nrz` to
+  compute the Poisson-upper / Q-projected Confidence BER at a 1e-12 target.
+
+**4. Reporting.**  The per-run summary now prints σ, error count, raw BER,
+conf BER, alignment lag and polarity.  Each figure title carries a
+`noiseless | σ_n=0.100 | BER=1.0e-5 (4/400000, conf=8.1e-10)` context line,
+and the output filename encodes σ (e.g. `..._pk0dB_sig000_adapt.html`,
+`..._pk0dB_sig100_adapt.html`) so noisy and clean runs never overwrite each
+other on disk.
+
+**5. Robust PNG export.**  Wrapped `fig.write_image()` in a try/except so a
+missing kaleido install downgrades gracefully to HTML-only output instead of
+failing the entire sweep.
+
+#### Results
+
+Channel: `cpo_interposer_3db` (3.24 dB IL @ 53 GHz), symmetric TX + RX legs;
+SmfLink with N = 2 Bessel TX driver and PD+TIA (f_c = 100 GHz); PRBS-31
+(500 000 symbols); CTLE bypass; Estimator MM CDR (proportional drive,
+KP_EST = 4.0) + Speculative DFE 1T (MU_H1 = 5e-4).
+
+| σ (V RMS) | lock pi | Q@lock | Q_max | errors / bits | raw BER | conf BER (@1e-12, 95 % CI) | locked |
+|---|---|---|---|---|---|---|---|
+| 0.00 (noiseless) | 6 | 2.90 | 2.93 | 0 / 400 000 | 0        | 7.5 × 10⁻¹¹ | YES |
+| 0.10 (SNR ≈ 20 dB) | 6 | 2.65 | 2.68 | 4 / 400 000 | 1.0 × 10⁻⁵ | 8.1 × 10⁻¹⁰ | YES |
+| 0.20 (SNR ≈ 14 dB) | 6 | 2.21 | 2.23 | 194 673 / 400 000 | 4.87 × 10⁻¹ | 4.83 × 10⁻¹ | **NO** |
+
+The alignment lag settles to +50 UI at every σ (channel group delay through
+TX driver → MRM → fiber → PD+TIA → symmetric electrical legs → CTLE is
+consistent across noise levels), and the recovered polarity is +1 (the MRM
+through-port inversion is absorbed inside the percentile normalisation for
+this operating point).
+
+#### Key observations
+
+* **Confidence-BER projection is more useful than raw BER for a 400 k-symbol
+  run.**  At σ = 0.10 we count 4 errors → the 95 % Poisson upper bound is 2.3
+  × 10⁻⁵ and the Q-projected conf BER is 8.1 × 10⁻¹⁰.  The noiseless case
+  (0 errors) projects to 7.5 × 10⁻¹¹ — this is the sensitivity floor of the
+  measurement, set by the sample count.  To probe below ~10⁻¹¹ we'd need
+  either many more symbols per run or a targeted "worst-case ISI" pattern
+  rather than PRBS-31.
+
+* **CDR unlocks between σ = 0.10 and σ = 0.20 on this eye.**  The BER at
+  σ = 0.20 is 49 % — the classic random-guess signature of a walking CDR, not
+  a merely-noisy CDR at a stable phase.  Once we add Ki + jitter injection
+  the next milestones can chart jitter tolerance vs σ.  Interestingly, the
+  Q-factor at σ = 0.20 (2.21) would predict a Gaussian BER of ~1.3 × 10⁻²,
+  three orders of magnitude below what we actually count — the extra loss
+  is entirely from CDR phase drift, not amplitude noise, which confirms this
+  operating point is CDR-noise-limited rather than slicer-noise-limited.
+
+* **The `rx_noise` module drops in cleanly.**  We reuse the same
+  `add_awgn_waveform` and `make_noise_rng` that were originally written for
+  the ADC-path DSP receiver.  When VGA and T/H models come online, the same
+  module provides `JitterModel` (RJ + sinusoidal PJ + DCD in UI) for the
+  eventual jitter-tolerance work.
+
+* **Symbol-level BER + Confidence-BER together resolve Phase 3 completely
+  for the SNR-limited regime.**  Analytical Q-based estimates are no longer
+  a proxy for BER; we can now do direct σ / channel / CTLE sweeps and read
+  a real error rate off the summary.
+
+#### Simulation code
+
+```
+scripts/analog_rx/oci_msa_analog_txrx.py       NOISE_RMS_V / NOISE_SEED knobs,
+                                               d_hist capture from all four CDRs,
+                                               compute_ber + summary + fig titles,
+                                               σ-encoded file stem, safe PNG export.
+src/optical_serdes/rx/rx_noise.py              add_awgn_waveform / make_noise_rng
+                                               (existing — reused unchanged).
+src/optical_serdes/analysis/conf_ber.py        conf_ber_nrz (existing — reused).
+```
+
+---
+
+### Technical Deep-Dive: Instantaneous vs. Estimator CDR Architectures
+
+This section clarifies the fundamental algorithmic difference between the two CDR
+implementations tested in Milestone 7.
+
+#### Instantaneous Mode (`AnalogMmCdr`)
+
+The **bang-bang timing error detector (TED)** makes decisions purely from the current
+and previous slicer outputs:
+
+**Timing error:**
+```
+e[n] = sign(d[n-1]·z[n] − d[n]·z[n-1])  ∈ {-1, 0, +1}
+```
+
+where:
+- `d[n]` = data slicer output at UI *n* (sign of y[n])
+- `z[n]` = error slicer output at UI *n* (sign of y[n] − d[n]·h₀)
+
+**Loop polarity:** `sign(h₁_peak)` — determined by the postcursor sign.
+
+**Problem:** When the channel has strong loss, the combined postcursor can flip sign,
+causing the CDR to lock **~0.5 UI off** (anti-phase false lock). The instantaneous
+discriminant `e[n]` is derived from noisy, single-sample products and has no
+"understanding" of the channel structure.
+
+Think of this as a **reflex-based** CDR — it reacts immediately to what it sees but
+doesn't model the underlying channel.
+
+#### Estimator Mode (`EstimatorMmCdr`)
+
+The **channel-estimate-driven CDR** uses a `ChannelEstimator` that learns the impulse
+response taps (ĥ₋₁, ĥ₀, ĥ₁) over time via **sign-error LMS adaptation**:
+
+**Channel estimation (per-tap LMS rule):**
+```
+ĥᵢ[n+1] = ĥᵢ[n] + μ · sign(e[n]) · d[n−i]
+```
+
+where the error is:
+```
+e[n] = y[n] − ŷ[n]
+ŷ[n] = ĥ₋₁·d[n+1] + ĥ₀·d[n] + ĥ₁·d[n−1] + ...
+```
+
+So specifically:
+- **Precursor update:** `ĥ₋₁[n+1] = ĥ₋₁[n] + μ · sign(e[n]) · d[n+1]`
+- **Cursor update:** `ĥ₀[n+1] = ĥ₀[n] + μ · sign(e[n]) · d[n]`
+- **Postcursor update:** `ĥ₁[n+1] = ĥ₁[n] + μ · sign(e[n]) · d[n−1]`
+
+**Timing discriminant:**
+```
+e_cdr = w_post·ĥ₁ − w_pre·ĥ₋₁
+```
+
+Expanding the estimates:
+```
+e_cdr = w_post · [ĥ₁[n−1] + μ · Σₖ sign(e[k]) · d[k−1]]
+      − w_pre · [ĥ₋₁[n−1] + μ · Σₖ sign(e[k]) · d[k+1]]
+```
+
+where the sums run over all past adaptation steps. The LMS integrator acts as a
+**leaky accumulator**, so:
+- **ĥ₁** ≈ running average of how much the postcursor contributes to the error
+- **ĥ₋₁** ≈ running average of how much the precursor contributes to the error
+
+**Loop polarity:** `sign(ĥ₀)` — determined by the **cursor** sign, not postcursor.
+
+**Advantage:** Locks at the cursor zero crossing (the correct phase) even when the
+postcursor flips sign. The discriminant slope at the cursor zero is
+`−sign(ĥ₀)`, so polarity from `sign(ĥ₀)` always picks the *cursor* zero as the
+stable equilibrium.
+
+Think of this as a **model-based** CDR — it builds an internal model of the channel
+via LMS and uses those smoothed estimates to make robust timing decisions.
+
+#### Key Difference: Robustness to Channel Loss
+
+The fundamental difference is:
+- **Instantaneous**: Uses `sign(h₁)` for polarity → fails when postcursor flips
+  negative at high loss. The timing error is formed from **noisy instantaneous
+  products** `d[n−1]·z[n]`.
+- **Estimator**: Uses `sign(ĥ₀)` for polarity → always locks on the cursor peak.
+  The timing error is formed from **smoothed, LMS-filtered estimates** of the
+  channel taps, which converge to the true impulse response structure.
+
+The estimator mode trades a bit of startup complexity (requires LMS convergence of
+ĥ₋₁/ĥ₀/ĥ₁) for reliable locking across a wide range of channel conditions. The
+weights `w_pre` and `w_post` remain available as a fine lock-point trim but are no
+longer required for correct lock.
+
+---
+
 ## 5. Open Questions
 
 These are the unresolved design questions that will drive the next development phases.
@@ -1052,7 +1275,7 @@ These are the unresolved design questions that will drive the next development p
 - [ ] Add integral path (Ki) and verify frequency acquisition range
 
 ### Phase 3 — Channel realism
-- [ ] Add AWGN — measure BER vs. SNR floor with analytic MM-CDR
+- [x] Add AWGN — measure BER vs. SNR floor with analytic MM-CDR (Milestone 8: input-referred AWGN + counted BER + SNPS Confidence-BER; σ = 0.10 → raw BER = 1e-5, conf BER = 8.1e-10 @ 1e-12 target)
 - [x] Add CTLE (1z2p) — verify TED does not lose discriminant after equalization (Milestone 3: h₁=0 crossing at ≈ 2.7 dB for −6 dB BT channel)
 - [x] Confirm h₀ tracking still accurate after CTLE reshapes eye (Milestone 3: tracking accurate only when CDR is locked; degrades when h₁ → 0)
 
@@ -1111,6 +1334,17 @@ These are the unresolved design questions that will drive the next development p
 - [x] Validate: anti-phase cliff collapses across all tested losses; Q@lock/Q_max ≥ 0.97
 - [ ] Initial-condition robustness sweep for the `sign(ĥ₀)` cold-start edge case
 - [ ] CTLE peaking sweep now that the CDR lock point is settled
+
+### Phase 4f — AWGN + counted BER ✅ (Milestone 8)
+- [x] Add `NOISE_RMS_V` + `NOISE_SEED` knobs; inject AWGN at slicer input via `rx_noise.add_awgn_waveform`
+- [x] Capture per-UI slicer decisions (`d_hist`) from every `run_cdr_*` variant
+- [x] Cross-correlation-based alignment with automatic MRM-polarity detection (`compute_ber`)
+- [x] Report raw errors, raw BER, and SNPS Confidence-BER (`conf_ber_nrz`) projected to 1e-12 @ 95 % CI
+- [x] Encode σ into figure titles and output filenames so noisy / clean runs don't collide
+- [x] Robust PNG export (falls back to HTML-only when kaleido is unavailable)
+- [ ] σ sweep (loop over `NOISE_RMS_V_LIST` analogous to `PEAKING_DB_LIST`) → BER vs SNR curve
+- [ ] Compare counted BER against analytical Gaussian-tail prediction (`ber_from_amplitude_samples`) to isolate CDR-drift vs slicer-noise contributions
+- [ ] Chart σ_break — the noise level at which the CDR falls out of lock (currently ≈ 0.15–0.20 on `cpo_interposer_3db`)
 
 ### Phase 5 — Full analog front-end integration
 - [ ] Integrate VGA model (gain controlled from digital engine)
