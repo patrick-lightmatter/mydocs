@@ -165,8 +165,10 @@ anti-phase zero.
 The final CDR error is
 
 $$
-  e_k = \operatorname{loop\_sign} \cdot d_k
+e_k = s_{\text{loop}} \cdot d_k
 $$
+
+where `s_loop` is the `loop_sign` selected per the table above.
 
 ### 3.3 Loop filter — proportional + integral
 
@@ -181,23 +183,17 @@ $$
 
 **Integral path — three cascaded stages:**
 
-*Stage 1: integrator input selection.*
+*Stage 1: integrator input selection.*  For a positive `freq_updn_threshold`
+(denoted $N_{\text{th}}$) a signed up/down counter $c$ accumulates
+$\mathrm{sign}(e_k)$ each UI; the integrator input is
 
 $$
-  \text{if } \texttt{freq\_updn\_threshold} \le 0 \colon
-    \quad f_{\text{inc}} = k_i \cdot e_k
-$$
-
-$$
-  \text{else} \colon \quad \text{a signed up/down counter accumulates}
-    \operatorname{sign}(e_k),
-$$
-$$
-  \text{when } |c| \ge \texttt{freq\_updn\_threshold}\!,\ f_{\text{inc}} =
-    \pm k_i \text{ and } c \gets 0;
-$$
-$$
-  \text{otherwise } f_{\text{inc}} = 0.
+f_{\text{inc}} =
+\begin{cases}
+k_i\, e_k, & N_{\text{th}} \le 0 \\[4pt]
+\pm k_i \quad (c \gets 0), & |c| \ge N_{\text{th}} \\[4pt]
+0, & \text{otherwise.}
+\end{cases}
 $$
 
 The counter branch is the classical BBPD "digital loop filter" idiom.  Under
@@ -220,7 +216,7 @@ walk decays back toward zero while real frequency offsets larger than
 *Stage 3: hard clamp.*
 
 $$
-  f_{n+1} \gets \operatorname{clip}(f_{n+1},\ \pm F_{\max})
+f_{n+1} \gets \mathrm{clip}(f_{n+1},\ \pm F_{\max})
 $$
 
 `F_max = freq_max` in codes/UI.  Physical meaning: `F_max / OSR` is the
@@ -232,11 +228,14 @@ clock budget.  A realistic ±100 ppm budget on a 106.25 GBaud line ⇒
 **Phase accumulator and PI code:**
 
 $$
-  \phi_{n+1} \mathrel{+}= f_{n+1}
+\phi_{n+1} \mathrel{+}= f_{n+1}
 $$
+
 $$
-  \operatorname{pi\_code}_{n+1} = \operatorname{round}(\phi_{n+1}) \bmod n_{\text{phases}}
+p_{n+1} = \mathrm{round}(\phi_{n+1}) \bmod n_{\text{phases}}
 $$
+
+where $p$ is the reported `pi_code`.
 
 `n_phases = OSR = 32`.  The accumulator itself is a Python float — no wrapping
 in the simulator — so `state.phase_accum` is the **unwrapped** phase used for
@@ -297,7 +296,7 @@ $$
 Sign-error LMS update (`adaptation = "sign_error"`):
 
 $$
-  \hat{h}_i[n+1] = \hat{h}_i[n] + \mu \cdot \operatorname{sign}(\varepsilon_n) \cdot d_{n-D-i}
+\hat{h}_i[n+1] = \hat{h}_i[n] + \mu \cdot \mathrm{sign}(\varepsilon_n) \cdot d_{n-D-i}
 $$
 
 with `mu = MU_TAPS = 5 × 10⁻⁴`.  Sign-error was chosen (over full LMS) because
