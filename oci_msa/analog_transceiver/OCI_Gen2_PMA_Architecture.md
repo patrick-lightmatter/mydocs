@@ -250,7 +250,7 @@ optional adaptation-step register.
 | `DRV_PRE` | state | `TBD_analog_design` | signed | \([-C_{\mathrm{tap,max}}, +C_{\mathrm{tap,max}}]\) | To pre-tap segmented DAC. |
 | `DRV_MAIN` | state | `TBD_analog_design` | signed | same | Main tap. |
 | `DRV_POST` | state | `TBD_analog_design` | signed | same | First post-tap. |
-| `SEG_EN` | param | 8b or 16b | thermometer | one-per-segment | Per-segment enable. |
+| `SEG_EN` | param | 8b or 16b | unsigned | one-per-segment | Per-segment enable. |
 | \(\lvert c_i\rvert\), \(i\in\{\text{pre,main,post}\}\) | intermediate | code-width | unsigned | \([0, C_{\mathrm{tap,max}}]\) | Per-tap magnitude. |
 | \(\sum\lvert c\rvert\) | intermediate | code-width + 2 | unsigned | \([0, 3\,C_{\mathrm{tap,max}}]\) | Total drive requirement. |
 | \(C_{\max}\) | param | code-width + 2 | unsigned | \([0, 3\,C_{\mathrm{tap,max}}]\) | Swing budget. |
@@ -265,8 +265,7 @@ optional adaptation-step register.
 | D1 | per-tap abs | \(\lvert c_i\rvert\), \(i\in\{\text{pre,main,post}\}\) | 3× code-width (signed) | 3× code-width (unsigned) | — | — |
 | D2 | swing sum | \(\sum\lvert c_i\rvert\) | 3× code-width | code-width + 2 | saturate | — |
 | D3 | swing compare | `SWING_VIOL = Σ|c| > C_max` | 2× (code+2) | 1b (sticky) | — | — |
-| D4 | thermometer decode | binary code → segment-enable pattern | code-width | \(N_{\mathrm{seg}}\) bits | — | — |
-| D5 | adapt step (optional) | `c_i += Δ` gated by `~DRV_FRZ` | code-width, 2b + 1b | code-width | saturate at rails | — |
+| D4 | adapt step (optional) | `c_i += Δ` gated by `~DRV_FRZ` | code-width, 2b + 1b | code-width | saturate at rails | — |
 
 #### Programmable parameters
 
@@ -275,7 +274,7 @@ optional adaptation-step register.
 | Precursor code | `DRV_PRE` | `TBD_analog_design` signed | \([-C_{\mathrm{tap,max}}, +C_{\mathrm{tap,max}}]\) | `TBD_from_link_budget` | Default index convention per §3-2: pre = \(d[n+1]\), main = \(d[n]\), post = \(d[n-1]\); positive code ⇒ positive tap weight. Confirm sign & index with RTL (`TBD_convention`). |
 | Main code | `DRV_MAIN` | `TBD_analog_design` signed | same | `TBD_from_link_budget` | |
 | Post code | `DRV_POST` | `TBD_analog_design` signed | same | `TBD_from_link_budget` | |
-| Segment enable | `SEG_EN` | 8b or 16b thermometer | one-per-segment | all-on | Segment count from §3-2. |
+| Segment enable | `SEG_EN` | 8b or 16b | one-per-segment | all-on | Segment count from §3-2. |
 | Segment count | \(N_{\mathrm{seg}}\) | fixed at synthesis | integer | 8 or 16 | Diagram note in §3-2. |
 | Swing limit | \(C_{\max}\) | `TBD_analog_design` unsigned | \([0, 3\,C_{\mathrm{tap,max}}]\) | `TBD_analog_design` | Hard clip on \(\sum\lvert c\rvert\). |
 | Swing violation flag | `SWING_VIOL` | 1b (sticky) | boolean | 0 | Write-1-to-clear. |
@@ -297,7 +296,7 @@ and remain in §3-2 / §3-6.
 | Control | Suggested approach |
 |---------|-------------------|
 | Codes | Independent DACs / codes for \(c_{\mathrm{pre}}\), \(c_{\mathrm{main}}\), \(c_{\mathrm{post}}\). |
-| Segmentation | 8 or 16 unit drivers; thermometer or binary decode to segments (D4). |
+| Segmentation | 8 or 16 unit drivers enabled by the segment code. |
 | Swing limit | Hard clip total weight so \(\lvert c_{\mathrm{pre}}\rvert+\lvert c_{\mathrm{main}}\rvert+\lvert c_{\mathrm{post}}\rvert \le C_{\max}\) (D3). |
 | CM / impedance | Meet microbump / MZM load (100 Ω-class differential if electrical spec requires). |
 
@@ -972,7 +971,7 @@ flowchart LR
 
 ## 9-2 PI / rotator — fixed-point specification
 
-- Control word: PI code (binary in the digital domain; typically thermometer-decoded inside the analog rotator macro).
+- Control word: PI code (binary in the digital domain; decoded inside the analog rotator macro).
 - Resolution: \(N_{\mathrm{taps}}\) steps per UI (or per 2 UI if 2T clocking) — freeze with analog design.
 - Code is **cyclic**; only the CDR phase accumulator (Ch. 11-3) should wrap. The PI code register on this side simply exposes the top \(N_{PI}\) bits of that accumulator.
 
@@ -989,19 +988,17 @@ qualifier, and (optionally) a per-slicer skew register.
 | `dxd_skew` | param (optional) | `TBD_rtl_floorplan` | signed | \(\pm N_{PI}/2\) | Static offset added to error-path clock code. |
 | `PI_code_err` | out (optional) | \(N_{PI}\) | unsigned (cyclic) | same | Error-clock PI code = `PI_code + dxd_skew` mod \(2^{N_{PI}}\). |
 | `reset_aligned` | out | 1b | boolean | {0,1} | Asserts after reset-alignment sequence completes. |
-| `PI_therm` | intermediate | \(2^{N_{PI}}\) bits | thermometer | one-hot / thermo | Decoded control to rotator segments. |
 
 #### Arithmetic stages
 
 | # | Stage | Operation | Input widths | Output width | Overflow | Rounding |
 |---|---|---|---|---|---|---|
 | P1 | dxd skew add | `PI_code_err = PI_code + dxd_skew` mod \(2^{N_{PI}}\) | \(N_{PI}\), skew-width | \(N_{PI}\) | **wrap** (same modulus as `PI_code`) | — |
-| P2 | binary → thermometer | decode \(N_{PI}\)-bit code to \(2^{N_{PI}}\) unit-cell enables | \(N_{PI}\) | \(2^{N_{PI}}\) | — | — |
-| P3 | reset align | qualify divider start on ref-clock edge | 1b (ref edge) | 1b (`reset_aligned`) | — | — |
+| P2 | reset align | qualify divider start on ref-clock edge | 1b (ref edge) | 1b (`reset_aligned`) | — | — |
 
-Stages P1–P2 may live in analog or digital depending on the rotator macro
-partition; whichever side owns the encoder must expose the same
-`PI_code` / `PI_code_err` view to the CDR (Ch. 11).
+How `PI_code` is decoded onto the rotator's unit cells is an analog-macro
+concern and is left out of this first draft; whichever side owns it must
+expose the same `PI_code` / `PI_code_err` view to the CDR (Ch. 11).
 
 #### Programmable parameters
 
@@ -1763,3 +1760,4 @@ Bit widths must match the fixed-point tables in Chapters 2–11 once frozen.
 | 2026-07-17 | 0.7 | Resolve `TBD_convention` tags — pick + flag defaults for data/error bus coding (Ch. 2-2), Driver tap sign/index (Ch. 3-4), level-mux select \(L\) (Ch. 8-3), `LMS_GATE_UNLK` (Ch. 10-4), MM-PD sign (Ch. 11-2), `CDR_MODE` and PI-code reset (Chs. 9-2 / 11-3); lock-detect hysteresis conventions flagged in Ch. 15 rather than editing the frozen truth table. No numeric widths resolved. |
 | 2026-07-17 | 0.8 | Clarify that the §11-2 MM-PD truth table tabulates only the sign / bang-bang decision (proportional path lives in §11-3 S4/S6, selected by `CDR_MODE`): add a prose note under the table and Ch. 15 item 10. Truth table itself unchanged. |
 | 2026-07-17 | 0.9 | Add Driver (§3-7) and TIA (§4-6) electrical specification tables, reproduced from the LightMatter *Requirements Specifications for the IP cores* (rev 0.12, N3P) with a first-cut 106.25G NRZ column derived by bridging the 64G-NRZ and 224G-PAM4 refs (bandwidth tracks the 106 GBd PAM4 front end; linearity/noise relax toward NRZ). Driver/TIA Conclusions renumbered to §3-8 / §4-7. First-cut numbers flagged `TBD_from_partner` / `TBD_from_sim_sweep` / `TBD_from_link_budget`; none sourced from `optical-serdes`. |
+| 2026-07-17 | 0.10 | Drop premature encoder detail: remove the thermometer-decode arithmetic stages (Driver §3-4 D4, PI §9-2 P2) and the `PI_therm` signal, and the "thermometer" wording on `SEG_EN` / PI code. Rotator/segment decode is deferred to the analog macro for this first draft. Remaining stages renumbered. |
