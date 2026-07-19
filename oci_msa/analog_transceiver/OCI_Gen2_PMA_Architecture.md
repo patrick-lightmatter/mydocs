@@ -365,7 +365,9 @@ applies, otherwise a typical value.
 | Output diff DC impedance | — | 30 | 30 | Ω | MRM load. |
 | Diff capacitive output load | 60 | 60 | 60 | fF | |
 | THD | — | 3 | 8 | % | NRZ-tolerant (cf. 64G TIA 8 %). |
-| Group-delay variation | — | 3 | 3 | ps | Small vs 9.41 ps UI. |
+| Group-delay variation, band 1 (DC–$f_1$) | — | 3 | 3 | ps | Frequency-dependent GDV. Band edges $f_1$/$f_2$/$f_3$ `TBD_from_sim_sweep` ($f_3\lesssim$ low-pass BW). Small vs 9.41 ps UI. |
+| Group-delay variation, band 2 ($f_1$–$f_2$) | — | 3 | 3 | ps | Band edges per band-1 note. |
+| Group-delay variation, band 3 ($f_2$–$f_3$) | — | 3 | 3 | ps | Band edges per band-1 note. |
 | Diff output eye width @1e-12 | 12 | — | ≥7 | ps | First cut: 0.77 UI scaled from 64G (SSPR-NRZ) (`TBD_from_link_budget`). |
 | X × Y dimension | 0.30 × 0.15 | 0.40 × 0.20 | 0.40 × 0.20 | mm | Tentative. |
 | Poly orientation / HS edge | Y / X-edge | Y / X-edge | Y / X-edge | — | Tentative. |
@@ -460,7 +462,9 @@ Cells show `min–max` where a range applies, otherwise a typical value.
 | Low-pass 3 dB BW | 30 | 50 | 50 | GHz | First cut ≈$f_N$ (`TBD_from_sim_sweep`). |
 | Return loss SDD22 @ $f_N$ | 15 | 15 | 15 | dB | |
 | THD @ max swing | 8 | 3 | 8 | % | NRZ-tolerant. |
-| Group-delay variation | 5 | 3 | 3 | ps | Small vs 9.41 ps UI. |
+| Group-delay variation, band 1 (DC–$f_1$) | 5 | 3 | 3 | ps | Frequency-dependent GDV. Band edges $f_1$/$f_2$/$f_3$ `TBD_from_sim_sweep` ($f_3\lesssim$ low-pass BW). Small vs 9.41 ps UI. |
+| Group-delay variation, band 2 ($f_1$–$f_2$) | 5 | 3 | 3 | ps | Band edges per band-1 note. |
+| Group-delay variation, band 3 ($f_2$–$f_3$) | 5 | 3 | 3 | ps | Band edges per band-1 note. |
 | Max input DC current | 520 | 520 | 520 | µA | Corrected by DCOC (Ch. 7). |
 | Output (monitor) current | 0–100 | 0–100 | 0–100 | µA | 1:1 mirror of DC current; N:1 divider option. |
 | Output current noise (ref. input) | 95 | 95 | 95 | nA | RMS 5 kHz–1 MHz @ 75 dBΩ, 80 µW optical. |
@@ -1762,3 +1766,4 @@ Bit widths must match the fixed-point tables in Chapters 2–11 once frozen.
 | 2026-07-17 | 0.9 | Add Driver (§3-7) and TIA (§4-6) electrical specification tables, reproduced from the LightMatter *Requirements Specifications for the IP cores* (rev 0.12, N3P) with a first-cut 106.25G NRZ column derived by bridging the 64G-NRZ and 224G-PAM4 refs (bandwidth tracks the 106 GBd PAM4 front end; linearity/noise relax toward NRZ). Driver/TIA Conclusions renumbered to §3-8 / §4-7. First-cut numbers flagged `TBD_from_partner` / `TBD_from_sim_sweep` / `TBD_from_link_budget`; none sourced from `optical-serdes`. |
 | 2026-07-17 | 0.10 | Drop premature encoder detail: remove the thermometer-decode arithmetic stages (Driver §3-4 D4, PI §9-2 P2) and the `PI_therm` signal, and the "thermometer" wording on `SEG_EN` / PI code. Rotator/segment decode is deferred to the analog macro for this first draft. Remaining stages renumbered. |
 | 2026-07-17 | 0.11 | Convert all math delimiters from `\(…\)` / `\[…\]` to GitHub-compatible `$…$` / `$$…$$` so equations render on GitHub (overrides `AGENT_HANDOFF.md` §7 per owner request). Three interleaved math/inline-code cells (Ch. 8-3 O-stages, Ch. 8-4 E4) reworded to keep spaces outside the `$…$` delimiters. No equation content changed. |
+| 2026-07-18 | 0.12 | Make Driver (§3-7) and TIA (§4-6) group-delay-variation spec frequency-dependent: split the single GDV row into three frequency bands (DC–$f_1$, $f_1$–$f_2$, $f_2$–$f_3$) with placeholder band edges $f_1$/$f_2$/$f_3$ flagged `TBD_from_sim_sweep`. First-cut ps values unchanged. |
