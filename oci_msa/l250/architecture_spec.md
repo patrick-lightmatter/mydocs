@@ -257,11 +257,26 @@ The CDR is `DigitalMmCdr`: a baud-rate, second-order, **integer / windowed** Mue
 
 ### 5-1 Block architecture
 
-```text
-d(k), e(k) ─► EarlyLateVoteGenNrz ─► CdrVoter ─────► LoopFilter ─► FsmPhase ─► pi_code (0…31)
-              (per-symbol vote)      (majority sum    (P + F,       (wrapping     │
-                                      over cdr_width   integer)      phase acc)   ▼
-                                      UI, downsample)                          piTable → sampler delay
+```mermaid
+flowchart LR
+    D["d(k)"]
+    E["e(k)"]
+    PD["EarlyLateVoteGenNrz<br/>(per-symbol vote)"]
+    V["CdrVoter<br/>(Σ vote over cdr_width UI,<br/>downsample)"]
+    LF["LoopFilter<br/>(P + F, integer)"]
+    FSM["FsmPhase<br/>(wrapping phase acc)"]
+    CODE["pi_code<br/>0…31"]
+    PI["piTable<br/>→ sampler delay"]
+
+    D --> PD
+    E --> PD
+    PD --> V
+    V --> LF
+    LF --> FSM
+    FSM --> CODE
+    CODE --> PI
+    PI -.->|sampling phase| D
+    PI -.-> E
 ```
 
 | RTL block | Class | Function |
@@ -493,7 +508,7 @@ The CDR is specified as a first-order-dominant tracking loop with the following 
 | Design target | **4–6 MHz** | Chosen inside the standards floor to bind untracked SJ under a ~0.10–0.15 UI pk-pk budget for both the CEI-XSR and IEEE dj mask families. |
 | Upper bound | ~30 MHz | Phase-margin ceiling implied by the round-trip loop delay (parallel-bus deserialization, loop-filter update rate, PI settling). Above this, jitter-peaking degrades the 0.05 UI high-frequency floor. |
 
-The **integer parameters** currently exercised in this document (`cdr_width = 32`, `p_step/p_div = 2/512`, `f_step/f_div = 2/256`) are the discrete equivalent of a proportional–integral loop; they were chosen to satisfy dither and pull-in criteria (§5-8) and give a self-consistent worked example, not to hit the 4–6 MHz closed-loop bandwidth *per se*. The loop-gain selection must be **verified against, and if necessary re-tuned to**, this bandwidth target once the loop-latency and jitter budgets are frozen. The verification is a small-signal linearization of the per-window update (§5-7) at the mission-mode operating point; the acquisition gear-shift (§6-9) is a separate operating point and is not constrained by the mission bandwidth target.
+The **integer parameters** currently exercised in this document (`cdr_width = 32`, `p_step/p_div = 2/512`, `f_step/f_div = 2/256`) are the discrete equivalent of a proportional–integral loop; they were chosen to satisfy dither and pull-in criteria (§5-8) and give a self-consistent worked example, not to hit the 4–6 MHz closed-loop bandwidth *per se*. The loop-gain selection must be **verified against, and if necessary re-tuned to**, this bandwidth target once the loop-latency and jitter budgets are frozen. The verification is a small-signal linearization of the per-window update (§5-7) at the mission-mode operating point; the acquisition gear-shift (§6-9) is a separate operating point and is not constrained by the mission bandwidth target. That linearization is carried out in **`cdr_closed_loop_analysis.md`** (Sonntag & Stonick JSSC 2006 methodology): at the CEI-XSR RJ baseline (σ_φ ≈ 0.022 UI) the default gains yield f_n ≈ 8.8 MHz and f_3dB ≈ 39 MHz — wider than this 4–6 MHz target — confirming that mission-mode gain retuning (integral path first, holding ζ > 1 per §5-10) is required once the operating crossing jitter is frozen.
 
 **Untracked jitter charged to the eye.** The bandwidth window above splits the applied sinusoidal-jitter (SJ) mask into a tracked part and an untracked part. Below the closed-loop corner the loop follows the SJ and it costs no eye; above the corner the CDR cannot track and the residual lands directly on the sampling instant, so it must be **absorbed by the horizontal eye budget** rather than by the loop. Two terms dominate the untracked residue:
 
