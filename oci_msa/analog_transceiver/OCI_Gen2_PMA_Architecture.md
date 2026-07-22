@@ -346,6 +346,20 @@ silicon and not from any `optical-serdes` simulation; each derived value
 carries a basis note or a `TBD_*` tag. Cells show `min–max` where a range
 applies, otherwise a typical value.
 
+**CPO channel context (drives the EQ / termination / return-loss numbers
+below).** This is a **co-packaged (CPO)** part: the driver (EIC) drives each MRM
+(PIC) through a **microbump only** — there is no PCB trace, connector, cable, or
+transmission line between them, and **no series or back-termination resistors**.
+The interconnect is essentially a lumped microbump + pad capacitance with
+**negligible frequency-dependent loss**. The ISI budget is therefore dominated
+by the **bandwidths of the driver, MRM, and RX TIA** (plus PD / optical), *not*
+by channel loss. Two consequences flow into the specs: (1) equalisation is light
+— the driver de-emphasis and TIA CTLE peaking only pre-/post-compensate the
+analog blocks' own roll-off, so their ranges are reduced; and (2)
+matched-impedance / return-loss targets are relaxed, since there is no line to
+reflect on and no termination resistor to match. The dominant ISI lever is the
+low-pass bandwidth of each analog block, not equalisation.
+
 ### Driver — operational / electrical specification
 
 | Metric | 64G NRZ (ref) | 224G PAM4 (ref) | 106G NRZ (first cut) | Unit | Basis / notes |
@@ -358,11 +372,11 @@ applies, otherwise a typical value.
 | Mid-band gain (max) | — | 16 | 14 | dB | First cut: 3 Vpp out / ~1 Vpp in + headroom; ≥10 dB needed at 1.2 Vpp in. |
 | Gain control range | — | 6 (1 dB steps) | 6 (1 dB steps) | dB | Preserve frequency response. |
 | In-band gain ripple | — | 0.3 | 0.5 | dB | Relaxed vs PAM4. |
-| EQ gain peaking (de-emphasis) | — | 4 | 4 | dB | Edge restoration into MRM. |
+| EQ gain peaking (de-emphasis) | — | 4 | 0–2 | dB | CPO near-zero channel — de-emphasis only pre-compensates driver/MRM BW roll-off, not channel loss, so a small range suffices (`TBD_from_sim_sweep`). |
 | EQ gain peaking step | — | 0.5 | 0.5 | dB | |
 | High-pass 3 dB BW | 50 | 100 | 100 | kHz | |
-| Low-pass 3 dB BW | 32 (guideline) | 60 | 55 | GHz | First cut ≈$f_N$–1.1$f_N$; eye mask governs (`TBD_from_sim_sweep`). |
-| Output diff DC impedance | — | 30 | 30 | Ω | MRM load. |
+| Low-pass 3 dB BW | 32 (guideline) | 60 | 55 | GHz | First cut ≈$f_N$–1.1$f_N$; with near-zero channel this BW (with MRM/TIA) is the **dominant ISI lever** — eye mask governs (`TBD_from_sim_sweep`). |
+| Output diff DC impedance | — | 30 | — | Ω | CPO: no back-termination resistor (direct microbump to capacitive MRM); load is the MRM cap below, not a matched line (`TBD_analog_design`). |
 | Diff capacitive output load | 60 | 60 | 60 | fF | |
 | THD | — | 3 | 8 | % | NRZ-tolerant (cf. 64G TIA 8 %). |
 | Group-delay variation, band 1 (DC–$f_1$) | — | 3 | 3 | ps | Frequency-dependent GDV. Band edges $f_1$/$f_2$/$f_3$ `TBD_from_sim_sweep` ($f_3\lesssim$ low-pass BW). Small vs 9.41 ps UI. |
@@ -373,8 +387,9 @@ applies, otherwise a typical value.
 | Poly orientation / HS edge | Y / X-edge | Y / X-edge | Y / X-edge | — | Tentative. |
 
 An **output bias circuit** at the driver output sets the MRM bias, couples the
-data signal to each MRM, provides differential termination, and suppresses HF
-common-mode (detailed spec `TBD_from_partner`).
+data signal to each MRM, and suppresses HF common-mode; **no back-termination
+resistor is used** — the MRM is attached directly through a microbump (detailed
+spec `TBD_from_partner`).
 
 **PVT / sign-off corners (apply to both Driver and TIA):** process TT, SS, FF,
 FS, SF, FFA, SSA; temperature 0–125 °C; supply variation ±5 %; absolute supply
@@ -455,12 +470,12 @@ Cells show `min–max` where a range applies, otherwise a typical value.
 | Max transimpedance gain | 80–82 | 66 | 80 | dBΩ | First cut: ~500 mVpp out at ~50 µApp in (mid-band). |
 | Min transimpedance gain | 68 | 54 | 62 | dBΩ | First cut: ~500 mVpp out at 400 µApp in. |
 | Transimpedance gain step | 0.5 | 0.25–0.5 | 0.5 | dB | |
-| CTLE peaking | — | 0–3 (1 dB steps) | 0–4 (1 dB steps) | dB | At $f_N$; Ch. 5 owns adaptation (`TBD_from_sim_sweep`). |
+| CTLE peaking | — | 0–3 (1 dB steps) | 0–2 (1 dB steps) | dB | At $f_N$; CPO near-zero channel — peaking only offsets TIA/PD/MRM BW roll-off, so a small range suffices. Ch. 5 owns adaptation (`TBD_from_sim_sweep`). |
 | Diff output swing, pk-pk | 600 | 100–500 | 200–600 | mVpp | Into samplers (Ch. 8). |
 | Input-referred noise (rms, excl PD shot) | 1 | 2 (critical) | 1.5 | µArms | Integrate DC→1.5$f_N$≈80 GHz; NRZ tolerates > PAM4 (`TBD_from_link_budget`). |
 | High-pass 3 dB BW | 50 | 100 | 100 | kHz | Set by DCOC loop (Ch. 7). |
-| Low-pass 3 dB BW | 30 | 50 | 50 | GHz | First cut ≈$f_N$ (`TBD_from_sim_sweep`). |
-| Return loss SDD22 @ $f_N$ | 15 | 15 | 15 | dB | |
+| Low-pass 3 dB BW | 30 | 50 | 50 | GHz | First cut ≈$f_N$; with near-zero channel this (with MRM/driver BW) is a **dominant ISI lever** (`TBD_from_sim_sweep`). |
+| Return loss SDD22 @ $f_N$ | 15 | 15 | 10 | dB | Relaxed: microbump direct attach, no transmission line to reflect (`TBD_analog_design`). |
 | THD @ max swing | 8 | 3 | 8 | % | NRZ-tolerant. |
 | Group-delay variation, band 1 (DC–$f_1$) | 5 | 3 | 3 | ps | Frequency-dependent GDV. Band edges $f_1$/$f_2$/$f_3$ `TBD_from_sim_sweep` ($f_3\lesssim$ low-pass BW). Small vs 9.41 ps UI. |
 | Group-delay variation, band 2 ($f_1$–$f_2$) | 5 | 3 | 3 | ps | Band edges per band-1 note. |
@@ -1767,3 +1782,4 @@ Bit widths must match the fixed-point tables in Chapters 2–11 once frozen.
 | 2026-07-17 | 0.10 | Drop premature encoder detail: remove the thermometer-decode arithmetic stages (Driver §3-4 D4, PI §9-2 P2) and the `PI_therm` signal, and the "thermometer" wording on `SEG_EN` / PI code. Rotator/segment decode is deferred to the analog macro for this first draft. Remaining stages renumbered. |
 | 2026-07-17 | 0.11 | Convert all math delimiters from `\(…\)` / `\[…\]` to GitHub-compatible `$…$` / `$$…$$` so equations render on GitHub (overrides `AGENT_HANDOFF.md` §7 per owner request). Three interleaved math/inline-code cells (Ch. 8-3 O-stages, Ch. 8-4 E4) reworded to keep spaces outside the `$…$` delimiters. No equation content changed. |
 | 2026-07-18 | 0.12 | Make Driver (§3-7) and TIA (§4-6) group-delay-variation spec frequency-dependent: split the single GDV row into three frequency bands (DC–$f_1$, $f_1$–$f_2$, $f_2$–$f_3$) with placeholder band edges $f_1$/$f_2$/$f_3$ flagged `TBD_from_sim_sweep`. First-cut ps values unchanged. |
+| 2026-07-18 | 0.13 | Reflect CPO near-zero electrical channel (EIC driver → PIC MRM through a microbump only; no transmission line or termination resistors, negligible frequency-dependent loss; ISI set by driver/MRM/TIA bandwidth). Add a "CPO channel context" note to §3-7; reduce Driver de-emphasis (4→0–2 dB) and TIA CTLE peaking (0–4→0–2 dB); drop Driver back-termination (output diff DC impedance → n/a, bias-circuit note updated); relax TIA return loss (15→10 dB); flag low-pass BW as the dominant ISI lever in both tables. |
