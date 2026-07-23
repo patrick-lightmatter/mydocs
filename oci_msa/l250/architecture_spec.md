@@ -5,7 +5,9 @@
 **Status:** draft
 **Date:** 2026-07-20
 
-Conventions: parameter tables list a **placeholder variable** (the generic fixed-point template name), the **model/RTL name**, and the **default value**. Every dead-band or hysteresis mechanism is flagged with a **Dead-band / hysteresis** callout that states how it is implemented. Voltage-domain LSB sizes at the slicer/DAC interfaces (`V_LSB,vp`, `V_LSB,off`) are **TBD pending the slicer-input full-scale**: no absolute voltage numbers are committed at those interfaces, and quantities derived from them are expressed symbolically. Likewise, the CTLE peaking range/resolution (`N_code,ctle`, `P_min`, `P_step`) and the AGC gain range/resolution (`N_code,agc`, `G_step`) are **intentionally left TBD pending the front-end design and the equalization sweep**; the loop logic (truth tables, dead-bands in normalized units, decimation, shifts) is specified independently of them.
+**Operating-mode disclaimer.** This document specifies the **106.25 Gbps NRZ (106.25 GBd)** operating point only. A **53 Gbps half-rate (53.125 GBd)** mode is planned; the digital PMA (CDR, adaptation loops, PI, decimation rates) will need **mode-specific parameterization** that is not fully worked through here. In particular, the phase interpolator may be scaled to span **0 … 2 UI** (UI ≈ 10 ps — ≈ 9.41 ps at 106.25 GBd) so that at half-rate the full PI code range still covers one symbol period when the recovery path runs at the high-speed UI clock. Numeric defaults and tables below assume **106G full-rate** unless noted; half-rate values are **TBD**.
+
+Conventions: parameter tables list a **placeholder variable** (the generic fixed-point template name), the **model/RTL name**, and the **default value**. Every dead-band or hysteresis mechanism is flagged with a **Dead-band / hysteresis** callout that states how it is implemented. Voltage-domain LSB sizes at the slicer/DAC interfaces (`V_LSB,vp`, `V_LSB,off`) are **TBD pending the slicer-input full-scale**: no absolute voltage numbers are committed at those interfaces, and quantities derived from them are expressed symbolically. Likewise, the CTLE peaking step (`P_min` = 0 dB, `P_step` = 1 dB) and the AGC/transimpedance gain step (`G_step` = 0.5 dB) have first-cut hardware targets (§4-1), but their code widths (`N_code,ctle`, `N_code,agc`) are **intentionally left TBD pending the front-end design and the equalization sweep**; the loop logic (truth tables, dead-bands in normalized units, decimation, shifts) is specified independently of them.
 
 ---
 
@@ -130,10 +132,10 @@ Equivalently `e = sign(y − d·Vp_rail)`, with the active rail selected by `d`.
 
 **Why two error slicers.** The MM CDR needs a signed `e(k)` on *every* UI at the data sample phase. A single upper-peak detector cannot see the bottom rail without time-multiplexing and would drop half the votes. Adapting `Vp_top` and `Vp_bot` **separately** means top/bottom asymmetry (e.g. one-sided compression in the optical path) does not bias the MM CDR or the AGC.
 
-**Impact of DC offset on the slicers.** A common DC offset of the waveform shifts the sample relative to **all three** thresholds. The data slicer is hit most directly — its threshold is fixed at 0, so the offset is a straight decision-threshold error: the eye is sampled off-center, one rail's noise margin shrinks, and the `d` decisions become polarity-biased. The error slicers are affected too: the conditional rail medians move with the offset, biasing the `e` duty on each rail; the Vp loops *absorb* the offset by converging to asymmetric codes (`code_top ≠ code_bot`) — exactly the imbalance signal the Offset/BLW loop detects (§6-5) — but until it is nulled, the biased `e` corrupts every consumer (MM CDR votes, CTLE correlation, AGC measurement). Offset is removed in two layers:
+**Impact of DC offset on the slicers.** Common DC shifts `y(k)` relative to all three thresholds. With the data slicer fixed at 0 V, offset biases `d` directly; the Vp loops partially absorb it as asymmetric codes (`code_top ≠ code_bot`), corrupting `e(k)` and every downstream loop until nulled. Offset is removed in two layers:
 
-1. **Coarse (TIA-integrated, architecture TBD)**: the single-ended→differential conversion at the TIA and its own DC-offset-cancellation (DCOC) loop remove the TIA DC operating point (see the 100 kHz high-pass corner in the TIA spec, §4, and the PMA architecture doc Ch. 7). In the behavioral model this is captured by a running-mean centering stage (`SeToDiff`, `mean += (x − mean)/2^mean_shift`, `mean_shift = 10`) — a simulation stand-in, not an implementation.
-2. **Fine, continuous**: the Offset/BLW loop (Section 6-5) drives a common offset DAC from Vp_top vs Vp_bot code imbalance.
+1. **Coarse (TIA-integrated, architecture TBD)**: SE→diff and DCOC at the TIA (§4, 100 kHz corner). In the model: `SeToDiff` running mean (`mean_shift = 10`) — not an implementation.
+2. **Fine, continuous**: Offset/BLW loop (§6-5) drives a common offset DAC from Vp_top vs Vp_bot imbalance.
 
 The exact SE→diff conversion and DCOC architecture at the TIA is not yet determined; this document only levies the loop-interaction requirements above (and in §6-5, §6-8, §6-10) on whatever that block becomes.
 
@@ -175,13 +177,11 @@ When the tap split is optimised, the weights are renormalised to preserve swing:
 
 The per-branch bandwidth and filter-order rows (`bandwidth_hz`, `bessel_order`) describe the **behavioral model** of the driver's analog bandwidth — a 4th-order Bessel-Thomson stand-in; the silicon driver's actual response is specified by the electrical spec (rise/fall and bandwidth rows of the §3-3 checklist).
 
-The behavioral model calibrates its drive amplitude into the MRM with a lumped scalar (folding a −1 dB driver-gain assumption and a legacy amplitude-normalisation convention); this is a simulation calibration, not an architecture parameter — the physical driver gain and MRM drive amplitude are specified in the driver electrical spec (PMA architecture doc §3-7).
-
 ### 3-2 Driver → modulator interface
 
-- The driver output passes through the **TX microbump** (EIC→PIC), modelled with a measured impulse response (DC gain ≈ 0.996); there is **no transmission line and no back-termination** — the load is the capacitive MRM attached directly through the bump.
+- The driver output passes through the **TX microbump** (EIC→PIC), modelled with a measured impulse response (DC gain ≈ 0.996); there is **no transmission line and no back-termination** — the load is the MRM attached directly through the bump.
 - The modulator is a **microring (MRM, TCMT model)** biased at the max OMA point.
-- Electrical spec targets (power 0.4 pJ/bit, 3 Vpp diff output, 55 GHz low-pass BW, programmable de-emphasis, THD 8 %, eye width ≥ 7 ps @ 1e-12) are the first-cut 106G NRZ column of the PMA architecture doc §3-7 and remain `TBD_*`-tagged there.
+- Electrical spec targets (power 0.4 pJ/bit, 3 Vpp diff output, 55 GHz low-pass BW, programmable de-emphasis, eye width ≥ 7 ps @ 1e-12) are the first-cut 106G NRZ column of the PMA architecture doc §3-7 and remain `TBD_*`-tagged there.
 
 ### 3-3 Industry driver-spec checklist (coverage and gaps)
 
@@ -196,7 +196,7 @@ Industry NRZ drivers are conventionally specified by the following list. Status 
 | Rise/fall time constraints | Implicit in BW, not yet an explicit row | Per-branch 4th-order Bessel at 53.125 GHz ⇒ 10–90 % rise/fall ≈ 0.34/BW ≈ **6.4 ps** (20–80 % ≈ 0.24/BW ≈ 4.5 ps; derived, not yet a signed-off row) | State an explicit rise/fall row; BW is inherent in it but analog sign-off wants the time-domain number |
 | Random / deterministic jitter limits (DJ, RJ, PSIJ) | First-iteration budget stated (§3-4) | Behavioral model is still jitter-free (`FirDacDriver`); §3-4 imports a UI-normalized TX jitter budget from CEI XSR so Section 5 CDR/JTOL analysis has a source term | Confirm decomposition against the Gen2 driver extraction; `TBD_from_link_budget` |
 | Eye mask | Partial only | Single row "diff output eye width ≥ 7 ps @ 1e-12" (PMA doc §3-7); no full mask | Define a TX eye mask combining swing + jitter + rise/fall in one spec. `TBD_from_link_budget` |
-| Asymmetrical peaking / rise-fall control (MRM nonlinearity cancellation) | Hook exists, not exercised | The ring's charge/discharge dynamics and Lorentzian slope make optical rising/falling edges inherently asymmetric (visible in the TCMT model); the driver model explicitly supports nonlinear / asymmetric `BranchDriver` subclasses injected via `FirDacDriver(config, drivers=(...))` | Prototype an asymmetric-edge branch driver and sweep against MRM eye asymmetry at tp2/tp35 before committing to a spec row — internal decision based on MRM performance |
+| Asymmetrical peaking / rise-fall control (MRM nonlinearity cancellation) | Hook exists, not exercised | The ring's charge/discharge dynamics and Lorentzian slope make optical rising/falling edges inherently asymmetric (visible in the TCMT model); the driver model explicitly supports nonlinear / asymmetric `BranchDriver` subclasses injected via `FirDacDriver(config, drivers=(...))` | Prototype an asymmetric-edge branch driver and sweep against MRM output and post-TIA electrical eye asymmetry before committing to a spec row — internal decision based on MRM performance |
 
 ### 3-4 TX electrical jitter budget (first-iteration)
 
@@ -220,6 +220,8 @@ Notes:
 
 ## Section 4: TIA Specification
 
+This section specifies **three analog blocks together as one macro**: the **TIA** (photodiode + transimpedance amplifier), the **CTLE** (peaking equalizer), and the **AGC** (front-end gain control). Architecturally, CTLE peaking and AGC gain **may live physically inside the TIA macro**; whether or not the silicon partitions them that way, §4-1 tabulates all three blocks' electrical targets (transimpedance/AGC gain range+step, CTLE peaking range+step, bandwidth, noise, group-delay variation) as a single spec, and Section 6 owns the digital adaptation loops that drive each of their DAC codes ("AGC codes", "CTLE codes") regardless of where the DACs physically sit.
+
 The receiver front end of the behavioral simulation model is deliberately *separable*: an **ideal photodiode** (pure W→A) followed by an **analytical 2nd-order Bessel transimpedance amplifier** (model constants below).
 
 ### 4-1 Parameters
@@ -227,27 +229,21 @@ The receiver front end of the behavioral simulation model is deliberately *separ
 | Parameter | Placeholder | Model/RTL name | Default | Notes |
 |---|---|---|---|---|
 | PD responsivity | `R` | `PD_RESPONSIVITY_A_PER_W` | 1.0 A/W | Ideal: no dark current, shot noise, or intrinsic bandwidth |
-| Transimpedance (DC) | `Z_T` | `TIA_ZT_OHM` | 1000 Ω (60 dBΩ) | Transfer function scaled so \|Z_T(0)\| = 1 kV/A; **non-inverting** (positive DC gain) |
+| Transimpedance (DC), model | `Z_T` | `TIA_ZT_OHM` | 1000 Ω (60 dBΩ) | Behavioral-model fixed gain; transfer function scaled so \|Z_T(0)\| = 1 kV/A; **non-inverting** |
+| Transimpedance gain range | `Z_T,min`–`Z_T,max` | TBD | **62–80 dBΩ** | First-cut hardware target (PMA doc §4-6, `TBD_from_partner`); spanned by the AGC loop (§6-4, `G_step`) |
+| Transimpedance gain step | `G_step` | TBD | **0.5 dB** | Same quantity as `G_step` in the §6-4 AGC parameter table; `N_code,agc` (code width) remains TBD |
+| CTLE peaking range | `P_min`–`P_max` | TBD | **0–2 dB** | First-cut hardware target (PMA doc §4-6, `TBD_from_sim_sweep`); spanned by the CTLE adaptation loop (§6-6, `P_min`/`P_step`) |
+| CTLE peaking step | `P_step` | TBD | **1 dB** | Same quantity as `P_step` in the §6-6 CTLE parameter table; `N_code,ctle` (code width) remains TBD |
 | Filter order | `N_TIA` | `TIA_ORDER` | 2 | Bessel response (`BesselResponse`) |
 | −3 dB corner | `f_c` | `TIA_CUTOFF_HZ` | `NYQUIST_HZ` = 53.125 GHz | `norm = "mag"` ⇒ `cutoff_hz` is the *exact* −3 dB corner (Butterworth convention) |
 | RX microbump | — | same measured IR as TX | DC gain ≈ 0.996 | Applied to the photocurrent (PIC→EIC) |
+| Group-delay variation, band 1 | `GDV_1` | TBD | **≤ 1 ps** | DC–`f_1`; band edge `f_1` `TBD_from_sim_sweep` |
+| Group-delay variation, band 2 | `GDV_2` | TBD | **≤ 1 ps** | `f_1`–`f_2` |
+| Group-delay variation, band 3 | `GDV_3` | TBD | **≤ 1 ps** | `f_2`–`f_3` (`f_3` ≲ low-pass BW); small vs 9.41 ps UI |
 
-### 4-2 Following CTLE (behavioral-model baseline, part of the analog front end)
+### 4-2 Electrical spec context
 
-The values below are the behavioral model's **fixed CTLE baseline** (a single representative setting), not a committed hardware peaking range:
-
-| Parameter | Model/RTL name | Default (behavioral-model baseline) | Notes |
-|---|---|---|---|
-| Peaking target | `CTLE_PEAKING_DB` | 6.0 dB | \|H(f_Nyq)\| − \|H(0)\| by construction (`CtleZPK.from_peaking`) |
-| Zero | `CTLE_F_Z_RATIO` | 0.25 × f_N = 13.28 GHz | |
-| Outer pole | `CTLE_F_P2_RATIO` | 2.0 × f_N = 106.25 GHz | Inner pole solved analytically to hit the peaking target |
-| DC gain | — | 1 (unity) | TIA settled rails carry through unchanged |
-
-In the adaptive configuration the peaking value is not fixed at the 6 dB baseline but selected by the CTLE adaptation code of Section 6-6 (`CtleAdaptNrz.peaking_db(code)`; range TBD — see §6-6).
-
-### 4-3 Electrical spec context
-
-First-cut 106G NRZ electrical targets for the physical TIA (power 0.2 pJ/bit, 62–80 dBΩ gain range in 0.5 dB steps, 0–2 dB integrated CTLE peaking, 50 GHz low-pass BW, 1.5 µA rms input noise, 100 kHz high-pass corner from the DCOC loop) are in the PMA architecture doc §4-6. The architecture stance there (§4-2) is that CTLE peaking and AGC gain **may live physically inside the TIA macro**; the adaptation logic in Section 6 talks to "CTLE codes" and "AGC codes" regardless of where the DACs sit.
+Other first-cut 106G NRZ electrical targets (power 0.2 pJ/bit, 50 GHz low-pass BW, 1.5 µA rms input noise, 100 kHz high-pass corner from the DCOC loop) are in the PMA architecture doc §4-6; transimpedance/AGC gain range+step, CTLE peaking range+step, and group-delay variation are all tabulated in §4-1 above. The CTLE adaptation code of Section 6-6 (`CtleAdaptNrz.peaking_db(code)`) selects the peaking value over that 0–2 dB range.
 
 ---
 
@@ -297,7 +293,7 @@ flowchart LR
 | Proportional divider / phase granularity | `K_p,den` | `p_div` | TBD | **512** | Also the sub-code granularity of the phase accumulator; recommended **programmable** for an acquisition gear-shift (see §5-8) |
 | Frequency step | `K_f,num` | `f_step` | TBD | **2** | `state_f += diff · f_step` per window |
 | Frequency divider | `K_f,den` | `f_div` | TBD | **256** | `f_out = floor(state_f / f_div)` sub-codes per window |
-| Frequency clamp | `F_max` | `f_bound` | TBD | **2^15** = 32 768 | `state_f` saturates at ±`f_bound` (no wrap); sized for the ±200 ppm design target per §5-6 (±100 ppm requirement per §1-3; the behavioral model's historical default of 2^20 is not the spec value) |
+| Frequency clamp | `F_max` | `f_bound` | TBD | **2^15** = 32 768 | `state_f` saturates at ±`f_bound` (no wrap); sized for the ±200 ppm design target — see §5-6 for the sizing rule |
 | Path enables | — | `en_p`, `en_f` | TBD | `True`, `True` | Gate the proportional / frequency paths individually |
 | Loop polarity | — | `flip_dir` | TBD | `False` | Negates `delta` before the phase accumulator |
 | PI resolution | `N_PI` | `n_pi_codes` | TBD | **32** (5-bit) | Codes across the PI span |
@@ -519,10 +515,9 @@ Adding these to the TX-side contributions imported in §3-4 (notably the J4u/J8u
 
 ### 5-10 Cycle-slip policy and damping
 
-- **Acquisition:** cycle slips are **permitted** while the CDR is pulling in phase and frequency, before valid data is delivered to the FEC and downstream. This is what allows the loop to converge on the correct sampling instant from arbitrary presets without wrapping through a null-vote region.
-- **Mission mode:** cycle slips are **not permitted** in tracking. A single slip generates a burst error orders of magnitude longer than the burst-length limits levied by OIF-CEI on this class of interface (bursts > 7 symbols must occur with probability < 1E-20; bursts > 3 symbols < 1E-12); the CDR must therefore behave so that a slip is a vanishing-probability event during tracking.
-- **Implication for loop shaping:** the mission-mode loop must be **heavily damped** (ζ significantly greater than 1, i.e. the frequency-path contribution kept well below the proportional path in the tracking gains), and **jitter peaking must be minimal** near the mask's high-frequency floor. This constrains the P/F balance in §5-5 and rules out re-using the acquisition gear-shift gains as mission-mode gains.
-- **How the design achieves this:** (i) `p_step/p_div = 2/512` places the per-window phase step at the 1-LSB dither floor (§5-8); (ii) `f_step/f_div = 2/256` puts the frequency-path quantum ≈ two decades below the proportional step (§6-9 CDR P/F balance), giving a type-II response with no peaking near the corner; (iii) the acquisition gear-shift (§5-8, §6-9) uses a *smaller* `p_div` (higher gain) only until lock, then restores mission gains.
+- **Acquisition:** cycle slips **permitted** while pulling in phase/frequency (before mission data).
+- **Mission mode:** slips **not permitted** in tracking — OIF-CEI burst limits (bursts > 7 symbols < 1E-20) require slips to be vanishingly rare once data delivery has begun.
+- **Loop shaping:** mission gains must be **heavily damped** (ζ ≫ 1, minimal jitter peaking) — not the acquisition gear-shift values. Defaults: `p_step/p_div = 2/512` (1-LSB dither floor, §5-8), `f_step/f_div = 2/256` (frequency path ≈ two decades below proportional, §6-9); higher acquisition gain via smaller `p_div` only until lock (§5-8, §6-9).
 
 ### 5-11 Signal-valid gate — CDR state hold
 
@@ -699,14 +694,14 @@ if ui_count == decimation:                      # one vote per window
 | `V_target` | `vp_ideal` | TBD from link budget / slicer-input full-scale | Target merged rail amplitude `(Vp_top+Vp_bot)/2` |
 | `V_hyst` | `hyst_v` → `hysteresis_v` | `None` → auto `vp_ideal·(10^(step_db/40) − 1)` | Hysteresis half-window (a fraction of the target, not an absolute voltage) |
 | `N_code,agc` | `code_bits` | `N_code,agc` (TBD) | Gain-code width (codes `0 … 2^N_code,agc − 1`) |
-| `G_step` | `step_db` | `G_step` (TBD) dB / LSB | ±`2^(N_code,agc−1)·G_step` dB about mid-scale (`code_mid = 2^(N_code,agc−1)` = 0 dB) |
+| `G_step` | `step_db` | **0.5 dB** / LSB (§4-1) | ±`2^(N_code,agc−1)·G_step` dB about mid-scale (`code_mid = 2^(N_code,agc−1)` = 0 dB) |
 | `N_shift` | `agc_shift` | 1 | Loop gain = 1/2 LSB per vote |
 | `N_accum` | `GainDac.acc` | `N_code,agc + agc_shift` bits | Saturate no wrap |
 | `D` | `decimation` | 4096 UI | Window length per vote |
 | `T_LSB` | — | ≥ 8192 UI per LSB | `decimation · 2^agc_shift` |
 | — | `init_code` | `None` → mid-scale (0 dB) | |
 
-The AGC gain range and resolution (`N_code,agc`, `G_step`) are intentionally left TBD pending the front-end design and the equalization sweep; the loop logic above is independent of them.
+The AGC gain step (`G_step` = 0.5 dB) is the §4-1 TIA electrical spec target; the code width `N_code,agc` remains TBD pending the front-end design (it sets how many 0.5 dB steps span the 62–80 dBΩ range). The loop logic above is independent of either.
 
 **Dead-band / hysteresis (AGC):** implemented as a **voltage hysteresis half-window on the window-mean measurement** — `vote = 0` while `|Vp_mean − Vp_ideal| ≤ hysteresis_v`. The default auto-selects **half of one gain step's effect on the rail**, `vp_ideal·(10^(step_db/40) − 1)`, so a converged loop *cannot* dither between two adjacent codes: once inside the band, neither neighbouring code's error can exceed the band. This stops coarse-code dither after lock while still tracking slow voltage/temperature drift.
 
@@ -799,10 +794,10 @@ if ui_count == decimation:                          # one vote per window
 | `D` | `decimation` | 2048 UI | Correlation window per vote |
 | `M` | `lags` | `(1,)` | Decision lags summed into the metric (add 3–6 for long-tail) |
 | `DB` | `corr_deadband` | 0.02 | No-vote dead-band on the mean correlation |
-| `P_min`, `P_step` | `peak_min_db`, `peak_step_db` | `P_min` (TBD), `P_step` (TBD) dB/LSB | `peaking_db = peak_min_db + code·peak_step_db` ⇒ `P_min … P_min + (2^N_code,ctle − 1)·P_step` |
+| `P_min`, `P_step` | `peak_min_db`, `peak_step_db` | **0 dB**, **1 dB**/LSB (§4-1) | `peaking_db = peak_min_db + code·peak_step_db` ⇒ `P_min … P_min + (2^N_code,ctle − 1)·P_step` |
 | — | `init_code` | `None` → mid-scale (`2^(N_code,ctle−1)`) | |
 
-The CTLE peaking range and resolution (`N_code,ctle`, `P_min`, `P_step`) are intentionally left TBD pending the front-end design and the equalization sweep; the loop logic above is independent of them.
+The CTLE peaking range (`P_min = 0` dB, `P_max = 2` dB) and step (`P_step = 1` dB) are the §4-1 TIA electrical spec target; the code width `N_code,ctle` remains TBD pending the front-end design (only 3 codes span the 0–2 dB range at this step). The loop logic above is independent of either.
 
 **Dead-band / hysteresis (CTLE):** implemented as a **correlation dead-band** — `vote = 0` while `|corr| ≤ corr_deadband`. Sizing is statistical: at the converged point the lag products are i.i.d. zero-mean ±1, so the window correlation is noise with `σ = 1/√(decimation·len(lags))` ≈ **0.022** at the defaults. The default `corr_deadband = 0.02` sits at ≈ 0.9 σ: it suppresses the bulk of the noise votes, and the residual (zero-mean) votes are further attenuated by the `1/2^ctle_shift` sub-LSB gain, leaving bounded, drift-free dither of order one LSB. For a fully quiet converged code raise the dead-band to ≥ 2–3 σ or increase `decimation` — a genuine one-LSB boost error produces `|corr|` of order 0.1–0.5, far above either choice.
 
