@@ -7,7 +7,7 @@
 
 **Operating-mode disclaimer.** This document specifies the **106.25 Gbps NRZ (106.25 GBd)** operating point only. A **53 Gbps half-rate (53.125 GBd)** mode is planned; the digital PMA (CDR, adaptation loops, PI, decimation rates) will need **mode-specific parameterization** that is not fully worked through here. In particular, the phase interpolator may be scaled to span **0 … 2 UI** (UI ≈ 10 ps — ≈ 9.41 ps at 106.25 GBd) so that at half-rate the full PI code range still covers one symbol period when the recovery path runs at the high-speed UI clock. Numeric defaults and tables below assume **106G full-rate** unless noted; half-rate values are **TBD**.
 
-Conventions: parameter tables list a **placeholder variable** (the generic fixed-point template name), the **model/RTL name**, and the **default value**. Every dead-band or hysteresis mechanism is flagged with a **Dead-band / hysteresis** callout that states how it is implemented. Voltage-domain LSB sizes at the slicer/DAC interfaces (`V_LSB,vp`, `V_LSB,off`) are **TBD pending the slicer-input full-scale**: no absolute voltage numbers are committed at those interfaces, and quantities derived from them are expressed symbolically. Likewise, the CTLE peaking step (`P_min` = 0 dB, `P_step` = 1 dB) and the AGC/transimpedance gain step (`G_step` = 0.5 dB) have first-cut hardware targets (§4-1), but their code widths (`N_code,ctle`, `N_code,agc`) are **intentionally left TBD pending the front-end design and the equalization sweep**; the loop logic (truth tables, dead-bands in normalized units, decimation, shifts) is specified independently of them.
+Conventions: parameter tables list a **placeholder variable** (the generic fixed-point template name), the **model/RTL name**, and the **default value**. Every dead-band or hysteresis mechanism is flagged with a **Dead-band / hysteresis** callout that states how it is implemented. Voltage-domain LSB sizes at the slicer/DAC interfaces (`V_LSB,vp`, `V_LSB,off`) are **TBD pending the slicer-input full-scale**: no absolute voltage numbers are committed at those interfaces, and quantities derived from them are expressed symbolically. The CTLE peaking range and step (`P_min` = 2.5 dB, `P_step` = 0.5 dB, `N_code,ctle` = 4-bit / 16 codes ⇒ 2.5–10.0 dB) are taken directly from the behavioral model's `CtleAdaptNrz` defaults (§4-1, §6-6) — this is a **simulation-derived working point, not a hardware-signed-off target** (see `simulation_revisit_items.md` for the open realizability question on the peaking topology's outer-pole placement). The AGC/transimpedance gain step (`G_step` = 0.5 dB) similarly has a first-cut hardware target (§4-1), but its code width (`N_code,agc`) is **intentionally left TBD pending the front-end design**; the loop logic (truth tables, dead-bands in normalized units, decimation, shifts) is specified independently of either code width.
 
 ---
 
@@ -179,7 +179,7 @@ The per-branch bandwidth and filter-order rows (`bandwidth_hz`, `bessel_order`) 
 
 ### 3-2 Driver → modulator interface
 
-- The driver output passes through the **TX microbump** (EIC→PIC), modelled with a measured impulse response (DC gain ≈ 0.996); there is **no transmission line and no back-termination** — the load is the MRM attached directly through the bump.
+- The driver output passes through the **TX microbump** (EIC→PIC), modelled with a measured impulse response (DC gain ≈ 0.996); where the load is the MRM attached directly through the bump.
 - The modulator is a **microring (MRM, TCMT model)** biased at the max OMA point.
 - Electrical spec targets (power 0.4 pJ/bit, 3 Vpp diff output, 55 GHz low-pass BW, programmable de-emphasis, eye width ≥ 7 ps @ 1e-12) are the first-cut 106G NRZ column of the PMA architecture doc §3-7 and remain `TBD_*`-tagged there.
 
@@ -231,19 +231,17 @@ The receiver front end of the behavioral simulation model is deliberately *separ
 | PD responsivity | `R` | `PD_RESPONSIVITY_A_PER_W` | 1.0 A/W | Ideal: no dark current, shot noise, or intrinsic bandwidth |
 | Transimpedance (DC), model | `Z_T` | `TIA_ZT_OHM` | 1000 Ω (60 dBΩ) | Behavioral-model fixed gain; transfer function scaled so \|Z_T(0)\| = 1 kV/A; **non-inverting** |
 | Transimpedance gain range | `Z_T,min`–`Z_T,max` | TBD | **62–80 dBΩ** | First-cut hardware target (PMA doc §4-6, `TBD_from_partner`); spanned by the AGC loop (§6-4, `G_step`) |
-| Transimpedance gain step | `G_step` | TBD | **0.5 dB** | Same quantity as `G_step` in the §6-4 AGC parameter table; `N_code,agc` (code width) remains TBD |
-| CTLE peaking range | `P_min`–`P_max` | TBD | **0–2 dB** | First-cut hardware target (PMA doc §4-6, `TBD_from_sim_sweep`); spanned by the CTLE adaptation loop (§6-6, `P_min`/`P_step`) |
-| CTLE peaking step | `P_step` | TBD | **1 dB** | Same quantity as `P_step` in the §6-6 CTLE parameter table; `N_code,ctle` (code width) remains TBD |
+| Transimpedance gain step | `G_step` | `step_db` (`AgcVpNrz`) | **0.5 dB** | Same quantity as `G_step` in the §6-4 AGC parameter table; matches the behavioral model's `step_db = 0.5` default. `N_code,agc` (code width) remains TBD |
+| CTLE peaking range | `P_min`–`P_max` | `peak_min_db` (`CtleAdaptNrz`) | **2.5–10.0 dB** | Behavioral-model value: `peak_min_db = 2.5` dB, `code_bits = 4` (16 codes) ⇒ `P_max = P_min + 15·P_step = 10.0` dB; spanned by the CTLE adaptation loop (§6-6, `P_min`/`P_step`/`N_code,ctle`). The model's fixed, non-adaptive CTLE baseline used elsewhere in the reference script sits at 6.0 dB (code 7) inside this range — see §4-2. Simulation-derived, not yet a hardware-signed-off target (`TBD_from_sim_sweep`); the 1z2p topology's peaking ceiling is ≈10.3 dB, and whether the outer-pole placement needed to reach it is physically realizable is an open item (`simulation_revisit_items.md` §1) |
+| CTLE peaking step | `P_step` | `peak_step_db` (`CtleAdaptNrz`) | **0.5 dB** | Same quantity as `P_step` in the §6-6 CTLE parameter table; matches the behavioral model's `peak_step_db = 0.5` default |
 | Filter order | `N_TIA` | `TIA_ORDER` | 2 | Bessel response (`BesselResponse`) |
 | −3 dB corner | `f_c` | `TIA_CUTOFF_HZ` | `NYQUIST_HZ` = 53.125 GHz | `norm = "mag"` ⇒ `cutoff_hz` is the *exact* −3 dB corner (Butterworth convention) |
+| High-pass corner (DCOC) | `f_HP` | TBD | **100 kHz** | First-cut target; set by the TIA DC-offset-cancellation loop (§6-5 offset/BLW provides fine trim downstream) |
+| Input-referred noise (rms) | `I_n,rms` | TBD | **1.5 µA rms** | Excludes PD shot noise; integrated DC → 1.5×`f_N` (`TBD_from_link_budget`) |
 | RX microbump | — | same measured IR as TX | DC gain ≈ 0.996 | Applied to the photocurrent (PIC→EIC) |
 | Group-delay variation, band 1 | `GDV_1` | TBD | **≤ 1 ps** | DC–`f_1`; band edge `f_1` `TBD_from_sim_sweep` |
 | Group-delay variation, band 2 | `GDV_2` | TBD | **≤ 1 ps** | `f_1`–`f_2` |
 | Group-delay variation, band 3 | `GDV_3` | TBD | **≤ 1 ps** | `f_2`–`f_3` (`f_3` ≲ low-pass BW); small vs 9.41 ps UI |
-
-### 4-2 Electrical spec context
-
-Other first-cut 106G NRZ electrical targets (power 0.2 pJ/bit, 50 GHz low-pass BW, 1.5 µA rms input noise, 100 kHz high-pass corner from the DCOC loop) are in the PMA architecture doc §4-6; transimpedance/AGC gain range+step, CTLE peaking range+step, and group-delay variation are all tabulated in §4-1 above. The CTLE adaptation code of Section 6-6 (`CtleAdaptNrz.peaking_db(code)`) selects the peaking value over that 0–2 dB range.
 
 ---
 
@@ -257,20 +255,14 @@ The CDR is `DigitalMmCdr`: a baud-rate, second-order, **integer / windowed** Mue
 flowchart LR
     D["d(k)"]
     E["e(k)"]
-    PD["EarlyLateVoteGenNrz<br/>(per-symbol vote)"]
-    V["CdrVoter<br/>(Σ vote over cdr_width UI,<br/>downsample)"]
-    LF["LoopFilter<br/>(P + F, integer)"]
-    FSM["FsmPhase<br/>(wrapping phase acc)"]
-    CODE["pi_code<br/>0…31"]
-    PI["piTable<br/>→ sampler delay"]
+    PD["EarlyLateVote"]
+    LF["LoopFilter"]
+    PI["PhaseInterpolator"]
 
     D --> PD
     E --> PD
-    PD --> V
-    V --> LF
-    LF --> FSM
-    FSM --> CODE
-    CODE --> PI
+    PD --> LF
+    LF --> PI
     PI -.->|sampling phase| D
     PI -.-> E
 ```
@@ -788,16 +780,16 @@ if ui_count == decimation:                          # one vote per window
 
 | Placeholder | Model/RTL name | Default | Meaning |
 |---|---|---|---|
-| `N_code,ctle` | `code_bits` | `N_code,ctle` (TBD) | Peaking-code width (codes `0 … 2^N_code,ctle − 1`) |
+| `N_code,ctle` | `code_bits` | **4-bit** (16 codes) | Peaking-code width (codes `0 … 2^N_code,ctle − 1` = `0…15`) |
 | `N_shift` | `ctle_shift` | 1 | Loop gain = 1/2 LSB per vote |
 | `N_accum` | `PeakingDac.acc` | `N_code,ctle + ctle_shift` bits | Saturate no wrap |
 | `D` | `decimation` | 2048 UI | Correlation window per vote |
 | `M` | `lags` | `(1,)` | Decision lags summed into the metric (add 3–6 for long-tail) |
 | `DB` | `corr_deadband` | 0.02 | No-vote dead-band on the mean correlation |
-| `P_min`, `P_step` | `peak_min_db`, `peak_step_db` | **0 dB**, **1 dB**/LSB (§4-1) | `peaking_db = peak_min_db + code·peak_step_db` ⇒ `P_min … P_min + (2^N_code,ctle − 1)·P_step` |
-| — | `init_code` | `None` → mid-scale (`2^(N_code,ctle−1)`) | |
+| `P_min`, `P_step` | `peak_min_db`, `peak_step_db` | **2.5 dB**, **0.5 dB**/LSB (§4-1) | `peaking_db = peak_min_db + code·peak_step_db` ⇒ `P_min … P_min + (2^N_code,ctle − 1)·P_step` = 2.5 … 10.0 dB |
+| — | `init_code` | `CtleAdaptNrz`'s own field default is `None` → mid-scale of *its* `code_bits`/`peak_min_db` defaults (5-bit, 0 dB min ⇒ code 16 = 8.0 dB); the reference script overrides `code_bits`/`peak_min_db`/`peak_step_db` to this section's values **and** sets `init_code = 7` explicitly (6.0 dB) to match its fixed non-adaptive CTLE baseline (§4-2) — the script never relies on the `None`/mid-scale default | |
 
-The CTLE peaking range (`P_min = 0` dB, `P_max = 2` dB) and step (`P_step = 1` dB) are the §4-1 TIA electrical spec target; the code width `N_code,ctle` remains TBD pending the front-end design (only 3 codes span the 0–2 dB range at this step). The loop logic above is independent of either.
+The CTLE peaking range (`P_min = 2.5` dB, `P_max = 10.0` dB) and step (`P_step = 0.5` dB) are the §4-1 behavioral-model working point, taken directly from `CtleAdaptNrz`'s defaults; the code width `N_code,ctle = 4` bits (16 codes) is likewise taken from the model rather than left open. These are simulation-derived values, not a hardware-signed-off target — see §4-1's note on the open peaking-topology realizability question. The loop logic above is independent of the specific range/step/width chosen.
 
 **Dead-band / hysteresis (CTLE):** implemented as a **correlation dead-band** — `vote = 0` while `|corr| ≤ corr_deadband`. Sizing is statistical: at the converged point the lag products are i.i.d. zero-mean ±1, so the window correlation is noise with `σ = 1/√(decimation·len(lags))` ≈ **0.022** at the defaults. The default `corr_deadband = 0.02` sits at ≈ 0.9 σ: it suppresses the bulk of the noise votes, and the residual (zero-mean) votes are further attenuated by the `1/2^ctle_shift` sub-LSB gain, leaving bounded, drift-free dither of order one LSB. For a fully quiet converged code raise the dead-band to ≥ 2–3 σ or increase `decimation` — a genuine one-LSB boost error produces `|corr|` of order 0.1–0.5, far above either choice.
 
@@ -841,7 +833,7 @@ Each first-order loop's bandwidth is set by two knobs — decimation `D` (UI per
 Guidance on choosing / re-tuning these:
 
 - **Prefer `decimation` over `shift` for slowing a loop down.** Both give the same worst-case slew, but a longer window improves the *measurement* (more averaging → smaller vote noise, better dead-band SNR), while a larger shift only attenuates votes that were already noisy. E.g. to quiet the CTLE code, doubling `decimation` halves the correlation noise floor `1/√(D·len(lags))`; doubling `ctle_shift` does not.
-- **Acquisition vs mission gear-shift.** Worst-case full-range slews at the defaults: Vp ≈ 8k UI (255 codes × 32 UI), CTLE ≈ `2^(N_code,ctle−1)`·4096 UI (`2^(N_code,ctle−1)` codes from mid-scale; scales with the TBD code width), AGC ≈ `2^(N_code,agc−1)`·8192 UI (`2^(N_code,agc−1)` codes from mid-scale; scales with the TBD code width), offset ≈ 520k UI ≈ 4.9 µs (128 codes). If bring-up time matters, run acquisition with 4–8× smaller `decimation` (or shift = 0) and restore mission values at lock — the truth tables and dead-bands are unchanged, only the two rate knobs move. The CDR benefits from the same treatment: with the mission `p_div = 512`, pulling in a 200 ppm offset takes ~56k UI, so `p_div` (and/or `f_step`) should be programmable to shift down for acquisition (§5-8).
+- **Acquisition vs mission gear-shift.** Worst-case full-range slews at the defaults: Vp ≈ 8k UI (255 codes × 32 UI), CTLE ≈ `2^(N_code,ctle−1)`·4096 UI = 8 codes from mid-scale × 4096 UI ≈ 32.8k UI (`N_code,ctle = 4` bits, §6-6), AGC ≈ `2^(N_code,agc−1)`·8192 UI (`2^(N_code,agc−1)` codes from mid-scale; scales with the still-TBD AGC code width), offset ≈ 520k UI ≈ 4.9 µs (128 codes). If bring-up time matters, run acquisition with 4–8× smaller `decimation` (or shift = 0) and restore mission values at lock — the truth tables and dead-bands are unchanged, only the two rate knobs move. The CDR benefits from the same treatment: with the mission `p_div = 512`, pulling in a 200 ppm offset takes ~56k UI, so `p_div` (and/or `f_step`) should be programmable to shift down for acquisition (§5-8).
 - **Keep the ratios, not the absolutes.** The load-bearing quantities are the separations: Vp ~100× slower than per-UI, offset/CTLE ~100× slower than Vp/CDR, AGC ≥ 2× slower again. Any retune (e.g. faster tracking for a drifty TIA) should scale the whole ladder, not one rung.
 - **CDR P/F balance.** The defaults `p_step/p_div = 2/512`, `f_step/f_div = 2/256` put the frequency path's quantum ~two decades below the proportional step (128 windows of full-majority `diff` to change the ramp by one sub-code), which is the classic type-II damping arrangement — raise `f_div` before touching `f_step` if frequency-path hunting is observed.
 
