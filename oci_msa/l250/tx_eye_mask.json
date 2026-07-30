@@ -9,19 +9,19 @@
   "coordinates": {
     "X1_ui": 0.14,
     "X2_ui": 0.4,
-    "Y1_v": 0.35,
+    "Y1_v": 0.4,
     "Y2_v": 1.5
   },
   "status": {
     "X1": "provisional \u2014 derived as TJ_pp/2 = 0.28/2 UI (spec \u00a73-1); TBD_from_link_budget",
     "X2": "provisional \u2014 CEI-56G-XSR-NRZ shoulder value, pending validation against the 3.2-4.5 ps transition-time envelope; TBD_from_sim_sweep",
-    "Y1": "provisional placeholder \u2014 pending derivation from the MRM P(V) transfer at the committed bias (ER >= 3.5 dB, OMA, TDEC) plus PVT/noise margin; TBD_from_link_budget",
+    "Y1": "provisional model-derived static floor \u2014 rounded from 399.2 mV at the Q=5000 corner using 25 pm/V and ER >= 3.5 dB; OMA passes at Pavg=0 dBm. Partner PVT P(V) and dynamic NRZ TDEC remain open; TBD_from_link_budget",
     "Y2": "provisional \u2014 set to V_PP,max/2 = 1.5 V (hard-clip bound, spec \u00a74-1); supersedes the earlier 600 mV placeholder, which is inconsistent with a 2.0-3.0 Vppd swing under the standard CEI mask construction; TBD_from_partner"
   },
   "derived": {
     "eye_width_guarantee_ui": 0.72,
     "eye_width_guarantee_ps": 6.777,
-    "inner_opening_pp_v": 0.7,
+    "inner_opening_pp_v": 0.8,
     "amplitude_bound_pp_v": 3.0
   },
   "polygons": {
@@ -32,11 +32,11 @@
       ],
       [
         0.4,
-        0.35
+        0.4
       ],
       [
         0.6,
-        0.35
+        0.4
       ],
       [
         0.86,
@@ -44,19 +44,20 @@
       ],
       [
         0.6,
-        -0.35
+        -0.4
       ],
       [
         0.4,
-        -0.35
+        -0.4
       ]
     ],
     "upper_forbidden_region": "v > +1.5 V for all t",
     "lower_forbidden_region": "v < -1.5 V for all t"
   },
   "budget_decomposition": {
-    "note": "Horizontal decomposition is exact dual-Dirac from the spec \u00a73-1 allocations; vertical is provisional (SNDR-only error bound, no committed vertical ISI/ripple budget).",
+    "note": "Horizontal decomposition is dual-Dirac from the spec \u00a73-1 allocations. No vertical arithmetic decomposition is made: SNDR cannot validly be treated as Gaussian voltage sigma; Y1 requires an MRM P(V)-to-ER/OMA/TDEC derivation.",
     "clause_ber": 0.00024,
+    "internal_raw_ber": 1e-12,
     "horizontal_per_side_ui": {
       "ISI/2": 0.0225,
       "DCD/2": 0.0075,
@@ -65,19 +66,14 @@
       "total": 0.12482
     },
     "horizontal_margin_ui": 0.01518,
-    "horizontal_per_side_ui_at_1e-15": {
+    "horizontal_per_side_ui_at_internal_ber": {
       "ISI/2": 0.0225,
       "DCD/2": 0.0075,
       "BUJ/2": 0.018,
-      "RJ = Q(1e-15)*J_RMS": 0.17471,
-      "total": 0.22271
+      "RJ = Q(1e-12)*J_RMS": 0.15476,
+      "total": 0.20276
     },
-    "horizontal_margin_ui_at_1e-15": -0.08271,
-    "vertical_mv": {
-      "rail_A=Vpp_min/2": 1000.0,
-      "noise+distortion Q*sigma(SNDR)": 82.8,
-      "unallocated (vertical ISI/ripple/mismatch)": 567.2,
-      "Y1": 350.0
-    }
+    "horizontal_margin_ui_at_internal_ber": -0.06276,
+    "vertical_status": "Not decomposed. Derive Y1 from MRM P(V), ER, OMA, and TDEC across PVT; validate with vertical eye distributions."
   }
 }

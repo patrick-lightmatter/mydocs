@@ -1,0 +1,74 @@
+{
+  "name": "L250 provisional MRM P(V)-derived Y1",
+  "status": "PROVISIONAL_STATIC_LOWER_BOUND_NOT_PVT_OR_TDEC_SIGNOFF",
+  "requirements": {
+    "q_range": [
+      5000.0,
+      8000.0
+    ],
+    "tuning_pm_per_v": 25.0,
+    "er_min_db": 3.5,
+    "tdec_max_db": 3.4,
+    "oma_min_dbm": -3.5000000000000004,
+    "pavg_max_dbm": 0.0
+  },
+  "assumptions": [
+    "Bus coupling and intrinsic loss scaled together from the Caribou TCMT template.",
+    "Each corner biased at the maximum static P(V) slope on the red side.",
+    "Symmetric electrical levels at +/-Y about that bias.",
+    "OMA evaluated after scaling laser power so average launch is 0 dBm.",
+    "Static calculation only; TDEC limit is used in the OMA formula but TDEC is not measured."
+  ],
+  "results": [
+    {
+      "q_target": 5000.0,
+      "q_actual": 4999.999999999999,
+      "rate_scale": 0.22118765909109284,
+      "coupling_bus": 0.0681257990000566,
+      "loss_db_per_m": 4296.3490901853875,
+      "bias_v_model_convention": -2.4859999999999998,
+      "notch_v_model_convention": -4.0,
+      "y_er_v": 0.3992,
+      "y_oma_v": 0.23020000000000002,
+      "y_required_static_v": 0.3992,
+      "er_at_y_db": 3.500483680836947,
+      "oma_at_y_dbm_with_pavg_0dbm": -1.1631603476861216
+    },
+    {
+      "q_target": 6500.0,
+      "q_actual": 6499.999999999853,
+      "rate_scale": 0.1695702986791214,
+      "coupling_bus": 0.052227651993169394,
+      "loss_db_per_m": 3293.733481543254,
+      "bias_v_model_convention": -2.8360000000000003,
+      "notch_v_model_convention": -4.0,
+      "y_er_v": 0.3063,
+      "y_oma_v": 0.1767,
+      "y_required_static_v": 0.3063,
+      "er_at_y_db": 3.500391866792259,
+      "oma_at_y_dbm_with_pavg_0dbm": -1.1632628010948225
+    },
+    {
+      "q_target": 8000.0,
+      "q_actual": 7999.999999999994,
+      "rate_scale": 0.13748527251463524,
+      "coupling_bus": 0.04234546393450765,
+      "loss_db_per_m": 2670.513933324275,
+      "bias_v_model_convention": -3.0540000000000003,
+      "notch_v_model_convention": -4.0,
+      "y_er_v": 0.2487,
+      "y_oma_v": 0.14350000000000002,
+      "y_required_static_v": 0.2487,
+      "er_at_y_db": 3.5003456467126624,
+      "oma_at_y_dbm_with_pavg_0dbm": -1.163314378361493
+    }
+  ],
+  "provisional_y1_floor_v": 0.3992,
+  "worst_static_corner_q": 5000.0,
+  "signoff_blockers": [
+    "Partner MRM P(V) curves across process, voltage, temperature, wavelength, and heater-lock error.",
+    "Voltage convention and allowed reverse-bias/overshoot range at the MRM terminals.",
+    "Dynamic NRZ TDEC measurement with SSPR and the normative 53.125 GHz BT4 receiver.",
+    "Optical noise/RIN and electrical residual-ISI distributions applied to the dynamic eye."
+  ]
+}
