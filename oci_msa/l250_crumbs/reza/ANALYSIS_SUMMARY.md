@@ -296,7 +296,64 @@ transition speed a **first-order, non-negligible ISI contributor in its own righ
 independent of any channel loss — consistent with the near-zero-margin SBR-only eye found in
 §3 using nothing but a PRBS-7 pattern and the measured SBR.
 
-## 8. Overall conclusions / key takeaways
+## 8. Exact-ISI + AWGN bathtub curves (`bathtub_noise_sbr.py`)
+
+**Motivation.** A parallel analysis in `temp/food/danyang/` (`bathtub_noise.py`) produced
+reference bathtub curves — BER vs. CDR lock point for a family of slicer SNR values, computed
+from the *exact* per-sample ISI distribution (no Gaussian-fit approximation) plus injected AWGN
+at the optimal decision threshold — for a different driver dataset (a real *step* response,
+differentiable directly into a Dirac IR, no deconvolution needed). Replicating that methodology
+for our own SBR-based dataset required a live Q&A with that analysis's author to resolve five
+methodological questions (deconvolution avoidance, edge-tapering, the OMA/SNR reference
+convention, the SNR sweep range, and the driver-only/driver+channel config mapping), since our
+only driver data is a single-*bit* pulse response rather than a step response.
+
+**Method.** Per the Q&A: skip Wiener-Hopf deconvolution entirely (justified independently by
+§6's finding that the Wiener `h_driver` only achieves ≈3.7 dB linear-convolution SNDR) and
+instead build the periodic PRBS-15 waveform directly via circular FFT convolution of the
+zero-stuffed symbol comb with the baseline-subtracted SBR (`comb ⊛ SBR_ac`, exactly the §6
+comb-then-channel construction, done here over one full period `N = 32767×32` samples so the
+result is edge-transient-free by construction), and further `⊛ h_channel` for the driver+channel
+config. OMA is computed as `sum(kernel)/SPS` (kernel = `SBR_ac` for driver-only,
+`conv(SBR_ac, h_channel)` for driver+channel) — algebraically identical to the reference
+analysis's `sum(h_dirac)` convention. BER at a given phase and noise `σ` is the mean AWGN tail
+probability averaged over every individual ISI-displaced sample (`s0`, `s1`, both symbol
+classes) at the optimal threshold (61-point grid); the required SNR for BER ≤ 1e-12 at each of
+the 32 lock-point phases is found by bisecting `σ ∈ [0.1, 200] mV` (40 iterations).
+
+**Pre-flight diagnostics (all clean):**
+
+| Check | Result |
+|---|---|
+| Tail-settling (taper needed?) | Not needed — last-UI window deviates from baseline by only 0.02% of pulse amplitude |
+| OMA cross-check, driver only (theory vs. empirical, PRBS-15 longest run) | 1.7422 V vs. 1.7241 V (−1.04%, fully settled: 10.62 UI memory < 15-bit run) |
+| OMA cross-check, driver+channel | 1.7339 V vs. 1.7388 V (+0.28%, but *not fully settled* — combined 20.16 UI memory exceeds what a 15-bit run can flush; a data-length limitation, not an error) |
+| Wander diagnostic (PRBS-7 vs. PRBS-15 required-SNR delta) | −0.002 dB (driver only), −0.011 dB (driver+channel) — no evidence of hidden baseline-wander artifacts |
+
+**Results:**
+
+| Config | Required SNR (best phase) | ISI penalty vs. ideal ISI-free NRZ (22.97 dB, Q=7.034) |
+|---|---|---|
+| Driver only (`comb ⊛ SBR_ac`) | 27.00 dB | **+4.03 dB** |
+| Driver + channel (`comb ⊛ SBR_ac ⊛ h_channel`) | 31.76 dB | **+8.80 dB** |
+
+![Bathtub curve family: BER vs. lock point for a family of slicer SNRs, driver-only and driver+channel](bathtub_noise_curves_sbr.png)
+![Required SNR vs. lock point, with the ideal ISI-free reference line](bathtub_noise_margin_sbr.png)
+
+**Caveat — phase axis is not directly comparable across datasets.** Each panel's phase origin
+comes from its own natural cursor (`argmax(SBR_ac)`, plus `argmax(h_channel)` for the
+driver+channel case), not an idealized Dirac-argmax roll — this only circularly relabels the
+phase axis (all 32 phases are swept regardless), but it means the "best lock point" index here
+is *not* meant to line up with `danyang/bathtub_noise_curves.png`'s phase axis, nor does either
+figure represent the same physical driver. The two analyses are a **methodological**
+cross-check (does the exact-ISI + swept-AWGN bathtub machinery, and the deconvolution-free
+comb-based construction, reproduce sane results on an independent dataset?), not a device-level
+comparison — the answer is yes: clean bathtub shapes, clean pre-flight diagnostics, and an ISI
+penalty (+4.0 dB driver-only, +8.8 dB driver+channel) that is directionally consistent with
+every other finding in this document (the driver's slow, asymmetric edges and the ~80 GHz notch
+already established in §4/§7 as first-order ISI contributors).
+
+## 9. Overall conclusions / key takeaways
 
 - **The driver has two real, physically-grounded impairments**, both confirmed by independent
   methods in this analysis: a genuine ~80 GHz notch (≈−22 to −23 dB, validated via
@@ -325,6 +382,11 @@ independent of any channel loss — consistent with the near-zero-margin SBR-onl
   one sample/UI and taking the FFT aliases that content back in-band and makes the driver
   falsely appear to *peak* (+~10 dB) rather than roll off — always inspect the full-rate
   response for actively-peaking blocks like this one.
+- **Exact-ISI + AWGN bathtub curves (§8) quantify the same ISI penalty in SNR terms**: +4.03 dB
+  (driver only) and +8.80 dB (driver + channel) above the ideal ISI-free NRZ requirement
+  (22.97 dB @ BER=1e-12) — an independent, methodologically cross-checked confirmation (against
+  a parallel analysis on a different driver dataset) that the driver's ISI is a first-order,
+  non-negligible SNR-budget line item, not a second-order effect.
 - **Open follow-ups:**
   - Should `channel_plus_driver.py` be rewritten to use the deconvolution-free
     (comb-then-channel) approach directly, retiring the Wiener-Hopf `h_driver` step for eye/ISI
