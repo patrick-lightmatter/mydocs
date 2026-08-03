@@ -373,11 +373,11 @@ The CDR is `DigitalMmCdr`: a baud-rate, second-order, **integer / windowed** Mue
 
 | Parameter | Placeholder | Model/RTL name | Range | Default | Meaning |
 |---|---|---|---|---|---|
-| Update window | `W_cdr` | `cdr_width` | TBD | **32** UI | UI accumulated in the voter per loop-filter update (parallel bus width in silicon) |
+| Update window | `W_cdr` | `cdr_width` | TBD | **128** UI | UI accumulated in the voter per loop-filter update (parallel bus width in silicon); sets the digital update clock at 106.25 GBd / 128 ≈ **830 MHz** (< 1 GHz) |
 | Proportional numerator | `K_p,num` | `p_step` | TBD | **2** | Per-window proportional step = `diff · p_step / p_div` PI codes |
 | Proportional divider / phase granularity | `K_p,den` | `p_div` | TBD | **512** | Also the sub-code granularity of the phase accumulator; recommended **programmable** for an acquisition gear-shift (see §6-8) |
 | Frequency step | `K_f,num` | `f_step` | TBD | **2** | `state_f += diff · f_step` per window |
-| Frequency divider | `K_f,den` | `f_div` | TBD | **256** | `f_out = floor(state_f / f_div)` sub-codes per window |
+| Frequency divider | `K_f,den` | `f_div` | TBD | **64** | `f_out = floor(state_f / f_div)` sub-codes per window; paired with `cdr_width` so that `f_div · cdr_width` (and hence the §6-6 frequency scaling) is invariant across window-width changes |
 | Frequency clamp | `F_max` | `f_bound` | TBD | **2^15** = 32 768 | `state_f` saturates at ±`f_bound` (no wrap); sized for the ±200 ppm design target — see §6-6 for the sizing rule |
 | Path enables | — | `en_p`, `en_f` | TBD | `True`, `True` | Gate the proportional / frequency paths individually |
 | Loop polarity | — | `flip_dir` | TBD | `False` | Negates `delta` before the phase accumulator |
@@ -389,7 +389,7 @@ Derived fixed-point widths (all derived, not stored as separate config):
 
 | Register | Placeholder | Width formula | Default width |
 |---|---|---|---|
-| Voter accumulator `CdrVoter.acc` | `N_diff` | `⌈log2(cdr_width)⌉ + 2` (signed, holds ±`W_cdr`) | 7 bits (±32) |
+| Voter accumulator `CdrVoter.acc` | `N_diff` | `⌈log2(cdr_width)⌉ + 2` (signed, holds ±`W_cdr`) | 9 bits (±128) |
 | Frequency register `LoopFilter.state_f` | `N_f` | `⌈log2(f_bound)⌉ + 2` (signed, holds ±`f_bound` inclusive) | 17 bits (±2^15) |
 | Phase accumulator `FsmPhase.state_p` | `N_p` | `⌈log2(n_pi_codes · p_div)⌉ + 1` (signed, wraps on ±`reg_max = n_pi_codes·p_div`) | 15 bits (±16384), set by `p_div·n_pi_codes` = 512·32 = 16 384 |
 | PI code | — | `log2(n_pi_codes)` | 5 bits |
@@ -413,7 +413,7 @@ Phase resolution: one PI code = `pi_span_ui / n_pi_codes` = **1/32 UI ≈ 294 fs
 
 Sign convention: the voter accumulates the ternary votes, i.e. **(early − late)** counts, so a **positive window sum `diff` ⇒ increase PI delay**. Lock occurs at `h(−1) = h(+1)` on the equalized pulse.
 
-**Dead-band / hysteresis (CDR):** the CDR carries **no explicit dead-band** — noise rejection comes from the *majority vote itself*: `cdr_width = 32` ternary votes are summed before any loop-filter action, so uncorrelated dither averages toward `diff ≈ 0` and only a persistent early/late majority moves the phase. Quantisation of the two paths (`p_div`, `f_div` floor division) additionally suppresses sub-LSB activity.
+**Dead-band / hysteresis (CDR):** the CDR carries **no explicit dead-band** — noise rejection comes from the *majority vote itself*: `cdr_width = 128` ternary votes are summed before any loop-filter action, so uncorrelated dither averages toward `diff ≈ 0` and only a persistent early/late majority moves the phase. Quantisation of the two paths (`p_div`, `f_div` floor division) additionally suppresses sub-LSB activity.
 
 ### 6-4 Downsampling: the windowed voter
 
@@ -430,7 +430,7 @@ self.acc = 0; self.count = 0
 return diff                # one dump per cdr_width UI
 ```
 
-This matches how the update path is intended to clock in the eventual silicon implementation: the digital loop runs on a **deserialized bus of `cdr_width = 32` UI**, so the loop filter and phase FSM update at 106.25 GHz / 32 ≈ **3.32 GHz**. The dump is detected downstream as `state.dump_count` incrementing.
+This matches how the update path is intended to clock in the eventual silicon implementation: the digital loop runs on a **deserialized bus of `cdr_width = 128` UI**, so the loop filter and phase FSM update at 106.25 GHz / 128 ≈ **830 MHz** — keeping the entire digital update path **below 1 GHz**, a comfortable synthesis target (the previous 32-UI working point implied a ≈ 3.32 GHz update clock, which is aggressive for standard-cell digital). The dump is detected downstream as `state.dump_count` incrementing. The hardware cost of the wider bus is small: a 128-input ternary adder tree in place of a 32-input one, and the voter accumulator growing from 7 to 9 bits.
 
 ### 6-5 Data paths: phase and frequency
 
@@ -438,7 +438,7 @@ This matches how the update path is intended to clock in the eventual silicon im
 flowchart TB
     IN["d(k), e(k)<br/>per-UI"]
     PD["Phase detector<br/>ternary vote"]
-    VOTER["Voter<br/>32-UI accumulator"]
+    VOTER["Voter<br/>128-UI accumulator"]
     LF["Loop filter<br/>proportional + frequency"]
     FSM["Phase FSM<br/>wrapping accumulator"]
     PI["Phase interpolator"]
@@ -469,8 +469,8 @@ state_p = wrap(state_p + (-delta if flip_dir else delta),    # modular wrap on
 pi_code = floor(state_p / p_div) % n_pi_codes                # 5-bit output
 ```
 
-- **Phase (proportional) path**: per window the phase moves `diff · p_step / p_div` PI codes. With defaults this is `diff · 2/512 ≈ diff · 0.0039` codes per window (= `diff · 1.22×10⁻⁴` UI per 32-UI window).
-- **Frequency path**: `state_f` is a saturating integrator of `diff`; its *divided-down* value `floor(state_f / f_div)` is added into every window's `delta`, producing a constant phase ramp — i.e. a frequency offset. The floor division means the frequency contribution has hysteresis-free `f_div`-sized quantisation: `state_f` must accumulate at least `f_div = 256` counts before the ramp changes by one sub-code per window.
+- **Phase (proportional) path**: per window the phase moves `diff · p_step / p_div` PI codes. With defaults this is `diff · 2/512 ≈ diff · 0.0039` codes per window (= `diff · 1.22×10⁻⁴` UI per 128-UI window). Because `diff` scales with the window length for a persistent phase error, the *per-UI* proportional gain is independent of `cdr_width`.
+- **Frequency path**: `state_f` is a saturating integrator of `diff`; its *divided-down* value `floor(state_f / f_div)` is added into every window's `delta`, producing a constant phase ramp — i.e. a frequency offset. The floor division means the frequency contribution has hysteresis-free `f_div`-sized quantisation: `state_f` must accumulate at least `f_div = 64` counts before the ramp changes by one sub-code per window.
 - **Phase accumulator**: the only wrapping register in the whole receiver (`FsmPhase`); everything else saturates. Wrap is modular over `2·reg_max` so continuous phase rotation (plesiochronous operation) is unlimited; an `unwrapped` shadow counter is maintained for observability only.
 
 ### 6-6 Frequency accumulator: sizing for a ppm offset, and saturation
@@ -482,7 +482,7 @@ A steady value of `state_f` produces a phase ramp of
 ppm           = state_f · 10⁶ / (f_div · p_div · cdr_width · n_pi_codes / pi_span_ui)
 ```
 
-With defaults (`f_div = 256`, `p_div = 512`, `cdr_width = 32`, `n_pi_codes = 32`, `pi_span_ui = 1`), the denominator is 256·512·32·32 = 2²⁷ = 134 217 728, so:
+With defaults (`f_div = 64`, `p_div = 512`, `cdr_width = 128`, `n_pi_codes = 32`, `pi_span_ui = 1`), the denominator is 64·512·128·32 = 2²⁷ = 134 217 728, so:
 
 | Quantity | Value (defaults) |
 |---|---|
@@ -499,14 +499,14 @@ N_f     = ⌈log2(f_bound)⌉ + 2        (signed register holding ±f_bound incl
 
 The governing frequency-tolerance **requirement** is **±100 ppm relative** (±50 ppm per end under IEEE P802.3dj D1.3; the same magnitude bounds the OIF-CEI asynchronous baud tolerance). This document adopts a **±200 ppm design target** — a deliberate 2× margin over the required tolerance — to cover reference-clock stack-up and to keep the register unsaturated on the worst-case combination of TX and RX rate error plus low-frequency jitter. At the design target, `f_bound ≥ 26 844`; the specified clamp is `f_bound = 2^15 = 32 768`, a 17-bit signed register, giving a ±244 ppm tracking capability — ~22 % margin over the 26 844 counts a settled 200 ppm offset requires. The clamp must also cover the acquisition transient: `state_f` overshoots its settled value during pull-in (the §6-8 validation shows an overshoot to roughly −28 k before settling at −26.6 k for a +200 ppm offset, ~5 %), which fits comfortably within ±32 768. If the design target changes, `f_bound` re-sizes by the same rule. (The behavioral model's historical default of `f_bound = 2^20` would give ±7 812.5 ppm; that is a model default, not the spec value.)
 
-This sizing depends only on the product `f_div·p_div·cdr_width·n_pi_codes` = 2²⁷ (§6-2), not on how that product is split between `p_div` and `n_pi_codes` individually — so the frequency-register sizing above holds for the `n_pi_codes = 32`, `p_div = 512` configuration exactly as given.
+This sizing depends only on the product `f_div·p_div·cdr_width·n_pi_codes` = 2²⁷ (§6-2), not on how that product is split between the individual factors — so the frequency-register sizing above holds for the `n_pi_codes = 32`, `p_div = 512` configuration exactly as given. The same invariance is what allowed the update window to move from `cdr_width = 32` / `f_div = 256` to `cdr_width = 128` / `f_div = 64` (the < 1 GHz digital-clock change, §6-4) without touching `f_bound`, the ppm resolution, or the ±244 ppm tracking range: `f_div` was scaled down by the same 4× that `cdr_width` grew, keeping `f_div · cdr_width` — and with it both the converged `state_f` for a given offset *and* the per-UI frequency-path gain — identical.
 
 **Saturation logic.** `state_f` is **clamped, not wrapped**: `state_f = clip(state_f + diff·f_step, −f_bound, +f_bound)`. Wrapping a frequency register would be catastrophic (a full-scale frequency sign flip); clamping instead degrades gracefully — if the line frequency offset exceeds the clamp the loop keeps slewing at its maximum ramp rate and simply cannot finish pulling in, which is detectable by the lock detector (persistent one-sided `diff`). The proportional path is unaffected by the clamp.
 
-### 6-7 Loop update summary (per `cdr_width` = 32 UI)
+### 6-7 Loop update summary (per `cdr_width` = 128 UI)
 
 ```text
-diff    = Σ_window (early − late)                       ∈ [−32, +32]
+diff    = Σ_window (early − late)                       ∈ [−128, +128]
 p_inc   = diff · p_step                                  (= 2·diff sub-codes)
 state_f = clip(state_f + diff · f_step, ±f_bound)        (= ±2^15)
 delta   = p_inc + floor(state_f / f_div)                 (sub-codes, p_div = 512 per PI code)
@@ -522,13 +522,15 @@ The **5-bit** PI resolution (`n_pi_codes = 32`, one code ≈ 294 fs) is an **ill
 
 The proportional divider is set to `p_step/p_div = 2/512`, giving a per-window proportional phase step of `diff · 1.22×10⁻⁴` UI. This value of `p_div` keeps the loop's steady-state dither pinned at the quantisation floor of 1 PI code (1/32 UI ≈ 0.031 UI p-p, RMS ≈ 0.0040 UI); a smaller `p_div` was found in simulation to let the loop hunt across 2 PI codes (≈ 0.063 UI p-p) around lock instead of settling within 1.
 
-This configuration was validated end-to-end in a behavioral simulation study (Jul 2026): the loop locks immediately and tracks a ±200 ppm frequency offset, with `state_f` settling within 1 % of theory and zero counted bit errors, at the cost of a ~56k UI (~0.5 µs) acquisition time for the 200 ppm pull-in. Smaller `p_div` values acquire faster (~9–11k UI) but reintroduce the hunting noted above — hence the recommendation that `p_div` (and/or `f_step`) be **programmable** for an acquisition gear-shift (§7-9).
+This configuration was validated end-to-end in a behavioral simulation study (Jul 2026, at the then-current `cdr_width = 32` / `f_div = 256` split): the loop locks immediately and tracks a ±200 ppm frequency offset, with `state_f` settling within 1 % of theory and zero counted bit errors, at the cost of a ~56k UI (~0.5 µs) acquisition time for the 200 ppm pull-in. Smaller `p_div` values acquire faster (~9–11k UI) but reintroduce the hunting noted above — hence the recommendation that `p_div` (and/or `f_step`) be **programmable** for an acquisition gear-shift (§7-9).
+
+The move to `cdr_width = 128` / `f_div = 64` (Aug 2026) was re-validated two ways: (a) a synthetic-plant A/B of the two operating points shows identical lock from a 0.3 UI offset, identical phase dither, and 200 ppm tracking with `|state_f|` within 0.2 % of the 26 844-count theory value; (b) a full-chain A/B in `mrm_nrz_transceiver_106g25.py` (identical waveform, bits, and alignment) locks at the same PI code with the same settled phase (−0.295 UI) and zero counted errors at both window widths. This is expected by construction — the per-UI proportional gain is invariant in `cdr_width` (the vote sum scales with the window) and `f_div · cdr_width` was held constant — so the per-window numbers below are quoted at the 128/64 point without re-derivation.
 
 The "theory" `state_f` value quoted above (and plotted as the dashed line in Figure 5-1) is the same closed-form sizing result already derived in §6-6 — reapplying it to a 200 ppm offset:
 
 ```text
 state_f_theory = Δf_ppm · 10⁻⁶ · f_div · p_div · cdr_width · (n_pi_codes / pi_span_ui)
-               = 200×10⁻⁶ · 256 · 512 · 32 · 32
+               = 200×10⁻⁶ · 64 · 512 · 128 · 32
                = 200×10⁻⁶ · 2²⁷
                ≈ 26 844   (sign per the loop-polarity convention, §6-5)
 ```
@@ -555,11 +557,11 @@ The CDR is specified as a first-order-dominant tracking loop with the following 
 |---|---|---|
 | Lower bound | ~2.7–4 MHz | Standards jitter-tolerance (JTOL) masks: the 1/f region of the OIF CEI-112G-XSR mask (Table 24-12; `f_CRU = f_b/13 280` ⇒ ~8 MHz at 106.25 GBd) and the IEEE P802.3dj electrical/optical masks (Tables 179-12 / 176D-10 / 182-20, corners at ~4 MHz and 4.27 MHz) both demand a tracking corner high enough to bring the untracked 1/f sinusoidal jitter under the eye-width budget. Above the corner, an unavoidable **0.05 UI pk-pk floor** applies out to ~10× the reference-CRU corner and must be absorbed by the eye budget. |
 | Design target | **4–6 MHz** | Chosen inside the standards floor to bind untracked SJ under a ~0.10–0.15 UI pk-pk budget for both the CEI-XSR and IEEE dj mask families. |
-| Upper bound | ~30 MHz | Phase-margin ceiling implied by the round-trip loop delay (parallel-bus deserialization, loop-filter update rate, PI settling). Above this, jitter-peaking degrades the 0.05 UI high-frequency floor. |
+| Upper bound | ~7–8 MHz | Phase-margin ceiling implied by the round-trip loop delay (parallel-bus deserialization, loop-filter update rate, PI settling). Above this, jitter-peaking degrades the 0.05 UI high-frequency floor. The earlier ~30 MHz estimate was budgeted at the 32-UI update window (≈ 301 ps update interval, ≈ 3.32 GHz update clock); the move to `cdr_width = 128` (§6-4) quadruples the update interval to ≈ 1.2 ns and scales the delay-implied ceiling down by roughly the same factor. The 4–6 MHz design target still fits under the revised ceiling, but with materially less margin — the ceiling must be re-derived exactly when the physical loop-latency budget closes. |
 
-![CDR small-signal JTOL tolerance curve (from cdr_closed_loop_analysis.md §5.2) overlaid on the IEEE P802.3dj Table 179-12 and OIF CEI-112G-XSR Table 24-12 masks at 106.25 GBd. The as-specified loop (f_n≈8.8 MHz, ζ≈2.13) clears both masks with wide margin; a re-tune candidate at the middle of the 4–6 MHz design target (f_n≈5 MHz, ζ≈2.0) still clears them but with less margin, illustrating the bandwidth trade discussed below.](jtol_curve.png)
+![CDR small-signal JTOL tolerance curve (from cdr_closed_loop_analysis.md §5.2, computed at the pre-change 32-UI window) overlaid on the IEEE P802.3dj Table 179-12 and OIF CEI-112G-XSR Table 24-12 masks at 106.25 GBd. The analyzed loop (f_n≈8.8 MHz, ζ≈2.13) clears both masks with wide margin; a re-tune candidate at the middle of the 4–6 MHz design target (f_n≈5 MHz, ζ≈2.0) still clears them but with less margin, illustrating the bandwidth trade discussed below.](jtol_curve.png)
 
-The **integer parameters** currently exercised in this document (`cdr_width = 32`, `p_step/p_div = 2/512`, `f_step/f_div = 2/256`) are the discrete equivalent of a proportional–integral loop; they were chosen to satisfy dither and pull-in criteria (§6-8) and give a self-consistent worked example, not to hit the 4–6 MHz closed-loop bandwidth *per se*. The loop-gain selection must be **verified against, and if necessary re-tuned to**, this bandwidth target once the loop-latency and jitter budgets are frozen. The verification is a small-signal linearization of the per-window update (§6-7) at the mission-mode operating point; the acquisition gear-shift (§7-9) is a separate operating point and is not constrained by the mission bandwidth target. That linearization is carried out in **`cdr_closed_loop_analysis.md`** (Sonntag & Stonick JSSC 2006 methodology): at the CEI-XSR RJ baseline (σ_φ ≈ 0.022 UI) the default gains yield f_n ≈ 8.8 MHz and f_3dB ≈ 39 MHz — wider than this 4–6 MHz target — confirming that mission-mode gain retuning (integral path first, holding ζ > 1 per §6-10) is required once the operating crossing jitter is frozen.
+The **integer parameters** currently exercised in this document (`cdr_width = 128`, `p_step/p_div = 2/512`, `f_step/f_div = 2/64`) are the discrete equivalent of a proportional–integral loop; they were chosen to satisfy dither and pull-in criteria (§6-8) and give a self-consistent worked example, not to hit the 4–6 MHz closed-loop bandwidth *per se*. The loop-gain selection must be **verified against, and if necessary re-tuned to**, this bandwidth target once the loop-latency and jitter budgets are frozen. The verification is a small-signal linearization of the per-window update (§6-7) at the mission-mode operating point; the acquisition gear-shift (§7-9) is a separate operating point and is not constrained by the mission bandwidth target. That linearization is carried out in **`cdr_closed_loop_analysis.md`** (Sonntag & Stonick JSSC 2006 methodology) at the pre-change `cdr_width = 32` / `f_div = 256` point: at the CEI-XSR RJ baseline (σ_φ ≈ 0.022 UI) the default gains yield f_n ≈ 8.8 MHz and f_3dB ≈ 39 MHz — wider than this 4–6 MHz target. The per-UI-equivalent gains are unchanged at the 128/64 point (§6-8), so f_n carries over approximately, but the 4× longer update interval adds transport delay that lowers the phase-margin ceiling (see the table above) — the as-analyzed 8.8 MHz point now sits at or above the delay-implied ceiling, so the mission-mode gain retuning toward 4–6 MHz (integral path first, holding ζ > 1 per §6-10) is **mandatory rather than optional**, and `cdr_closed_loop_analysis.md` must be re-run with the 128-UI update interval and delay in the model once the operating crossing jitter is frozen.
 
 **Untracked jitter charged to the eye.** The bandwidth window above splits the applied sinusoidal-jitter (SJ) mask into a tracked part and an untracked part. Below the closed-loop corner the loop follows the SJ and it costs no eye; above the corner the CDR cannot track and the residual lands directly on the sampling instant, so it must be **absorbed by the horizontal eye budget** rather than by the loop. Two terms dominate the untracked residue:
 
@@ -572,7 +574,7 @@ Adding these to the TX-side contributions imported in §3-1 (notably the J4u/J8u
 
 - **Acquisition:** cycle slips **permitted** while pulling in phase/frequency (before mission data).
 - **Mission mode:** slips **not permitted** in tracking — OIF-CEI burst limits (bursts > 7 symbols < 1E-20) require slips to be vanishingly rare once data delivery has begun.
-- **Loop shaping:** mission gains must be **heavily damped** (ζ ≫ 1, minimal jitter peaking) — not the acquisition gear-shift values. Defaults: `p_step/p_div = 2/512` (1-LSB dither floor, §6-8), `f_step/f_div = 2/256` (frequency path ≈ two decades below proportional, §7-9); higher acquisition gain via smaller `p_div` only until lock (§6-8, §7-9).
+- **Loop shaping:** mission gains must be **heavily damped** (ζ ≫ 1, minimal jitter peaking) — not the acquisition gear-shift values. Defaults: `p_step/p_div = 2/512` (1-LSB dither floor, §6-8), `f_step/f_div = 2/64` (frequency path ≈ two decades below proportional, §7-9); higher acquisition gain via smaller `p_div` only until lock (§6-8, §7-9).
 
 ### 6-11 Signal-valid gate — CDR state hold
 
@@ -596,7 +598,7 @@ The MM phase detector votes only on **data transitions** (§6-3: `vote = 0` when
 
 The specified behavior during a CID run is:
 
-- The phase-detector output stream is a run of `vote = 0` samples: `diff` for any window that overlaps the CID run trends toward the frequency-path contribution alone.
+- The phase-detector output stream is a run of `vote = 0` samples: `diff` for any window that overlaps the CID run trends toward zero and the phase update toward the frequency-path contribution alone. At `cdr_width = 128` a 72-UI run fits inside at most two windows, merely diluting their majority sums.
 - The **frequency register `state_f` holds its previously learned value** and continues to drive the sampling phase along the tracked ramp (the wrapping phase accumulator, §6-5, has no need for fresh votes to keep advancing).
 - On the first symbol after the CID run, transition votes resume and the proportional path re-engages; provided `state_f` was correct entering the run and the applied jitter did not exceed the closed-loop bandwidth budget (§6-9), the sampling instant is still inside the eye.
 
@@ -718,7 +720,7 @@ Vp_bot (valid only when `d = −1`; vote is `−e₋`):
 
 **Dead-band / hysteresis (Vp):** **none** — these are pure bang-bang median loops and intentionally dither ±1 LSB around lock. The dither is attenuated by the `1/2^vp_shift = 1/16` sub-LSB accumulator gain, and the *downstream* loops that observe the Vp codes (offset, AGC) carry their own dead-bands sized to ignore it.
 
-**Nesting:** faster than AGC / CTLE / offset (inner loop), but quasi-static on the CDR's 32-UI dump timescale — both hold at the defaults (~32 UI per Vp LSB vs code changes needing 16 consecutive same-sign votes).
+**Nesting:** faster than AGC / CTLE / offset (inner loop). Relative to the CDR's 128-UI dump: around lock the Vp codes dither ±1 LSB about the rail median, so the error-slicer thresholds are consistent to within one LSB across any CDR window; during acquisition slew, however, a Vp code can move up to ~4 LSB within one 128-UI window (~32 UI per Vp LSB at the defaults). This is tolerated because cycle slips are permitted during acquisition (§6-10) and was verified benign in the full-chain A/B at `cdr_width = 128` (§6-8: identical lock point, zero errors).
 
 ### 7-4 AGC — front-end gain (h₀ amplitude to target)
 
@@ -860,7 +862,7 @@ The CTLE peaking range (`P_min = 2.5` dB, `P_max = 10.0` dB) and step (`P_step =
 
 **Dead-band / hysteresis (CTLE):** implemented as a **correlation dead-band** — `vote = 0` while `|corr| ≤ corr_deadband`. Sizing is statistical: at the converged point the lag products are i.i.d. zero-mean ±1, so the window correlation is noise with `σ = 1/√(decimation·len(lags))` ≈ **0.022** at the defaults. The default `corr_deadband = 0.02` sits at ≈ 0.9 σ: it suppresses the bulk of the noise votes, and the residual (zero-mean) votes are further attenuated by the `1/2^ctle_shift` sub-LSB gain, leaving bounded, drift-free dither of order one LSB. For a fully quiet converged code raise the dead-band to ≥ 2–3 σ or increase `decimation` — a genuine one-LSB boost error produces `|corr|` of order 0.1–0.5, far above either choice.
 
-**Nesting:** the slowest EQ loop — ≥ 4096 UI per LSB, ~two orders of magnitude slower than the CDR's 32-UI dump. It **must** be slower than the CDR because every peaking step reshapes the pulse the MM phase detector locks to (`h(−1) = h(+1)`), and the shared error slicers must be quasi-static on the CDR update timescale. On a code change the caller applies the de-glitch strobe (swap the CTLE response between UI; let Vp / CDR re-settle before trusting the next windows). Freeze via `adapt=False` (= `lock_ctle`).
+**Nesting:** the slowest EQ loop — ≥ 4096 UI per LSB, 32× the CDR's 128-UI dump. It **must** be slower than the CDR because every peaking step reshapes the pulse the MM phase detector locks to (`h(−1) = h(+1)`), and the shared error slicers must be quasi-static on the CDR update timescale. On a code change the caller applies the de-glitch strobe (swap the CTLE response between UI; let Vp / CDR re-settle before trusting the next windows). Freeze via `adapt=False` (= `lock_ctle`).
 
 ### 7-7 h₋₁ (pre-cursor): no dedicated loop
 
@@ -875,7 +877,7 @@ Every continuous loop in this receiver observes the eye through the **same three
 | **AGC** (gain code) | Vp_top/bot, TIA DCOC state (SE→diff mean in the model), MM votes, CTLE corr | One gain LSB rescales the *entire* eye by `G_step` dB: both rail medians move, so both Vp DACs must re-slew by the corresponding fraction of their code; the single-ended DC operating point also rescales, transiently biasing the data slicer through the TIA's DC-cancellation state (in the model, the `mean_shift = 10` (~1k UI) running-mean tracker) | AGC is the **slowest** loop (≥ 8192 UI/LSB); half-gain-step hysteresis prevents converged dither; **de-glitch strobe**: rescale the TIA DC-cancellation state (the SE→diff mean in the model) by `g_new/g_old` at the code update so it does not have to re-converge |
 | **CTLE** (peaking code) | CDR lock point, Vp rails, AGC measurement | One peaking LSB (`P_step` dB) reshapes the pulse: the `h(−1)=h(+1)` phase the MM PD locks to *moves*, and the rail medians change | CTLE ≥ 4096 UI/LSB, ~128× slower than the CDR dump so the CDR tracks the drifting lock point as a slow disturbance; de-glitch strobe on code change (swap the response between UI, discard the next windows) |
 | **Offset** (offset code) | Vp codes (its own observable!), data-slicer bias | One offset LSB (`V_LSB,off`) shifts both rails by a fraction `V_LSB,off / V_LSB,vp` of a Vp LSB; the Vp codes it reads must re-settle (~32 UI/LSB) before the next imbalance window means anything | Offset ≥ 4096 UI/LSB ≫ Vp settling; 1.0-code dead-band ignores the Vp ±1 LSB dither; the **TIA DCOC loop must be quasi-static after acquisition** (in the model: freeze the SE→diff running mean) — two integrators (TIA DC cancellation + offset DAC) must not control the same DC node |
-| **Vp_top/bot** (threshold codes) | `e(k)` seen by CDR, CTLE, AGC | The error sign flips its decision boundary by `V_LSB,vp` per LSB; if the thresholds moved *within* a CDR window, the window's votes would be inconsistent | Vp moves ≤ 1/16 LSB per UI (`vp_shift = 4`), i.e. quasi-static over any `cdr_width = 32` UI window |
+| **Vp_top/bot** (threshold codes) | `e(k)` seen by CDR, CTLE, AGC | The error sign flips its decision boundary by `V_LSB,vp` per LSB; if the thresholds moved *within* a CDR window, the window's votes would be inconsistent | Vp moves ≤ 1/16 LSB per UI (`vp_shift = 4`): ±1 LSB dither around lock keeps windows internally consistent; the up-to-~4-LSB worst-case slew across a `cdr_width = 128` UI window occurs only during acquisition, where slips are permitted (§6-10, §7-3) |
 | **CDR** (PI code) | Sample instant for everything | A phase step moves where `y` is sampled, so rail medians (Vp) and correlations (CTLE) shift slightly | CDR is deliberately the **fastest** loop — everyone else treats the sampling phase as settled; its own step is tiny (`p_step/p_div = 2/512` ⇒ ≤ 0.125 PI code = 1/256 UI per window at full majority) |
 
 Three structural rules fall out of this matrix:
@@ -888,7 +890,7 @@ Three structural rules fall out of this matrix:
 
 1. *Not needed for stability.* `CtleAdaptNrz` (§7-6) is a bang-bang saturating accumulator, not a linear integrator — a corrupted vote from one contaminated window costs at most one wrong-direction LSB step, which the next (clean) window's vote corrects. Omitting the discard risks a little extra hunting or noisier settling near `corr_deadband`, not divergence.
 2. *The real defense is dilution by averaging, and it's a ratio argument.* Each vote means `d(k−m)·e(k)` over the full `ctle_decimation`-UI window; if the post-step Vp/CDR re-settling transient occupies only a small fraction of that window, it's diluted into the clean majority and the vote direction is unaffected. This is exactly the reasoning behind the "~128× slower than the CDR dump" figure already in the mitigation cell, and at the spec's mission defaults (`ctle_decimation = 2048`, `ctle_shift = 1` ⇒ 4096 UI/LSB) that margin is large — the explicit discard is likely belt-and-suspenders there.
-3. *The margin is thinner at the reference script's actual (faster, simulation-budget-driven) rate.* `mrm_nrz_transceiver_106g25.py` defaults to `ctle_decimation = 512`, `ctle_shift = 0` ⇒ 512 UI/LSB, only ~16× the CDR's `cdr_width = 32` dump, not ~128×. Its own docstring notes a peaking step "shifts the CTLE group delay, so the CDR walks to a new lock point during the climb" — and since the CDR's proportional path moves ≤ 0.125 PI code per window (`p_step/p_div = 2/512` at full majority), fully walking to a new lock point after a larger group-delay jump can plausibly take several hundred to ~1000+ UI. At `decimation = 512` that is no longer a small fraction of the window, so the case for the discard is stronger at the script's rate than at the mission rate.
+3. *The margin is thinner at the reference script's actual (faster, simulation-budget-driven) rate.* `mrm_nrz_transceiver_106g25.py` defaults to `ctle_decimation = 512`, `ctle_shift = 0` ⇒ 512 UI/LSB, only ~4× the CDR's `cdr_width = 128` dump, not ~32×. Its own docstring notes a peaking step "shifts the CTLE group delay, so the CDR walks to a new lock point during the climb" — and since the CDR's proportional path moves ≤ 0.5 PI code per window (`p_step/p_div = 2/512` at full majority, unchanged per UI), fully walking to a new lock point after a larger group-delay jump can plausibly take several hundred to ~1000+ UI. At `decimation = 512` that is no longer a small fraction of the window, so the case for the discard is stronger at the script's rate than at the mission rate.
 4. *The single-sample discontinuity itself is negligible.* With `lags = (1,)`, only one `d(k−1)·e(k)` term per window straddles the waveform-bank swap — a 1-in-`decimation` weighted contribution. The multi-UI Vp/CDR re-settling in point 3, not this discontinuity, is the actual mechanism of concern.
 
 Whether this is observable in practice (a dip/spike in `corr_meas` right after a code change, relative to the steady-state noise floor) has not been checked empirically — tracked as an open item in `simulation_revisit_items.md`.
@@ -899,9 +901,9 @@ Each first-order loop's bandwidth is set by two knobs — decimation `D` (UI per
 
 | Loop | Knobs (default) | UI per code LSB (min) | Time per LSB @ 9.41 ps UI | Separation vs inner neighbour |
 |---|---|---|---|---|
-| CDR proportional | `p_step/p_div = 2/512`, `cdr_width = 32` | ≤ 0.125 PI code / 32-UI window | ~1.2×10⁻⁴ UI phase step per window | — (innermost) |
-| CDR frequency | `f_step/f_div = 2/256` | `f_div/f_step = 128` windows ≈ 4096 UI to change the ramp by 1 sub-code | — | 128 windows per f-quantum: F path ~2 decades below P path |
-| Vp_top / Vp_bot | `vp_shift = 4`, per-UI valid-gated | ~32 UI (16 valid votes × ~2 UI/valid) | ~0.3 ns | Quasi-static over a 32-UI CDR window ✓ |
+| CDR proportional | `p_step/p_div = 2/512`, `cdr_width = 128` | ≤ 0.5 PI code / 128-UI window (≤ 0.125 per 32 UI — per-UI slew unchanged) | ~1.2×10⁻⁴ UI phase step per window per unit `diff` | — (innermost) |
+| CDR frequency | `f_step/f_div = 2/64` | `f_div/f_step = 32` windows ≈ 4096 UI to change the ramp by 1 sub-code (unchanged in time) | — | 32 windows per f-quantum: F path ~2 decades below P path per UI |
+| Vp_top / Vp_bot | `vp_shift = 4`, per-UI valid-gated | ~32 UI (16 valid votes × ~2 UI/valid) | ~0.3 ns | ±1 LSB dither around lock across a 128-UI CDR window ✓ (up to ~4 LSB/window slew only during acquisition, §7-3) |
 | Offset / BLW | `decimation = 2048`, `offset_shift = 1` | ≥ 4096 UI | ~39 ns | ~128× slower than Vp ✓ |
 | CTLE | `decimation = 2048`, `ctle_shift = 1` | ≥ 4096 UI | ~39 ns | ~128× slower than the CDR dump ✓ |
 | AGC | `decimation = 4096`, `agc_shift = 1` | ≥ 8192 UI | ~77 ns | 2× slower than offset/CTLE, ~256× slower than Vp ✓ |
@@ -911,7 +913,7 @@ Guidance on choosing / re-tuning these:
 - **Prefer `decimation` over `shift` for slowing a loop down.** Both give the same worst-case slew, but a longer window improves the *measurement* (more averaging → smaller vote noise, better dead-band SNR), while a larger shift only attenuates votes that were already noisy. E.g. to quiet the CTLE code, doubling `decimation` halves the correlation noise floor `1/√(D·len(lags))`; doubling `ctle_shift` does not.
 - **Acquisition vs mission gear-shift.** Worst-case full-range slews at the defaults: Vp ≈ 8k UI (255 codes × 32 UI), CTLE ≈ `2^(N_code,ctle−1)`·4096 UI = 8 codes from mid-scale × 4096 UI ≈ 32.8k UI (`N_code,ctle = 4` bits, §6-6), AGC ≈ `2^(N_code,agc−1)`·8192 UI (`2^(N_code,agc−1)` codes from mid-scale; scales with the still-TBD AGC code width), offset ≈ 520k UI ≈ 4.9 µs (128 codes). If bring-up time matters, run acquisition with 4–8× smaller `decimation` (or shift = 0) and restore mission values at lock — the truth tables and dead-bands are unchanged, only the two rate knobs move. The CDR benefits from the same treatment: with the mission `p_div = 512`, pulling in a 200 ppm offset takes ~56k UI, so `p_div` (and/or `f_step`) should be programmable to shift down for acquisition (§6-8).
 - **Keep the ratios, not the absolutes.** The load-bearing quantities are the separations: Vp ~100× slower than per-UI, offset/CTLE ~100× slower than Vp/CDR, AGC ≥ 2× slower again. Any retune (e.g. faster tracking for a drifty TIA) should scale the whole ladder, not one rung.
-- **CDR P/F balance.** The defaults `p_step/p_div = 2/512`, `f_step/f_div = 2/256` put the frequency path's quantum ~two decades below the proportional step (128 windows of full-majority `diff` to change the ramp by one sub-code), which is the classic type-II damping arrangement — raise `f_div` before touching `f_step` if frequency-path hunting is observed.
+- **CDR P/F balance.** The defaults `p_step/p_div = 2/512`, `f_step/f_div = 2/64` put the frequency path's quantum ~two decades below the proportional step (32 windows of unit `diff` ≈ 4096 UI to change the ramp by one sub-code), which is the classic type-II damping arrangement — raise `f_div` before touching `f_step` if frequency-path hunting is observed. If `cdr_width` is ever changed again, scale `f_div` inversely (keep `f_div · cdr_width` constant, §6-6) to preserve this balance.
 
 ### 7-10 Bring-up sequence
 

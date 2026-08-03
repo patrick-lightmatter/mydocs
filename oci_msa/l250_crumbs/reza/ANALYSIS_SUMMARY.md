@@ -340,6 +340,23 @@ the 32 lock-point phases is found by bisecting `σ ∈ [0.1, 200] mV` (40 iterat
 ![Bathtub curve family: BER vs. lock point for a family of slicer SNRs, driver-only and driver+channel](bathtub_noise_curves_sbr.png)
 ![Required SNR vs. lock point, with the ideal ISI-free reference line](bathtub_noise_margin_sbr.png)
 
+**Investigation note — the driver-only panel's markedly asymmetric ("cusp", not "U") shape is
+real, not a bug.** The driver-only bathtub is a razor-thin, lopsided opening (near-instantaneous
+BER recovery on one side of its best lock point, a gradual ~0.4 UI climb back to saturation on
+the other) rather than a classic symmetric U. This was investigated explicitly: (1) a bit-for-bit
+periodicity check — tiling the constructed PRBS-15 waveform two full periods back-to-back and
+comparing every phase-decimated sample set between periods — confirms exact (floating-point
+identical) periodicity, ruling out a wraparound/indexing bug; (2) inspecting the SBR itself shows
+its 20–80% rise (0.5625 UI) and 80–20% fall (0.4375 UI) sum to almost exactly **1.0 UI**, leaving
+essentially no settled/flat region and hence an intrinsically narrow, asymmetric eye — consistent
+with §3's near-zero SBR-only eye margin and §7's rise/fall asymmetry. Because the raw
+`argmax(SBR_ac)` cursor happens to sit at the extreme edge (not the center) of this narrow
+opening, a plain `[0, 1)` phase window makes the periodic recovery on one side collapse into a
+single boundary point and look like it "never reopens." Both figures above are therefore plotted
+with each config's phase axis **independently re-centered on its own best lock point**
+(`[-0.5, +0.5)` UI window) purely for visual clarity — a circular relabeling of the x-axis only;
+it changes no BER or required-SNR value (all numbers in the table above are unaffected).
+
 **Caveat — phase axis is not directly comparable across datasets.** Each panel's phase origin
 comes from its own natural cursor (`argmax(SBR_ac)`, plus `argmax(h_channel)` for the
 driver+channel case), not an idealized Dirac-argmax roll — this only circularly relabels the
