@@ -10,6 +10,94 @@ assumption in §8.
 
 ---
 
+## 0. Glossary
+
+### Acronyms / abbreviations
+
+| Term | Meaning |
+|---|---|
+| OCI | Optical Compute Interconnect |
+| MSA | Multi-Source Agreement |
+| GBd | Gigabaud |
+| NRZ | Non-Return-to-Zero |
+| CPO | Co-Packaged Optics |
+| BER | Bit Error Rate |
+| FEC / KP4 | Forward Error Correction / the RS(544,514) code used at 100–200G |
+| OMA | Optical Modulation Amplitude |
+| TIA | Transimpedance Amplifier |
+| SRS | Stressed Receiver Sensitivity |
+| TDEC(Q) | Transmitter and Dispersion Eye Closure (Quaternary, for PAM4) |
+| SEC(Q) | Stressed Eye Closure (Quaternary) |
+| ER | Extinction Ratio |
+| MPI | Multipath Interference |
+| RIN | Relative Intensity Noise |
+| ORL | Optical Return Loss |
+| ISI | Intersymbol Interference |
+| EQ | Equalization |
+| FIR | Finite Impulse Response (filter) |
+| CTLE | Continuous-Time Linear Equalizer |
+| DFE | Decision Feedback Equalizer |
+| CD | Chromatic Dispersion |
+| DJ / RJ / TJ | Deterministic / Random / Total Jitter |
+| DCD | Duty-Cycle Distortion |
+| UI | Unit Interval |
+| PD | Photodiode |
+| MRM | Micro-Ring Modulator |
+| MRR | Micro-Ring Resonator |
+| EIC / PIC | Electronic / Photonic Integrated Circuit |
+| ELS | External Laser Source |
+| SerDes | Serializer/Deserializer |
+| CID | Consecutive Identical Digits |
+| AGC | Automatic Gain Control |
+| LF | Low Frequency |
+| SE | Single-Ended |
+| BT4 | Bessel-Thomson 4th-order (reference filter) |
+| TP2 / TP3 | Test Point 2 / 3 (Tx output / Rx input) |
+| IL | Insertion Loss |
+| SMF | Single-Mode Fiber |
+| DWDM | Dense Wavelength-Division Multiplexing |
+| TT | Typical-Typical (process corner) |
+| SOA | State of the Art |
+
+### Math symbols
+
+| Symbol | Meaning | First used |
+|---|---|---|
+| $Q$ | Personick Q-factor | §3.2 |
+| $i_n$ | Input-referred rms noise current (TIA) | §3.3 |
+| $R$ | Photodiode responsivity (A/W) | §3.3 |
+| $Z_T$ | Transimpedance gain | §3.3, §6 |
+| $B_n$ | Noise bandwidth (Personick integral) | §3.3 |
+| $H(f)$ | Transfer function (generic) | §3.3–3.5 |
+| $\mathrm{OMA_{floor}}$ / $\mathrm{OMA_{sens}}$ | Analytic noise-limited sensitivity | §3.1, §3.3 |
+| $P_i$ | Penalty stack line $i$ (dB) | §3.1, §3.6 |
+| $h_{-1}, h_{+1}, h_{+2}$ | Pulse-response cursors (pre-, post-1, post-2) | §3.4 |
+| $\tau$ | Pole time constant | §3.4 |
+| $t_{20\text{–}80}$ | 20–80% transition time | §3.4 |
+| $\omega_z, \omega_p$ | CTLE zero / pole (angular freq.) | §3.5 |
+| $\eta$ | CTLE rms noise-enhancement factor | §3.5 |
+| $D_{\mathrm{MPI}}$ | MPI discount factor | §3.6 |
+| $D_{\mathrm{disp}}$ | Fiber dispersion coefficient (ps/nm), CD penalty formula | §3.6 |
+| $S$ | MPI reflection-pair sum | §3.6, §4.3 |
+| $R_t, R_r, R_c$ | Transmitter / receiver / connector reflectance | §3.6, §4.3 |
+| $E$ | Extinction ratio (linear, in MPI formula) | §3.6 |
+| $\sigma_{RJ}$ | RJ standard deviation | §3.6 |
+| $I_{DK}$ | Dark current | §3.6 |
+| $q$ | Electron charge | §3.6 |
+| $\varepsilon$ | Crosstalk factor | §3.6 |
+| $\delta$ | Threshold-offset fraction of swing | §3.6 |
+| $\lambda$ | Wavelength | §3.4 (CD) |
+| $N$ | CID run length (bits) | §6 |
+| $f_{LF}$ | Low-frequency cutoff | §6 |
+| $f_{3\mathrm{dB}}$ | 3 dB bandwidth | throughout |
+
+*Note:* $D$ is used for two distinct quantities in the source derivations (MPI discount
+factor and fiber dispersion coefficient); they are disambiguated above as $D_{\mathrm{MPI}}$
+and $D_{\mathrm{disp}}$ for this glossary, though the body text below still uses the bare
+$D$ in each local context — read it per §3.6's two formulas.
+
+---
+
 ## 1. Executive summary
 
 The link budget's purpose is to **derive component requirements** — above all, the GEN2
