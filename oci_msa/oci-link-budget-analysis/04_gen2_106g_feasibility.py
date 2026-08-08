@@ -5,12 +5,18 @@ Produces (OCI-GEN2-CPO-spec canvas, GEN2 column):
   - 152-setting rescan at 106.25 GBd (motivates a new TIA design class: 0 settings qualify)
   - measured-noise scaling regression: f2-only fit R^2 = 0.871 vs white-only 0.590
   - scaled-design floors at 58 GHz: white-scaled 5.4 uA -> -10.60 dBm, f2-scaled 17 uA -> -5.63 dBm
-  - required TIA noise inversion (i_n <= ~4.4 uA for +2 dB margin, pre-microbump accounting)
+  - required TIA noise inversion (i_n <= ~4.0 uA for +2 dB margin, pre-microbump accounting)
   - target-class TIA (58 GHz Butterworth-2, 4.5 uA): floor -11.41 dBm
-  - final stack incl. 25 fF microbump in the ISI chain: fast/typ/max Tx = 3.41 / 3.74 / 4.29 dB
-    -> margins +2.00 / +1.67 / +1.12 dB at Tx OMA -3.5 dBm
-  - supporting lines: RIN+shot Q-solve 0.82 dB at BWn 64 GHz, CD 0.04 dB booked, TDEC proxy
-    0.77/1.11/1.77 dB, microbump droop table, jitter 0.95 dB at RJ 0.015 / DJ 0.14 UI
+  - final stack incl. 25 fF microbump in the ISI chain: fast/typ/max Tx = 3.74 / 4.07 / 4.62 dB
+    -> margins +1.67 / +1.34 / +0.79 dB at Tx OMA -3.5 dBm
+  - supporting lines: RIN+shot Q-solve 1.16 dB at BWn = 1.5 x f3dB = 87 GHz, CD 0.04 dB
+    booked, TDEC proxy 0.77/1.11/1.77 dB, microbump droop table, jitter 0.95 dB at
+    RJ 0.015 / DJ 0.14 UI
+  - jitter CDR-fallback check (0.018 UI / 169 fs RJ vs. the 0.015 UI / 141 fs baseline):
+    +0.19 dB incremental, re-evaluated at os_r=256 to resolve a sample-grid quantization
+    artifact at the default os_r=32 (see Methodology_Provenance.md 2.1)
+  NOTE: canvas values (stack 3.74 typ, +1.67, 4.37 uA, RIN+shot 0.82) predate the
+  BWn = 1.5x f3dB convention (they used the Butterworth-2 shape integral, 64 GHz).
 
 Inputs: TIA tables (common.TIA_DIR), package s4p (common.PKG_DIR).
 """
@@ -31,7 +37,8 @@ ASSUMPTIONS = dict(
     CD_BOOKED=0.04,               # ~4x the GEN1 0.01 dB (pulse-sim gives 0.013; booked conservative)
     XTALK=0.36, THRESH=0.21,      # carried from GEN1 (rate-independent in OMA domain)
     TIA_TARGET_F3DB=58e9,         # required-class reference response (Butterworth-2)
-    TIA_TARGET_IN=4.5e-6,         # target-class noise (published 100GBd-class TIAs: 2.5-5 uA)
+    TIA_TARGET_IN=4.5e-6,         # target-class noise (internal, unreferenced estimate for
+                                  # 100GBd-class TIAs: ~2.5-5 uA / 55-65 GHz -- not a cited source)
     TX_OMA=-3.5,
 )
 
@@ -95,8 +102,7 @@ for s in settings:
     if pj_i is None:
         n_eye_closed += 1
         continue
-    BWn_i = np.trapz((np.abs(s['H']) / np.abs(s['H']).max()) ** 2, s['f'])
-    rs_i = rin_shot_penalty(s['inr'], BWn_i)
+    rs_i = rin_shot_penalty(s['inr'], 1.5 * s['bw'])   # BWn = 1.5x f3dB convention
     tot = rs_i + 0.205 + bs[0] + 0.04 + pj_i + 0.36 + 0.21
     if (-1.5 - IL_LINK) - (floor_dbm(s['inr']) + tot) >= 0:
         cnt += 1
@@ -115,7 +121,11 @@ print(f"  white-scaled (sqrt BW): {inr_white*1e6:.2f} uA -> floor {floor_dbm(inr
 print(f"  f2-scaled (BW^1.5):     {inr_f2*1e6:.1f} uA -> floor {floor_dbm(inr_f2):.2f} dBm (canvas: -5.63)")
 
 IN_T = ASSUMPTIONS['TIA_TARGET_IN']
-print(f"target-class TIA: {IN_T*1e6:.1f} uA over BWn {B1h/1e9:.0f} GHz "
+# Noise integration bandwidth for shot/RIN: 1.5x f3dB (NOT the Butterworth-2 shape
+# integral B1h = 64 GHz, which understates a real part's noise tail - cf. the f^2
+# scaling finding above and the >= 1.5x f3dB measurement requirement in the spec).
+BN_T = 1.5 * ASSUMPTIONS['TIA_TARGET_F3DB']
+print(f"target-class TIA: {IN_T*1e6:.1f} uA, BWn = 1.5 x 58 = {BN_T/1e9:.0f} GHz "
       f"-> floor {floor_dbm(IN_T):.2f} dBm (canvas: -11.41)")
 
 # FIR3+CTLE vs CTLE-only on the target-class TIA (typ Tx, no bump - as originally run):
@@ -137,8 +147,10 @@ t4, _ = sim.opt_fir(1, 2, Htx['typ'] * Htb * Hcb, step=0.04)
 print(f"4th-tap check (best measured + its CTLE): 3-tap {t3:.2f} vs 4-tap {t4:.2f} dB (canvas: 5.60 vs 5.60)")
 
 # ---------------- ISI+EQ with the 25 fF microbump in chain ----------------
+# Unterminated direct EIC-on-PIC drive: no physical 50 ohm. 50 is a placeholder
+# effective node impedance (conservative if driver Rout / TIA Rin are lower).
 Hmb = sim.one_pole(1 / (2 * np.pi * 50 * ASSUMPTIONS['MICROBUMP_C']))
-print("\nmicrobump droop scan (50-ohm RC pole):")
+print("\nmicrobump droop scan (placeholder 50-ohm effective node impedance):")
 for C in (20e-15, 25e-15, 30e-15, 50e-15):
     fpole = 1 / (2 * np.pi * 50 * C)
     droop = -20 * np.log10(np.abs(1 / (1 + 1j * NYQ / fpole)))
@@ -160,8 +172,23 @@ pj, TJ = sim.jitter_pp(Hop, ASSUMPTIONS['RJ_UI'], ASSUMPTIONS['DJ_UI'])
 print(f"\njitter: RJ {ASSUMPTIONS['RJ_UI']} UI = {ASSUMPTIONS['RJ_UI']*sim.UI*1e15:.0f} fs, "
       f"TJ = {TJ:.3f} UI = {TJ*sim.UI*1e12:.2f} ps -> PP {pj:.2f} dB (canvas: 0.95)")
 
-rs = rin_shot_penalty(IN_T, B1h)
-print(f"RIN+shot Q-solve at BWn {B1h/1e9:.0f} GHz: {rs:.3f} dB (canvas: 0.82)")
+# fallback CDR spec check (if the 0.015 UI / 141 fs analog-CDR RJ target is not met by
+# the vendor and a looser 0.018 UI / 169 fs spec has to be accepted instead). Same Hop
+# chain, DJ unchanged; the delta below is the actual booked cost of the fallback, not
+# an estimate (os_r=32 default in Sim() rounds both cases to the same TJ/2 sample bin,
+# so this is re-evaluated at os_r=256 for resolution -- see note in Methodology_Provenance).
+sim_fine = Sim(BAUD, os_r=256, n=8192 * 8)
+Hop_fine = (sim_fine.tx_two_pole_from_tr(0.45 * sim_fine.UI)[0] * sim_fine.butter2(58e9)
+            * sim_fine.one_pole(1 / (2 * np.pi * 50 * ASSUMPTIONS['MICROBUMP_C']))
+            * sim_fine.ctle(ctle_pick['typ'][0], ctle_pick['typ'][1], ctle_pick['typ'][1]))
+pj_fb, TJ_fb = sim_fine.jitter_pp(Hop_fine, 0.018, ASSUMPTIONS['DJ_UI'])
+pj_base_fine, _ = sim_fine.jitter_pp(Hop_fine, ASSUMPTIONS['RJ_UI'], ASSUMPTIONS['DJ_UI'])
+print(f"jitter fallback: RJ 0.018 UI = {0.018*sim.UI*1e15:.0f} fs, TJ = {TJ_fb:.3f} UI -> "
+      f"PP {pj_fb:.2f} dB vs {pj_base_fine:.2f} dB at baseline (delta {pj_fb-pj_base_fine:+.2f} dB, "
+      f"re-evaluated at os_r=256 to resolve the sample-grid quantization at os_r=32)")
+
+rs = rin_shot_penalty(IN_T, BN_T)
+print(f"RIN+shot Q-solve at BWn {BN_T/1e9:.0f} GHz: {rs:.3f} dB (canvas, at shape-integral 64 GHz: 0.82)")
 
 Hbt4 = sim.bessel4(0.5 * BAUD)
 for nm in ('fast', 'typ', 'max'):
@@ -193,7 +220,7 @@ print("(canvas: 3.41/+2.00, 3.74/+1.67, 4.29/+1.12)")
 def required_in(tx_oma, margin, isi_line, jit_line):
     inr_ = 4e-6
     for _ in range(6):
-        tot = (rin_shot_penalty(inr_, B1h) + MPI + isi_line + ASSUMPTIONS['CD_BOOKED']
+        tot = (rin_shot_penalty(inr_, BN_T) + MPI + isi_line + ASSUMPTIONS['CD_BOOKED']
                + jit_line + ASSUMPTIONS['XTALK'] + ASSUMPTIONS['THRESH'])
         fl_req = tx_oma - IL_LINK - margin - tot
         inr_ = 10 ** (fl_req / 10) * 1e-3 * RESP / (2 * Q)
@@ -206,9 +233,9 @@ r_nb = required_in(-3.5, 2.0, bh[0], pj_nb)
 r_wb = required_in(-3.5, 2.0, isi['typ'], pj)
 print(f"\nrequired i_n for +2 dB margin at Tx OMA -3.5 dBm:")
 print(f"  pre-microbump accounting (as on canvas sec 2): {r_nb*1e6:.2f} uA "
-      f"({r_nb/np.sqrt(B1h)*1e12:.1f} pA/rtHz avg)  (canvas: 4.37)")
+      f"({r_nb/np.sqrt(BN_T)*1e12:.1f} pA/rtHz avg over {BN_T/1e9:.0f} GHz)  (canvas: 4.37)")
 print(f"  with 25 fF bump charged to ISI: {r_wb*1e6:.2f} uA  "
-      f"(equivalently, 4.5 uA target gives +1.67 dB not +2.0)")
+      f"(equivalently, 4.5 uA target gives +1.34 dB not +2.0)")
 
 # package counterfactual at the new Nyquist
 try:

@@ -2,7 +2,8 @@
 05 - GEN2 TIA requirements derivations (spec canvas section 7) + verification recipe.
 
 Produces:
-  - bandwidth window: total sensitivity flat at ~-8.66 dBm across f3dB 50-64 GHz
+  - bandwidth window: total sensitivity flat at ~-8.3/-8.4 dBm across f3dB 45-64 GHz
+    (canvas -8.66 plateau predates the BWn = 1.5x f3dB convention)
   - noise-shape finding: f2-shaped input noise sees <= 0 dB extra post-CTLE penalty vs
     equal-rms white (the mild CTLE's poles sit where f2 noise lives) -> spec enforces shape
     via full-band rms + spot-density ceiling instead of a post-CTLE allowance
@@ -10,7 +11,7 @@ Produces:
     +0.11 dB of the 1.15 dB budget line
   - group-delay diagnosis: widest measured setting has 12.5 ps GD ripple (2-40 GHz) with
     flat magnitude -> h-1 ~ 0.48 pre-cursor; motivates the <= 3 ps GD-ripple spec line
-  - ZT floor (57 dBohm), overload currents (150-696 uApp, 731 uA DC), LF cutoff (1.34 MHz
+  - ZT floor (57 dBohm), overload currents (162-696 uApp, 731 uA DC), LF cutoff (1.34 MHz
     for 0.05 dB BLW at 72-bit CID)
   - verify_tia(): the 6-step pass/fail recipe on the standard TF+noise data format
 
@@ -31,8 +32,13 @@ ASSUMPTIONS = dict(
     RJ_UI=0.015, DJ_UI=0.14,
     TIA_TARGET_F3DB=58e9, TIA_TARGET_IN=4.5e-6,
     MICROBUMP_C=25e-15,
-    RX_OMA_MAX_DBM=-1.0, ER_DB=4.5,
-    REQ_OMA_FLOOR_DBM=-7.67,   # GEN2 required OMA at Rx (from script 04, typ Tx)
+    RX_OMA_MAX_DBM=-1.0,           # judgment call, not derived from a Tx-OMA/link-IL
+                                   # corner; reviewed vs. an alternative +1.79 dBm /
+                                   # 1.13 mApp case and retained -- see
+                                   # Methodology_Provenance.md ("Rx OMA max / overload
+                                   # governing case")
+    ER_DB=4.5,
+    REQ_OMA_FLOOR_DBM=-7.34,   # GEN2 required OMA at Rx (script 04, typ Tx, BWn=1.5x f3dB)
 )
 
 BAUD = 106.25e9
@@ -42,6 +48,7 @@ settings.sort(key=lambda s: -s['bw'])
 s12 = next(s for s in settings if s['key'] == '12211111')
 
 Hh = sim.butter2(ASSUMPTIONS['TIA_TARGET_F3DB'])
+# 50 = placeholder effective node impedance (unterminated direct drive, no physical 50 ohm)
 Hmb = sim.one_pole(1 / (2 * np.pi * 50 * ASSUMPTIONS['MICROBUMP_C']))
 Htx_typ, _ = sim.tx_two_pole_from_tr(0.45 * sim.UI)
 Htx_max, _ = sim.tx_two_pole_from_tr(0.60 * sim.UI)
@@ -108,7 +115,7 @@ for f0 in (45e9, 50e9, 53e9, 58e9, 64e9, 70e9):
     B1h = np.trapz(np.abs(Hb) ** 2 / np.abs(Hb[1]) ** 2, sim.freqs)
     inr_w = s12['inr'] * np.sqrt(B1h / s12['B1'])
     b_ = sim.ctle_sweep(Htx_typ * Hb * Hmb, Hb, np.arange(10e9, 40e9, 4e9), np.arange(45e9, 100e9, 8e9))
-    tot = floor_dbm(inr_w) + b_[0] + rin_shot_penalty(inr_w, B1h)
+    tot = floor_dbm(inr_w) + b_[0] + rin_shot_penalty(inr_w, 1.5 * f0)   # BWn = 1.5x f3dB
     print(f"  f3dB {f0/1e9:.0f} GHz: {tot:.2f} dBm")
 print("  -> flat 50-64 GHz (canvas: -8.66 plateau); window spec, not a point spec")
 
@@ -142,9 +149,9 @@ def verify_tia(setting, sim106=sim, tx_tr_ui=0.45, verbose=True):
     A measured noise SPECTRUM (for the density mask) is not in this data format, so
     step 1 checks total rms only. Returns dict of step results."""
     res = {}
-    # 1. input-referred noise
+    # 1. input-referred noise (ceiling from script 04 inversion at BWn = 1.5x f3dB)
     res['in_uA'] = setting['inr'] * 1e6
-    res['pass_noise'] = setting['inr'] <= 4.4e-6
+    res['pass_noise'] = setting['inr'] <= 4.0e-6
     # 2. response quality
     ff = setting['f']
     i2 = np.searchsorted(ff, 2e9)
@@ -158,7 +165,7 @@ def verify_tia(setting, sim106=sim, tx_tr_ui=0.45, verbose=True):
                             and res['gd_ripple_ps'] <= 3.0)
     # 3. analytic floor
     res['floor_dBm'] = floor_dbm(setting['inr'])
-    res['pass_floor'] = res['floor_dBm'] <= -11.4
+    res['pass_floor'] = res['floor_dBm'] <= -11.9
     # 4. ISI+EQ
     Htx_, _ = sim106.tx_two_pole_from_tr(tx_tr_ui * sim106.UI)
     Ht = sim106.tia_interp(setting)
@@ -172,7 +179,8 @@ def verify_tia(setting, sim106=sim, tx_tr_ui=0.45, verbose=True):
     res['pass_jitter'] = pj_ is not None and pj_ <= 1.0
     # 6. end-to-end margin
     if pj_ is not None:
-        stack = (rin_shot_penalty(setting['inr'], setting['B1']) + mpi_penalty(-24, -24, -35, 4, 4.5, 0.5)
+        stack = (rin_shot_penalty(setting['inr'], 1.5 * setting['bw'])   # BWn = 1.5x f3dB
+                 + mpi_penalty(-24, -24, -35, 4, 4.5, 0.5)
                  + bx[0] + 0.04 + pj_ + 0.36 + 0.21)
         res['margin_dB'] = (-3.5 - IL_LINK) - (res['floor_dBm'] + stack)
         res['pass_margin'] = res['margin_dB'] >= 1.5

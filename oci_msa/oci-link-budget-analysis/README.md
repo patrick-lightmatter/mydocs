@@ -35,16 +35,20 @@ file). Nothing under `sandbox/alex` is used.
 |---|---|---|
 | `common.py` | Shared machinery: TIA table loading + input-referral conventions, `Sim` pulse/ISI/EQ/jitter framework, RIN+shot Q-solve, MPI bound | — |
 | `01_tia_survey.py` | Scan all 152 TIA settings, pick the GEN1 design point | 55 usable settings; design point `12211111`: iₙ = 3.17 µA, 29.3 GHz; floor **−12.93 dBm** (bottom-up canvas §1) |
-| `02_bottom_up_budget_53g.py` | GEN1 bottom-up budget at 53.125 GBd (legacy pulse machinery kept for exact reproduction) | stack **2.87 dB**; required OMA −10.06 dBm; margins **+0.66** (spec-min Tx) / **+2.36 dB** (realistic Tx); sensitivity table (bottom-up canvas §2–5) |
-| `03_cpo_gen2_53g.py` | 53 GBd CPO study: Tx corners, slice-DAC FIR + CTLE scenarios, microbump/package | EQ scenarios (CTLE-only 1.86 dB), stack 3.90 dB, margin +3.03 dB (spec canvas GEN1 column) |
-| `04_gen2_106g_feasibility.py` | 106.25 GBd rework: 152-setting rescan, noise scaling law, required TIA class, closure | f²-fit R² 0.87 vs 0.59; scaled floors −10.60/−5.63 dBm; target-class floor **−11.41 dBm**; ISI+EQ 0.82/1.15/1.70; stack **3.74 dB** typ; margins **+2.00/+1.67/+1.12**; required iₙ 4.37 µA (spec canvas §2–6) |
-| `05_tia_requirements.py` | Derivations behind the TIA requirements table + `verify_tia()` recipe | BW window plateau −8.66 dBm (50–64 GHz); peaking ≤1 dB / GD ripple ≤3 ps sweep; measured 12.5 ps ripple → h₋₁ 0.48; ZT ≥ 57 dBΩ; overload 150–696 µApp, 731 µA DC; LF cutoff 1.34 MHz (spec canvas §7) |
-| `06_device_tradeoffs.py` | TIA A/B × Tx FIR/no-FIR scenario matrix, FIR value isolation, MRM sensitivity | full 24-cell matrix (e.g. no-FIR/MRM60 × B@4 µA **+1.99 dB**; worst cell **+0.50 dB**); no-FIR beats FIR3 by 0.27 dB on matched channel; A-vs-B crossover ≈ 3.6 µA (trade-offs canvas) |
+| `02_bottom_up_budget_53g.py` | GEN1 bottom-up budget at 53.125 GBd (legacy pulse machinery kept for exact reproduction) | stack **2.93 dB**; required OMA −10.00 dBm; margins **+0.60** (spec-min Tx) / **+2.30 dB** (realistic Tx); sensitivity table (bottom-up canvas §2–5; canvas values 2.87/+0.66 predate the −24 dB-ends and Bₙ = 1.5×f₃dB conventions) |
+| `03_cpo_gen2_53g.py` | 53 GBd CPO study: Tx corners, slice-DAC FIR + CTLE scenarios, microbump/package | EQ scenarios (CTLE-only 1.86 dB), stack 4.23 dB, margin +2.70 dB (spec canvas GEN1 column: 3.90/+3.03, pre-convention) |
+| `04_gen2_106g_feasibility.py` | 106.25 GBd rework: 152-setting rescan, noise scaling law, required TIA class, closure | f²-fit R² 0.87 vs 0.59; scaled floors −10.60/−5.63 dBm; target-class floor **−11.41 dBm**; ISI+EQ 0.82/1.15/1.70; stack **4.07 dB** typ; margins **+1.67/+1.34/+0.79**; required iₙ 4.03 µA (spec canvas §2–6: 3.74/+1.67 etc., pre-convention) |
+| `05_tia_requirements.py` | Derivations behind the TIA requirements table + `verify_tia()` recipe | BW window plateau −8.3/−8.4 dBm (45–64 GHz); peaking ≤1 dB / GD ripple ≤3 ps sweep; measured 12.5 ps ripple → h₋₁ 0.48; ZT ≥ 57 dBΩ; overload 162–696 µApp, 731 µA DC; LF cutoff 1.34 MHz (spec canvas §7) |
+| `06_device_tradeoffs.py` | TIA A/B × Tx FIR/no-FIR scenario matrix, FIR value isolation, MRM sensitivity | full 24-cell matrix (e.g. no-FIR/MRM60 × B@4 µA **+1.63 dB**; worst cell **+0.16 dB**); no-FIR beats FIR3 by 0.27 dB on matched channel; A-vs-B crossover ≈ 3.6 µA (trade-offs canvas, pre-convention values +1.99/+0.50) |
 
 ## Conventions worth knowing
 
 - **Input-referred noise** iₙ = (output noise rms) / (peak single-ended p-leg
   transimpedance) — the conservative GEN1 reading of the model, kept everywhere.
+- **Noise integration bandwidth** for the signal-dependent terms (shot/RIN/dark):
+  Bₙ = 1.5 × f₃dB, both generations (single-pole NEB factor π/2, rounded; real noise
+  extends beyond the circuit bandwidth). The signal-TF shape integrals (`BWn_se`,
+  `B1`) remain in `common.py` for the noise-power scaling law and canvas reproduction.
 - **GEN1 vs GEN2 bandwidth conventions**: the GEN1 budget (scripts 01–02) selects and
   integrates on the single-ended p-leg response (`bw_se`, `BWn_se`, no noise LPF); the
   GEN2 work (03–06) uses the differential response with the model's 60 GHz noise-path
@@ -56,12 +60,15 @@ file). Nothing under `sandbox/alex` is used.
 
 ## Reproduction status
 
-All canvas numbers reproduce exactly or within ±0.01 dB rounding. Two footnotes:
+Canvas numbers reproduced exactly or within ±0.01 dB at canvas time; the scripts have
+since adopted two deliberate accounting changes the canvases do not carry (report
+Appendix A documents both): (i) −24 dB end reflectances for GEN1 (shared product
+line), and (ii) Bₙ = 1.5 × f₃dB noise integration bandwidth. Script comments say how
+to revert each for exact canvas reproduction. Two further footnotes:
 
-1. The spec canvas §2 line "iₙ ≤ 4.4 µA → +2 dB margin" was derived before the 25 fF
-   microbump was charged to the ISI line; with the bump charged (as the §6 closure table
-   does), 4.4 µA corresponds to ≈ +1.8 dB and +2.0 dB needs ≈ 4.2 µA. Script 04 prints
-   both accountings.
+1. The spec canvas §2 line "iₙ ≤ 4.4 µA → +2 dB margin" was additionally derived
+   before the 25 fF microbump was charged to the ISI line; current equivalents are
+   4.03 µA pre-bump / 3.83 µA with the bump charged. Script 04 prints both accountings.
 2. A superseded 53 GBd draft of the spec canvas claimed "21 settings close with ≥2 dB";
-   script 03's improved machinery gives 15. The claim is not on any current canvas; the
-   count is sensitive to the sampling-phase optimization and is reported as-is.
+   script 03 now gives 9 (sensitive to the sampling-phase optimization and the stack
+   total; reported as-is).

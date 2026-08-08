@@ -4,7 +4,8 @@
 Produces:
   - 24-cell scenario matrix: TIA {A@3uA/50G, A@4uA/50G, B@4uA/60G, B@5uA/60G} x
     Tx {FIR3 typ 0.45 UI, FIR3 slow 0.60 UI, no-FIR 60 GHz driver with MRM 40/50/60/80 GHz}
-    (canvas cells e.g. B@4 no-FIR/MRM60 = +1.99 dB; worst combo B@5/MRM40 = +0.50 dB)
+    (now B@4 no-FIR/MRM60 = +1.63 dB, worst combo B@5/MRM40 = +0.16 dB; canvas cells
+    +1.99/+0.50 predate the BWn = 1.5x f3dB convention)
   - FIR value isolation on a matched 60+60 GHz channel (FIR converges to zero taps;
     net difference is the slice-DCD jitter charge: no-FIR better by ~0.27 dB)
   - TIA A-vs-B crossover: A wins below i_n ~ 3.6 uA
@@ -35,6 +36,7 @@ ASSUMPTIONS = dict(
 
 BAUD = 106.25e9
 sim = Sim(BAUD)
+# 50 = placeholder effective node impedance (unterminated direct drive, no physical 50 ohm)
 Hmb = sim.one_pole(1 / (2 * np.pi * 50 * ASSUMPTIONS['MICROBUMP_C']))
 FZ = np.arange(10e9, 40e9, 3e9)
 FP = np.arange(45e9, 100e9, 6e9)
@@ -42,8 +44,8 @@ FP = np.arange(45e9, 100e9, 6e9)
 tias = {}
 for k, (f0, inr) in ASSUMPTIONS['TIA_OPTIONS'].items():
     Hb = sim.butter2(f0)
-    tias[k] = dict(H=Hb, inr=inr, BWn=np.trapz(np.abs(Hb) ** 2 / np.abs(Hb[1]) ** 2, sim.freqs),
-                   floor=floor_dbm(inr))
+    # BWn = 1.5x f3dB convention for shot/RIN (not the Butterworth-2 shape integral)
+    tias[k] = dict(H=Hb, inr=inr, BWn=1.5 * f0, floor=floor_dbm(inr))
     print(f"TIA {k}: BWn={tias[k]['BWn']/1e9:.1f} GHz, floor={tias[k]['floor']:.2f} dBm")
 
 txs = {}

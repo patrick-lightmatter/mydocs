@@ -1,9 +1,13 @@
 """
 02 - GEN1 bottom-up OMA-domain link budget at 53.125 GBd NRZ, BER 1e-12 (Q = 7.035).
 
-Produces (OCI-link-budget-bottom-up canvas): penalty stack total 2.87 dB, required OMA at Rx,
-closure margins vs spec Tx cases (spec-min Tx TDEC=1.4 dB -> +0.66 dB margin), assumption
-sensitivity table.
+Produces (OCI-link-budget-bottom-up canvas): penalty stack total, required OMA at Rx,
+closure margins vs spec Tx cases, assumption sensitivity table.
+NOTE: the canvas numbers (stack 2.87 dB, +0.66 dB spec-min margin) were computed with the
+spec's -19 dB end reflectances AND the signal-TF Personick noise bandwidth (28.2 GHz).
+The budget now books -24 dB ends (shared GEN1/GEN2 product line) and BWn = 1.5x f3dB
+(44 GHz) for the shot/RIN/dark terms. Set MPI_REFL_DB=-19 and BWn = sel['BWn_se'] to
+reproduce the canvas.
 
 Methodology: Sackinger/Palermo lecture 4 (Personick sensitivity, power penalties), lecture 7
 (ER/CD), lecture 10 (dual-Dirac jitter), Bhatt/King 802.3bs MPI upper bound.
@@ -32,7 +36,9 @@ ASSUMPTIONS = dict(
     THRESH_OFFSET=0.025,  # decision threshold offset, fraction of swing
     DARK_UA=1.0,          # worst-case dark current
     MPI_D=0.5,            # Bhatt/King discount factor
-    MPI_REFL_DB=-19.0,    # end reflectances (spec)
+    MPI_REFL_DB=-24.0,    # end reflectances: GEN1/GEN2 share the product line, so the
+                          # GEN2-derived <= -24 dB requirement applies to both generations
+                          # (OCI spec only requires -19 dB, which would book 0.51 dB MPI)
     MPI_CONN_DB=-35.0, MPI_NCONN=4,
     IL=2.5,               # link insertion loss dB
 )
@@ -47,7 +53,11 @@ ok = sorted([s for s in settings if s['bw_se'] >= 0.55 * BAUD], key=lambda s: s[
 sel, med, worst = ok[0], ok[len(ok) // 2], ok[-1]
 R = sel['Rpd']
 in_amp = sel['inr']
-BWn = sel['BWn_se']         # p-leg Personick integral (no 60 GHz noise LPF)
+# Noise integration bandwidth for the signal-dependent terms (shot/RIN/dark):
+# 1.5x the circuit's 3 dB bandwidth (single-pole NEB factor pi/2, rounded), NOT the
+# signal-TF Personick integral (28.2 GHz here) - real receiver noise extends beyond
+# f3dB (cf. the f^2 scaling finding in script 04), so the shape integral understates it.
+BWn = 1.5 * sel['bw_se']
 d0 = pd.read_csv(TIA_DIR + f"TT_Tia_TF_{sel['key']}.csv")
 
 OMA_sens_amp = 2 * Q * in_amp / R
@@ -89,7 +99,7 @@ Rc = 10 ** (ASSUMPTIONS['MPI_CONN_DB'] / 10)
 nc = ASSUMPTIONS['MPI_NCONN']
 S = np.sqrt(Rt * Rr) + nc * np.sqrt(Rt * Rc) + nc * np.sqrt(Rr * Rc) + nc * (nc - 1) / 2 * Rc
 x_mpi = ASSUMPTIONS['MPI_D'] * 4 * S * r / (r - 1)
-pen['MPI (Bhatt UB, D=0.5, -19 dB ends)'] = 10 * np.log10(1 / (1 - x_mpi))
+pen[f"MPI (Bhatt UB, D=0.5, {ASSUMPTIONS['MPI_REFL_DB']:.0f} dB ends)"] = 10 * np.log10(1 / (1 - x_mpi))
 
 # ---------------- ISI / CD / jitter via legacy pulse machinery ----------------
 fgrid = d0['ipreal X'].values
@@ -159,7 +169,7 @@ print("\n--- GEN1 PENALTY STACK (dB) ---")
 tot = sum(pen.values())
 for k, v in pen.items():
     print(f"{v:6.3f}  {k}")
-print(f"{tot:6.3f}  TOTAL   (canvas: 2.87)")
+print(f"{tot:6.3f}  TOTAL   (canvas, at -19 dB ends: 2.87)")
 
 req_at_rx = dbm(OMA_sens_amp) + tot
 print(f"\nrequired OMA at Rx = {req_at_rx:.2f} dBm")
@@ -169,7 +179,7 @@ for name, txoma, tdec in [("Spec-min Tx (TDEC=1.4 dB)", -5.5, 1.4),
                           ("Realistic LM Tx", -3.2, 2.0)]:
     margin = (txoma - IL - tdec) - req_at_rx
     print(f"{name}: margin {margin:+.2f} dB")
-print("(canvas: spec-min TDEC=1.4 case -> +0.66 dB)")
+print("(canvas, at -19 dB ends: spec-min TDEC=1.4 case -> +0.66 dB)")
 
 # ---------------- assumption sensitivity ----------------
 print("\n--- assumption sensitivity (vs spec-min TDEC=1.4 base) ---")

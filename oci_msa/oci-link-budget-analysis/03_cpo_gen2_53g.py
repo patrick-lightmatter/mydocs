@@ -4,8 +4,10 @@ correction this is the GEN1-rate CPO baseline on the GEN2 canvas).
 
 Produces (OCI-GEN2-CPO-spec canvas, GEN1 column): pulse cursors h-1=0.128 / h+1=0.229 at the
 typical 12 ps Tx corner, EQ scenario comparison (CTLE-only net 1.86 dB), analog-CDR jitter
-0.73 dB, MPI 0.205 dB at -24 dB ends, stack total 3.90 dB, required OMA -9.03 dBm,
-margin +3.03 dB at Tx OMA -3.5 dBm, TIA qualification (21 settings with >=2 dB margin).
+0.73 dB, MPI 0.205 dB at -24 dB ends, stack total 4.23 dB, required OMA -8.70 dBm,
+margin +2.70 dB at Tx OMA -3.5 dBm, TIA qualification (9 settings with >=2 dB margin).
+NOTE: canvas values (stack 3.90, -9.03, +3.03, 21 settings) predate the BWn = 1.5x f3dB
+convention (ER/shot+RIN carried from script 02 at the old shape-integral BWn).
 
 Inputs: TIA tables (common.TIA_DIR), package s4p counterfactual (common.PKG_DIR).
 """
@@ -21,8 +23,9 @@ ASSUMPTIONS = dict(
     ER_DB=4.5,                     # GEN2 ER target (cuts MPI)
     REFL_DB=-24.0,                 # GEN2 end-reflectance target
     MICROBUMP=[(30e-15, 30e-12), (50e-15, 50e-12)],   # C, L bounds
-    # stack lines carried from script 02 (rate- and architecture-independent here):
-    ER_SHOT=0.11, RIN=0.41, CD=0.01, XTALK=0.36, THRESH=0.21,
+    # stack lines carried from script 02 (rate- and architecture-independent here;
+    # BWn = 1.5x f3dB convention, see script 02):
+    ER_SHOT=0.177, RIN=0.681, CD=0.01, XTALK=0.36, THRESH=0.21,
     FLOOR_DBM=-12.93,              # design point floor from 01/02
     TX_OMA=-3.5,
 )
@@ -44,6 +47,7 @@ for nm, tr in zip(('fast', 'typ', 'max'), ASSUMPTIONS['TX_TR_PS']):
           f"{fp*np.sqrt(np.sqrt(2)-1)/1e9:.1f} GHz")
 
 # microbump + package counterfactual
+# (RC pole at placeholder 50-ohm effective node impedance; unterminated direct drive)
 for C, L in ASSUMPTIONS['MICROBUMP']:
     fres = 1 / (2 * np.pi * np.sqrt(L * C))
     fpole = 1 / (2 * np.pi * 50 * C)
