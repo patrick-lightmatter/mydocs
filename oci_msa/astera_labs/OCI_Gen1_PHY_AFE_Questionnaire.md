@@ -2,7 +2,7 @@
 
 **Purpose:** Collect the electrical PHY and analog-front-end information needed to estimate end-to-end link performance for an OCI Gen1 proposal.
 
-**Interface context:** 53.125 GBd NRZ per optical lane, four wavelengths per 212.5 Gb/s stream, aligned with the 200G OCI Optical PHY Specification v1.0.
+**Interface context:** 53.125 GBd NRZ per optical lane, four wavelengths per 212.5 Gb/s stream, aligned with the *200G Optical Compute Interconnect (OCI) Line Interface Specification, Version 1.0* (March 11, 2026) — referred to below as the OCI MSA.
 
 **Requested from:** Astera Labs  
 **Prepared for:** Bradford / Astera Labs proposal team  
@@ -43,7 +43,7 @@ Unless otherwise stated, requests apply per optical lane at 53.125 GBd NRZ acros
 | ID | Requested information | Response format / conditions | OCI Gen1 reference | Why needed | Priority |
 |---|---|---|---|---|---|
 | A-1 | PHY/AFE block diagram showing the Tx data path, driver, Rx input, TIA, equalizers, samplers/ADC, CDR, adaptation, deskew, and management interfaces | Diagram with integration boundaries and clock domains | 53.125 GBd NRZ, 4λ per 212.5 Gb/s stream | Establishes the model boundary and prevents double-counting functions | P1 |
-| A-2 | Confirm which blocks are integrated and which are external: serializer/deserializer, driver, TIA, PD, modulator, laser, mux/demux, termination, AC coupling, CDR, FEC, and deskew | Integrated / external / optional for each block | OCI PMA includes 4λ deskew and line-side PMA functions | Defines ownership of channel impairments and controls | P1 |
+| A-2 | Confirm which blocks are integrated and which are external: serializer/deserializer, driver, TIA, PD, modulator, laser, mux/demux, termination, AC coupling, CDR, FEC, and deskew | Integrated / external / optional for each block | MSA requires hardware 4λ deskew within the OCI PMA/PMD (§1, §1.1) | Defines ownership of channel impairments and controls | P1 |
 | A-3 | Receiver architecture | Analog slicer, ADC/DSP, or hybrid; sampling rate and ADC resolution if applicable | MSA does not prescribe implementation | Determines applicable noise, equalization, and quantization models | P1 |
 | A-4 | Supported line modes and lane mappings | Baud rate, modulation, wavelength count, aggregate rates, lane remapping options | 53.125 GBd NRZ × 4λ | Confirms that the proposed mode matches the optical interface | P1 |
 | A-5 | Intended optical transmitter/modulator interface | Modulator type; differential/single-ended drive; expected voltage, capacitance, termination, and bias environment | MSA specifies the optical output, not the electrical modulator interface | Driver performance depends strongly on the actual optical load | P1 |
@@ -60,7 +60,7 @@ Unless otherwise stated, requests apply per optical lane at 53.125 GBd NRZ acros
 | ID | Requested information | Response format / conditions | OCI Gen1 reference | Why needed | Priority |
 |---|---|---|---|---|---|
 | TX-1 | Driver topology | Limiting/current-mode/voltage-mode/linear; single-ended or differential; segmented or monolithic | MSA does not prescribe electrical driver topology | Selects the correct transfer-function and distortion model | P1 |
-| TX-2 | Differential output swing and common-mode range | Nom/min/max Vppd and common mode across PVT and legal EQ settings | Optical OMA and ER are specified at TP2 | Connects electrical drive capability to modulator OMA/ER | P1 |
+| TX-2 | Differential output swing and common-mode range | Nom/min/max Vppd and common mode across PVT and legal EQ settings | OMA ≥ max(−5.5, −6.9+TDEC) dBm and ER ≥ 3.5 dB at the Tx optical output (MSA Table 2-2) | Connects electrical drive capability to modulator OMA/ER | P1 |
 | TX-3 | Designed output load | Differential and common-mode R, C, L; state whether load is a terminated line or direct capacitive attachment | MSA does not specify the internal electrical load | The loaded response, not unloaded bandwidth, sets optical edge rate and ISI | P1 |
 | TX-4 | Output impedance and termination assumptions | DC and frequency-dependent differential output impedance; source/back termination; on-die termination range and tolerance | — | Required to combine the driver with package and modulator parasitics | P1 |
 | TX-5 | Interconnect/package assumption between driver and modulator | Trace length/type, bump or wirebond model, S-parameters, insertion/return loss, crosstalk | — | Distinguishes a direct-attach CPO load from a matched electrical channel | P1 |
@@ -145,10 +145,10 @@ Unless otherwise stated, requests apply per optical lane at 53.125 GBd NRZ acros
 | ID | Requested information | Response format / conditions | OCI Gen1 reference | Why needed | Priority |
 |---|---|---|---|---|---|
 | CDR-1 | CDR architecture | Analog/digital, baud/oversampled, phase detector, PI/VCO/DCO, frequency-acquisition path | MSA does not prescribe architecture | Establishes tracking and jitter-generation assumptions | P1 |
-| CDR-2 | Jitter-tolerance mask | SJ amplitude vs frequency; test pattern, BER criterion, stress conditions, and standard used | MSA publishes SEC/SRS but no explicit JTOL table | Needed to verify operation with the expected Tx/channel jitter spectrum | P1 |
-| CDR-3 | Signaling-rate tolerance | Per-end and relative ppm range; acquisition and tracking limits | MSA does not state ppm; CEI context is ±100 ppm | Bounds independent-clock operation | P1 |
+| CDR-2 | Jitter-tolerance mask | SJ amplitude vs frequency; test pattern, BER criterion, stress conditions, and standard used | MSA publishes SEC/SRS but no explicit JTOL table; IEEE P802.3dj Table 179-12 is a published JTOL reference | Needed to verify operation with the expected Tx/channel jitter spectrum | P1 |
+| CDR-3 | Signaling-rate tolerance | Per-end and relative ppm range; acquisition and tracking limits | MSA does not state ppm; IEEE P802.3dj (MSA reference) uses ±50 ppm per end, OIF CEI uses ±100 ppm | Bounds independent-clock operation | P1 |
 | CDR-4 | Loop bandwidth and peaking | Closed-loop bandwidth, damping/jitter peaking, programmable modes | — | Determines tracked vs untracked jitter allocation | P2 |
-| CDR-5 | Lock acquisition | Frequency/phase pull-in range and time; gear-shift behavior; initial conditions | `t_lock` ≤ 50 ms after modulation restoration | Confirms compatibility with link startup timing | P2 |
+| CDR-5 | Lock acquisition | Frequency/phase pull-in range and time; gear-shift behavior; initial conditions | MSA `t_lock`: detect restoration of modulation ≤ 50 ms (§1.1 notes) | Confirms compatibility with link startup timing | P2 |
 | CDR-6 | Loss-of-lock detection | LOL criteria, assert/deassert times, false-lock protection, exposed status | MSA requires LOL indication within 50 ms | Drives relink and fault handling | P2 |
 | CDR-7 | Consecutive-identical-digit behavior | Maximum CID without slip; whether frequency state coasts or holds; include a 72-UI run test if available | OCI training uses repeated `0xCC`; the 72-UI test is an engineering characterization request, not an OCI MSA requirement | Ensures timing remains stable without transitions | P2 |
 | CDR-8 | Pattern-swap continuity | Behavior during training → release → mission change; required freeze/reacquisition actions | Swap must be phase-continuous and not lose far-end lock | Prevents startup-induced burst errors | P2 |
@@ -163,15 +163,16 @@ Unless otherwise stated, requests apply per optical lane at 53.125 GBd NRZ acros
 | ID | Requested information | Response format / conditions | OCI Gen1 reference | Why needed | Priority |
 |---|---|---|---|---|---|
 | BF-1 | PHY operating BER target | Raw/pre-FEC BER target and guaranteed BER floor; pattern and confidence interval | TDEC/SRS use 2.4×10⁻⁴; BER floor ≤ 1×10⁻⁶ | Defines the Q-factor and required sensitivity | P1 |
-| BF-2 | FEC location and type | Internal, host-side, bypassable; code type and thresholds; symbol/lane mapping | OCI interfaces to Ethernet PMA/PCS structures | Prevents inconsistent pre-/post-FEC assumptions | P1 |
-| BF-3 | Error monitoring | PRBS generator/checker support, supported polynomials, raw BER, pre-FEC BER, corrected/uncorrectable counts | OCI VDM includes pre-FEC BER and per-channel PRBS BER | Needed to validate modeled margin on hardware | P2 |
-| BF-4 | Error propagation behavior | DFE burst behavior, CDR-slip impact, lane-error containment | — | Connects physical errors to FEC effectiveness | P3 |
+| BF-2 | Required and expected pre-FEC BER | FEC correction-threshold pre-FEC BER for the supported FEC; expected operating pre-FEC BER at nominal and worst-case Rx OMA; state whether it is measured by FEC tally or PRBS and over what population | MSA compliance points (TDEC, SRS) are defined at pre-FEC BER 2.4×10⁻⁴ | The pre-FEC BER operating point anchors the Q-factor, sensitivity floor, and margin definition of the link estimate | P1 |
+| BF-3 | FEC location and type | Internal, host-side, bypassable; code type and thresholds; symbol/lane mapping | OCI interfaces to Ethernet PMA/PCS structures | Prevents inconsistent pre-/post-FEC assumptions | P1 |
+| BF-4 | Error monitoring | PRBS generator/checker support, supported polynomials, raw BER, pre-FEC BER, corrected/uncorrectable counts | OCI VDM includes pre-FEC BER, per-channel PRBS checker BER, and per-channel MPI metrics | Needed to validate modeled margin on hardware | P2 |
+| BF-5 | Error propagation behavior | DFE burst behavior, CDR-slip impact, lane-error containment | — | Connects physical errors to FEC effectiveness | P3 |
 
 ### 7.2 OCI MSA protocol and management
 
 | ID | Requested information | Response format / conditions | OCI Gen1 reference | Why needed | Priority |
 |---|---|---|---|---|---|
-| PM-1 | OCI MSA v1.0 compliance statement | Supported, partially supported, or external; list deviations | 200G OCI Optical PHY Specification v1.0 | Identifies functions that the proposal must supply elsewhere | P1 |
+| PM-1 | OCI MSA v1.0 compliance statement | Supported, partially supported, or external; list deviations | *200G OCI Line Interface Specification, Version 1.0* (March 11, 2026) | Identifies functions that the proposal must supply elsewhere | P1 |
 | PM-2 | Training and release pattern support | Generation/detection, channel-ID fields, timing, programmability | 160-bit patterns; training ≥ 285 ms; release ≥ 200 ms | Required for OCI link initialization | P1 |
 | PM-3 | Four-wavelength deskew | Range, resolution, buffering, acquisition time, tracking, error flags | Compensate 0–7 UI relative skew | Confirms line-side lane alignment capability | P1 |
 | PM-4 | Pattern detection robustness | Supported BER during detection, false-detect behavior, MPI sensitivity | Pattern detect functional at BER ≤ 1×10⁻⁴ | Determines startup robustness under a stressed optical link | P2 |
@@ -197,14 +198,14 @@ Unless otherwise stated, requests apply per optical lane at 53.125 GBd NRZ acros
 
 ## 9. Feature and diagnostic capability checklist
 
-For each feature below, please answer supported / not supported / roadmap, and describe the capability where supported. This section expands on the telemetry items referenced in EQ-8, BF-3, and PM-8; cross-reference those answers rather than repeating them where convenient.
+For each feature below, please answer supported / not supported / roadmap, and describe the capability where supported. This section expands on the telemetry items referenced in EQ-8, BF-4, and PM-8; cross-reference those answers rather than repeating them where convenient.
 
 | ID | Feature | If supported, please describe | Why needed | Priority |
 |---|---|---|---|---|
 | FT-1 | Rx eye monitor / on-chip eye scan | 1D (timing or voltage bathtub) vs full 2D eye capture; resolution in UI and mV; capture depth; whether the scan is non-destructive on live mission traffic or requires a dedicated sampler | Primary tool for correlating measured eye margin against the link estimate without external instrumentation | P1 |
 | FT-2 | BER margining | Horizontal/vertical decision-point offset sweeps with live BER readout; step sizes; automation support | Converts eye-monitor data into quantified margin at the operating BER | P1 |
-| FT-3 | Loopback modes | Host-side (shallow/deep), line-side, and per-block loopbacks; supported rates and any signal-path differences vs mission mode | Isolates Tx, Rx, and channel contributions during bring-up and fault isolation | P1 |
-| FT-4 | Pattern generation and checking | Per-lane PRBS generators/checkers (polynomials per BF-3), fixed and user-defined patterns, OCI training/release pattern generation, error injection | Enables lane-level BER validation independent of host traffic | P2 |
+| FT-3 | Loopback modes | Host-side (shallow/deep), line-side, and per-block loopbacks; supported rates and any signal-path differences vs mission mode | Isolates Tx, Rx, and channel contributions during bring-up; the OCI MSA explicitly encourages electrical and optical loopback modes and MPI detection for debug and self-test (§3) | P1 |
+| FT-4 | Pattern generation and checking | Per-lane PRBS generators/checkers (polynomials per BF-4), fixed and user-defined patterns, OCI training/release pattern generation, error injection | Enables lane-level BER validation independent of host traffic | P2 |
 | FT-5 | Adaptation-state and AFE telemetry readback | EQ tap/CTLE/AGC/offset code readback, CDR phase/frequency state, signal-level (RSSI-like) indicators, convergence/rail flags | Confirms the AFE is operating where the link model assumes; flags marginal convergence | P2 |
 | FT-6 | Eye/link health monitoring during mission traffic | Background eye-opening metric, pre-FEC BER trend, alarm thresholds and interrupts | Supports in-service monitoring and degradation detection | P2 |
 | FT-7 | Lane-level controls | Per-lane enable/power-down, polarity inversion, lane swap/remap (see PM-7), independent rate/EQ settings | Simplifies board routing and partial-lane debug | P2 |
@@ -244,7 +245,7 @@ If a full response is not immediately available, the following subset is suffici
 2. Driver swing, intended electrical load/termination, loaded edge rate, Tx EQ, and jitter (**TX-2 through TX-6, TXE-1 through TXE-3, TXJ-1 through TXJ-3**).
 3. TIA input capacitance assumption, transimpedance, complex frequency response, and input-referred noise with integration limits (**RX-2, RX-3, RX-5 through RX-7, RXN-1/RXN-2**).
 4. Receiver CTLE/FFE/DFE capability (**EQ-1 through EQ-4**).
-5. Raw/pre-FEC BER target and FEC placement (**BF-1/BF-2**).
+5. Raw/pre-FEC BER target, pre-FEC BER operating point, and FEC placement (**BF-1 through BF-3**).
 6. Signaling-rate tolerance and available JTOL information (**CDR-2/CDR-3**).
 7. TIA transfer/noise files and driver loaded waveforms (**D-2 through D-7**).
 
