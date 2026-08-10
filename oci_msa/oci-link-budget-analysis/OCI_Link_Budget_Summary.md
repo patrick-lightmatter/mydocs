@@ -61,6 +61,9 @@ generations; GEN1 books 0.24 dB, GEN2 0.205 dB).
 
 ![GEN2 budget waterfall](./fig_waterfall.png)
 
+*Penalties stack on the receiver floor (−11.41) to give the required OMA (−7.34); the
+delivered OMA (−6.00) sits above it, and the gap is the +1.34 dB margin.*
+
 | Penalty | GEN1-CPO @ 53 GBd | GEN2 @ 106 GBd |
 |---|---:|---:|
 | ER/shot + RIN | 0.86 | 1.16 |
@@ -118,7 +121,11 @@ channel and costs 0.27 dB of slice-DCD jitter.
 
 ## 6. Margin sensitivity
 
-![GEN2 margin sensitivity tornado](./fig_tornado.png)
+![GEN2 margin sensitivity](./fig_tornado.png)
+
+*Each bar starts at the +1.34 dB baseline (the waterfall margin) and ends at the
+margin that results if that one lever moves, all else unchanged; the label is the
+resulting margin. All levers stay right of 0 dB — no single slip breaks the link.*
 
 PD capacitance (30–40 fF assumed, unmeasured) is not a margin lever but a
 **buildability gate**: 60 fF strands the 4.0 µA TIA noise line.
