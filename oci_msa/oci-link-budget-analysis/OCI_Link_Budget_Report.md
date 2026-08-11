@@ -42,8 +42,7 @@ assumption in §7.
 | DCD | Duty-Cycle Distortion |
 | UI | Unit Interval |
 | PD | Photodiode |
-| MRM | Micro-Ring Modulator |
-| MRR | Micro-Ring Resonator |
+| MRM | Micro-Ring Modulator; sole acronym for ring resonators in this report |
 | EIC / PIC | Electronic / Photonic Integrated Circuit |
 | ELS | External Laser Source |
 | SerDes | Serializer/Deserializer |
@@ -339,7 +338,7 @@ on a 32×-oversampled grid ($N = 8192$):
 | ISI + EQ | §2.4/§2.5 net of noise enhancement and de-emphasis | per scenario |
 | CD | pulse-sim delta at ±1.7/−0.9 ps/nm | GEN1 0.005 → book 0.01; GEN2 sim 0.015 → book 0.04 (scales ≈ baud²) |
 | Jitter | dual-Dirac: $TJ = DJ + 2Q\sigma_{RJ}$; penalty from the equalized eye re-evaluated at $\pm TJ/2$; a closed eye at the offset ⇒ scenario does not close (no finite penalty is booked) | GEN1: RJ 0.010 UI rms, DJ 0.10 UI → TJ 0.241 UI (4.5 ps) → 0.61 dB. GEN2: RJ 0.015 UI (141 fs), DJ 0.14 UI → TJ 0.351 UI (3.30 ps) → 0.95 dB |
-| Inter-channel crosstalk | $-10\log_{10}(1-2\varepsilon)$, $\varepsilon = n_{adj}10^{-\mathrm{iso}/10}10^{\Delta\mathrm{OMA}/10}$ | MRR demux isolation 20 dB (assumed), 2 neighbors, +3 dB aggressor ΔOMA → 0.36 dB |
+| Inter-channel crosstalk | $-10\log_{10}(1-2\varepsilon)$, $\varepsilon = n_{adj}10^{-\mathrm{iso}/10}10^{\Delta\mathrm{OMA}/10}$ | MRM demux isolation 20 dB (assumed), 2 neighbors, +3 dB aggressor ΔOMA → 0.36 dB |
 | Threshold offset | $10\log_{10}(1+2\delta)$ | $\delta = 2.5\%$ of swing → 0.21 dB |
 | Dark current | $10\log_{10}\sqrt{1 + 2qI_{DK}B_n/i_n^2}$ | 1 µA → 0.003 dB |
 
@@ -682,7 +681,7 @@ number, use the measured large-swing edge (each +0.15 UI of transition costs
 | 5 | RIN$_{\mathrm{OMA}}$ | −138 dB/Hz | spec (@ 21.4 dB ORL) | −144 (ELS-only): GEN1 RIN line 0.68 → 0.16 dB (margin +1.13 at spec-min) |
 | 6 | GEN1 jitter | RJ 0.010 UI rms, DJ 0.10 UI | assumed (DSP-SerDes class) | jitter line 0.61 dB |
 | 7 | GEN2 jitter | RJ 0.015 UI = 141 fs, DJ 0.14 UI (incl. 0.05 slice DCD) | assumed; 113 fs judged beyond analog-CDR SOA | jitter line 0.95 dB; no-FIR credits DJ→0.11 (worth 0.27 dB) |
-| 8 | Crosstalk isolation | 20 dB adjacent, 2 neighbors, +3 dB ΔOMA | assumed (MRR demux) | 0.36 dB line; 17 dB iso ≈ +0.4 dB |
+| 8 | Crosstalk isolation | 20 dB adjacent, 2 neighbors, +3 dB ΔOMA | assumed (MRM demux) | 0.36 dB line; 17 dB iso ≈ +0.4 dB |
 | 9 | Threshold offset | 2.5 % of swing | assumed (offset cal) | 0.21 dB line |
 | 10 | Dark current | 1 µA | assumed worst case | negligible |
 | 11 | MPI discount $D$ | 0.5 | Bhatt/King | $D=1$: GEN1 MPI 0.24→0.49 dB |
