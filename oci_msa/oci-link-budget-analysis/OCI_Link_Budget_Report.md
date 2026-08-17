@@ -1,12 +1,11 @@
-# OCI Optical Link Budget — GEN1 (53.125 GBd) and GEN2 (106.25 GBd CPO) Unified Engineering Report
+# OCI Optical Link Budget — GEN1 (53.125 GBd) and GEN2 (106.25 GBd) Unified Engineering Report
 
 **Scope.** Bottom-up, OMA-domain link budgets per DWDM channel for the 200G OCI line
 interface at an internal pre-FEC BER target of $10^{-12}$ ($Q = 7.035$), covering the
-GEN1 MSA-rate link (53.125 GBd NRZ) and the GEN2 co-packaged-optics (CPO) link
-(106.25 GBd NRZ, analog SerDes, CTLE-only receiver). The document unifies four analysis
-canvases and details the methodology and calculations behind every result. All numbers
-trace to the runnable scripts in this folder (`01`–`06`, see Appendix A) or to a labeled
-assumption in §7.
+GEN1 MSA-rate link (53.125 GBd NRZ) and the GEN2 link
+(106.25 GBd NRZ, analog SerDes, CTLE-only receiver). The document details the
+methodology and calculations behind every result. All numbers trace to the runnable
+scripts in this folder (`01`–`06`, see Appendix A) or to a labeled assumption in §7.
 
 ---
 
@@ -20,7 +19,6 @@ assumption in §7.
 | MSA | Multi-Source Agreement |
 | GBd | Gigabaud |
 | NRZ | Non-Return-to-Zero |
-| CPO | Co-Packaged Optics |
 | BER | Bit Error Rate |
 | FEC / KP4 | Forward Error Correction / the RS(544,514) code used at 100–200G |
 | OMA | Optical Modulation Amplitude |
@@ -125,7 +123,7 @@ became a headline spec line.
 | Closure vs. realistic transmitter (−3.2 dBm OMA, TDEC ≈ 2 dB) | **+2.30 dB** | [C.4](Methodology_Provenance.md#c4-gen1-closure-margins) |
 | Spec finding | At the spec's −19 dB end reflectances the derived MPI penalty would be 0.51 dB — 2.5× the MSA's 0.2 dB allocation. Meeting ~0.2 dB requires **≤ −24 dB** ends. Because GEN1 and GEN2 share the product line, the ≤ −24 dB requirement is enforced for both generations, ensuring the ~0.2 dB MPI line by construction (GEN1 books 0.24 dB, §3.3) | [C.5](Methodology_Provenance.md#c5-mpi-reflectance-finding) |
 
-**GEN2 (106.25 GBd NRZ, CPO).**
+**GEN2 (106.25 GBd NRZ).**
 
 | Item | Value | Calculation |
 |---|---|---|
@@ -388,6 +386,22 @@ simulated waterfall crosses BER $10^{-12}$ at −11.8 dBm OMA — between our an
 floor (−12.93) and full required OMA (−10.00), consistent with a simulation that
 includes ISI/jitter but not MPI/crosstalk stresses.
 
+**Receiver-side spec compliance.** The same receiver and penalty stack, re-evaluated
+at the spec's own compliance points (shot/RIN/jitter re-solved at the spec Q;
+MPI/ISI/crosstalk/threshold unchanged), clears every Table 2-3 limit with several dB
+to spare:
+
+| Spec point (BER $2.4\times10^{-4}$ unless noted) | Limit | This receiver | Margin |
+|---|---:|---:|---:|
+| RxSens, unstressed (crosstalk line conservatively retained) | −8.2 dBm | −13.9 dBm | 5.7 dB |
+| SRS (SEC 3.4 dB stress + aggressors at −3.2 dBm) | −6.2 dBm | −10.5 dBm | 4.3 dB |
+| BER floor at min test OMA −6.2 dBm (ref-Tx TDEC 2 dB, $Q = 4.75$) | $\le 10^{-6}$ | required −10.4 dBm; RIN-limited floor $\sim 10^{-48}$ | 4.2 dB |
+
+The one input where the budget is tighter than the spec is end reflectance (≤ −24 dB
+adopted vs the spec's −19 dB, §3.3); even at the spec's −19 dB the internal $10^{-12}$
+closure stays positive at +0.33 dB (§3.4), so the requirement protects the ~0.2 dB MPI
+line, not the link's ability to close.
+
 ### 3.3 IEEE Clause 181 cross-check and the MPI finding
 
 Our 2.93 dB stack sits 1.0 dB under Clause 181's 3.9 dB allocation — expected, since
@@ -422,7 +436,7 @@ is framed as deriving the receiver class the doubled rate requires.
 
 ---
 
-## 4. GEN2 CPO architecture and rate scaling — 106.25 GBd NRZ (scripts `03`, `04`)
+## 4. GEN2 architecture and rate scaling — 106.25 GBd NRZ (scripts `03`, `04`)
 
 ### 4.1 Architecture
 
@@ -453,7 +467,7 @@ undelayed, once-delayed, and twice-delayed nodes respectively and summed at the 
 node — this is the analog FIR — through an EIC–PIC microbump to the MRM (the laser
 feeds the MRM directly), mux → 500 m fiber → demux, PD, second microbump, TIA inside
 the SerDes Rx AFE. **Rx EQ is CTLE only; DFE is
-not supported.** CPO eliminates the package trace channel (1.61/0.72 dB differential IL
+not supported.** GEN2 eliminates the package trace channel (1.61/0.72 dB differential IL
 at the new Nyquist, plus its reflections) and replaces it with a microbump parasitic.
 The bump is an unterminated direct connection — extra load capacitance, not a matched
 interface. Booked as a single 127 GHz pole at 25 fF (§2.4): 0.70 dB droop at 53.1 GHz,
@@ -506,7 +520,7 @@ $$\mathrm{OMA_{floor}} = \frac{2 \times 7.035 \times 4.5\ \mu\mathrm{A}}{0.876} 
 Penalty stack (typical Tx 0.45 UI, 25 fF bump in chain, optimal CTLE
 $z = 37$ GHz / $p = 62$ GHz, noise enhancement ×0.99):
 
-| Line | GEN1 CPO @ 53 GBd | GEN2 @ 106 GBd | Driver |
+| Line | GEN1-rate @ 53 GBd | GEN2 @ 106 GBd | Driver |
 |---|---:|---:|---|
 | ER/shot + RIN (Q-solve) | 0.86 | 1.16 | $B_n$ 43.9 → 87 GHz (1.5× $f_{3\mathrm{dB}}$) |
 | MPI | 0.21 | 0.21 | rate-independent; −24 dB ends, ER 4.5 |
@@ -750,7 +764,7 @@ buildability gate. This ranking is where validation effort should go first.
    line can be treated as final.
 
 **Next experiments — the kill-or-confirm set.** The architecture claim reduces to a
-finite, measurable list: *106.25 GBd NRZ CPO is feasible provided the TIA achieves the
+finite, measurable list: *106.25 GBd NRZ GEN2 is feasible provided the TIA achieves the
 derived noise/BW/phase class, PD capacitance stays in the assumed range, the MRM
 introduces no problematic peaking, and the clock/CDR approaches the RJ target.* The
 remaining work is predominantly characterization, not further model iteration — these
@@ -776,7 +790,7 @@ four experiments retire the Low-confidence rows of the §1 status table:
    demonstrated one.
 
 If all four land inside the assumptions register, the budget has done its job: it has
-converted "can 106G CPO NRZ work?" into a finite set of measurable component
+converted "can 106G GEN2 NRZ work?" into a finite set of measurable component
 requirements, per the §1 bottom line.
 
 ---
@@ -785,43 +799,33 @@ requirements, per the §1 bottom line.
 
 ### Script-to-result map
 
-| Result | Script | Canvas |
+| Result | Script | Report section |
 |---|---|---|
-| 152-setting survey; GEN1 design point (3.17 µA / 29.3 GHz); floor −12.93 dBm | `01_tia_survey.py` | bottom-up §1 |
-| GEN1 stack 2.93 dB; required −10.00 dBm; +0.60 / +2.30 dB; sensitivity table | `02_bottom_up_budget_53g.py` | bottom-up §2–5 |
-| 53 GBd CPO: Tx corners, EQ scenarios (CTLE-only 1.86 dB), stack 4.23, +2.70 dB; microbump/package | `03_cpo_gen2_53g.py` | GEN2 spec, GEN1 column |
-| Noise scaling regression (R² 0.87 vs 0.59); scaled floors −10.60/−5.63; target floor −11.41; ISI+EQ 0.82/1.15/1.70; jitter 0.95; stacks 3.74/4.07/4.62 → +1.67/+1.34/+0.79; required 4.03 µA; TDEC proxy | `04_gen2_106g_feasibility.py` | GEN2 spec §2–6 |
-| BW window plateau −8.3/−8.4 dBm; noise-shape ≤ 0 dB; peaking/GD sweeps; 12.45 ps ripple → $h_{-1}$ 0.477; $Z_T$ ≥ 57 dBΩ; 162–696 µApp / 731 µA; 1.34 MHz; `verify_tia()` | `05_tia_requirements.py` | GEN2 spec §7 |
-| 24-cell margin matrix; FIR isolation (0.27 dB); MRM sweep; A/B crossover 3.6 µA | `06_device_tradeoffs.py` | device trade-offs |
+| 152-setting survey; GEN1 design point (3.17 µA / 29.3 GHz); floor −12.93 dBm | `01_tia_survey.py` | §3 |
+| GEN1 stack 2.93 dB; required −10.00 dBm; +0.60 / +2.30 dB; sensitivity table | `02_bottom_up_budget_53g.py` | §3 |
+| 53 GBd baseline: Tx corners, EQ scenarios (CTLE-only 1.86 dB), stack 4.23, +2.70 dB; microbump/package | `03_cpo_gen2_53g.py` | §4 |
+| Noise scaling regression (R² 0.87 vs 0.59); scaled floors −10.60/−5.63; target floor −11.41; ISI+EQ 0.82/1.15/1.70; jitter 0.95; stacks 3.74/4.07/4.62 → +1.67/+1.34/+0.79; required 4.03 µA; TDEC proxy | `04_gen2_106g_feasibility.py` | §4 |
+| BW window plateau −8.3/−8.4 dBm; noise-shape ≤ 0 dB; peaking/GD sweeps; 12.45 ps ripple → $h_{-1}$ 0.477; $Z_T$ ≥ 57 dBΩ; 162–696 µApp / 731 µA; 1.34 MHz; `verify_tia()` | `05_tia_requirements.py` | §5 |
+| 24-cell margin matrix; FIR isolation (0.27 dB); MRM sweep; A/B crossover 3.6 µA | `06_device_tradeoffs.py` | §6 |
 
-### Canvas cross-reference
+Reproduction status: script outputs match the report numbers within ±0.01 dB rounding,
+but the report has since adopted two deliberate accounting changes that differ from
+earlier script defaults:
 
-- `canvases/200G-OCI-link-budget.canvas.tsx` — spec-side framing: TDEC-coupled OMA law,
-  SRS closure-by-construction, Q table, IEEE parameter table (below), COUPE waterfall
-  cross-check.
-- `canvases/OCI-link-budget-bottom-up.canvas.tsx` — GEN1 bottom-up budget (§3 here).
-- `canvases/OCI-GEN2-CPO-spec.canvas.tsx` — GEN2 budget, proposed spec, TIA
-  requirements (§4–5 here).
-- `canvases/OCI-GEN2-device-tradeoffs.canvas.tsx` — device trade study (§6 here).
-
-Reproduction status: canvas numbers reproduced exactly or within ±0.01 dB rounding at
-the time the canvases were made, but the report has since adopted two deliberate
-accounting changes the canvases do not carry:
-
-1. **End reflectance −24 dB for GEN1** (shared GEN1/GEN2 product line, §3.3) — the
-   bottom-up canvas's 2.87 dB / +0.66 dB used the spec's −19 dB. Script `02`
-   reproduces the canvas with `MPI_REFL_DB=-19`.
+1. **End reflectance −24 dB for GEN1** (shared GEN1/GEN2 product line, §3.3) — an
+   earlier run with the spec's −19 dB gave stack 2.87 dB / margin +0.66 dB. Script `02`
+   can reproduce that case with `MPI_REFL_DB=-19`.
 2. **Noise integration bandwidth $B_n = 1.5 \times f_{3\mathrm{dB}}$** (§2.3, register
-   row 23) — the canvases used signal-TF shape integrals (GEN1 28.2 GHz, GEN2 64 GHz),
-   giving GEN1 shot/RIN 0.11/0.41 (now 0.18/0.68), GEN2 RIN+shot 0.82 (now 1.16),
-   GEN2 margins +2.00/+1.67/+1.12 (now +1.67/+1.34/+0.79), and the noise ceiling
-   4.37 µA / 17 pA/√Hz (now 4.03 µA / 13.6 pA/√Hz). Scripts reproduce the canvases by
-   reverting the `BWn`/`BN_T` lines to the shape integrals (see script comments).
+   row 23) — an earlier convention used signal-TF shape integrals (GEN1 28.2 GHz, GEN2
+   64 GHz), giving GEN1 shot/RIN 0.11/0.41 (now 0.18/0.68), GEN2 RIN+shot 0.82 (now
+   1.16), GEN2 margins +2.00/+1.67/+1.12 (now +1.67/+1.34/+0.79), and the noise ceiling
+   4.37 µA / 17 pA/√Hz (now 4.03 µA / 13.6 pA/√Hz). Scripts can reproduce the earlier
+   convention by reverting the `BWn`/`BN_T` lines to the shape integrals (see script
+   comments).
 
-One accounting footnote: the spec canvas's "$i_n \le 4.4\ \mu$A → +2 dB margin" was
-additionally derived before the 25 fF microbump was charged to the ISI line; the
-current equivalents are 4.03 µA pre-bump / 3.83 µA with the bump charged. Script `04`
-prints both accountings.
+One accounting footnote: an earlier derivation of "$i_n \le 4.4\ \mu$A → +2 dB margin"
+predated charging the 25 fF microbump to the ISI line; the current equivalents are
+4.03 µA pre-bump / 3.83 µA with the bump charged. Script `04` prints both accountings.
 
 ### OCI MSA vs IEEE P802.3dj (D1.3) parameter table
 
@@ -870,7 +874,7 @@ prints both accountings.
   (complex single-ended p/n-leg transfer functions and the PD column, 0–67 GHz).
 - Tx driver class: `LM-link-vpiphotonics/Caribou/COUPE_models/DWDM_TxDrv/DWDM_COUPE_TxDrv.vtmg_pack/Inputs/Typ_Txdrv_NL.csv`
   (~1.2 V$_{\mathrm{ppd}}$ swing class; used to ground the realistic-Tx OMA case).
-- Package traces (the channel CPO eliminates): `Caribou_EOE/Package/TL_TX_64G.s4p`,
+- Package traces (absent in GEN2): `Caribou_EOE/Package/TL_TX_64G.s4p`,
   `TL_RX_64G.s4p` (differential S21: 1.31/0.55 dB IL at 26.6 GHz; 1.61/0.72 dB at 53.1 GHz).
 - GEN2 architecture block diagram: `OCI-GEN2_Simplified.png` (copied into this folder
   from `mydocs/oci_msa/OCI-GEN2 Simplified.png`; reproduced in §4.1). Cascaded 2×

@@ -3,7 +3,7 @@
 **Project:** OCI-Gen2 — 106.25G NRZ co-packaged optical transceiver  
 **Governing MSA (Gen1):** [200G OCI Optical PHY Specification v1.0](./200G-OCI-Optical-Phy-Specification-v1.0.pdf) (March 11, 2026)  
 **Local standards used for cross-check:** [`../standards/`](../standards/) — IEEE P802.3dj/D1.3, OIF CEI-05.2  
-**Related:** [CDR_Standards_Traceability.md](./CDR_Standards_Traceability.md) (CDR bandwidth / ppm derivations)
+**Related:** [CDR_Standards_Traceability.md](./CDR_Standards_Traceability.md) (CDR bandwidth / ppm derivations); [gen1_evk_compliance_matrix.md](./gen1_evk_compliance_matrix.md) (GEN1 EVK test-plan mapping of every row below to a measurement method and prediction)
 
 ---
 
