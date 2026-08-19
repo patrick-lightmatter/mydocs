@@ -43,9 +43,9 @@ flowchart LR
 
 ### 1-2 Primary goals
 
-1. **Error-free NRZ transport at 106.25 GBd** End to End channel includes: microbump-attached modulator and photodiode, ~0.2 km fibre, no electrical transmission line and hence a near-zero-loss electrical channel. The ISI budget is dominated by the *bandwidths* of the driver, MRM, PD, and TIA rather than by channel loss (see the PMA architecture doc §3-7).
+1. **Error-free NRZ transport at 106.25 GBd** End to End channel includes: microbump-attached modulator and photodiode, ~0.5 km fibre, no electrical transmission line and hence a near-zero-loss electrical channel. The ISI budget is dominated by the *bandwidths* of the driver, MRM, PD, and TIA rather than by channel loss (see the PMA architecture doc §3-7).
 2. **Baud-rate receive path**: a data slicer plus two error slicers feed integer digital loops. All equalization is linear (CTLE only — no DFE, no FFE taps in this architecture).
-3. **Hardware-faithful digital control**: every adaptation loop and the CDR are specified as integer truth-table / accumulator machines (vote → scale → accumulate → DAC) that translate directly to Verilog; truth tables, filter equations, and DAC code ranges in this document are the source of truth.
+3. **Hardware-faithful digital control**: every adaptation loop and the CDR are specified as integer truth-table / accumulator machines (vote → scale → accumulate → DAC).
 4. **Self-contained bring-up**: all thresholds (Vp), gain (AGC), vertical centering (offset/BLW), equalization (CTLE peaking), and timing (MM CDR) converge from the received data itself, with a defined nesting hierarchy (Section 7-10).
 
 ### 1-3 Target performance metrics
@@ -66,7 +66,6 @@ flowchart LR
 | CDR frequency tolerance, design target | ±200 ppm (2× margin over required) | Frequency register sized to this target: `f_bound = 2^15` (17-bit signed), ±244 ppm capability (§6-6) |
 | CDR closed-loop bandwidth, design target | 4–6 MHz (first-iteration architecture target; final value pending jitter-budget and loop-latency closure) | Jitter-tolerance floor derived from OIF CEI-112G-XSR Table 24-12 and IEEE P802.3dj Tables 179-12 / 182-20 masks (§6-9); latency ceiling from loop-delay budget |
 | Cycle slips in mission mode | Not permitted during tracking | OIF-CEI burst-error limits (error bursts > 7 symbols < 1E-20) forbid slip-induced bursts once mission data delivery has begun |
-| SSC (spread-spectrum clocking) | Not required | Confirmed absent from IEEE P802.3dj and OIF-CEI for these interfaces; the CDR frequency path tracks only static plesiochronous offset and ordinary jitter, not an SSC ramp |
 
 ### 1-4 OCI-MSA alignment
 
@@ -91,13 +90,11 @@ This link is the **106G NRZ** operating point of the OCI-MSA-aligned Gen2 co-pac
 | DAC code | Saturating integer register driving an analog knob (threshold, gain, offset, peaking) |
 | Dead-band | A no-vote region around the loop target — vote 0 while the measured error is inside the band |
 | Decimation | Number of UI averaged into one window measurement before a single vote is taken |
-| CPO | Co-packaged optics |
-| MRM | Microring modulator |
 | BLW | Baseline wander |
 
 ### 2-2 Error slicers vs. data slicers
 
-The sampling front end (`VpAdaptNrz`) has **three comparators**, all clocked at the same data sample phase:
+The sampling front end has **three comparators**, all clocked at the same data sample phase. Each is the same structure: the sample `y(k)` is compared against a threshold voltage.
 
 ```mermaid
 flowchart LR
@@ -108,44 +105,23 @@ flowchart LR
     CMP -.->|observe| ADAPT
 ```
 
-Each comparator is this canonical structure: the sample `y(k)` is compared against a threshold voltage from a **threshold DAC** (`V_th = code · V_LSB`; `V_LSB` is TBD pending slicer-input full-scale). A **digital adaptation loop** (vote → scale → accumulate → DAC, §7-1) drives the DAC code so the threshold tracks its target. The data slicer uses a fixed 0 V threshold after centering; the two error slicers each have their own DAC and Vp loop (§7-3).
-
 | Slicer | Threshold | Output |
 |---|---|---|
 | **Data slicer** | 0 V (after centering) | `d = +1 if y ≥ 0 else −1` |
 | **Top error slicer** | `+Vp_top` | `e₊ = +1 if y > +Vp_top else −1` |
 | **Bottom error slicer** | `−Vp_bot` | `e₋ = +1 if y > −Vp_bot else −1` |
 
-- A **data slicer** decides the transmitted bit: its threshold is the vertical eye center (nominally 0 after offset cancellation).
-- An **error slicer** compares the same sample against an adapted *reference amplitude* rather than against 0; its output is the **sign of the residual** between the sample and the expected rail.
-- **Each error slicer has a dedicated threshold DAC** providing its reference voltage (`VpDac` instances `dac_top` / `dac_bot`, `N_code,vp`-bit at `V_LSB,vp` volts per LSB — `V_LSB,vp` is TBD pending the slicer-input full-scale), and a **control loop manages that voltage**: the Vp_top / Vp_bot median loops of Section 7-3 servo each DAC so its slicer sits at the conditional median of its rail (~50/50 duty for the active polarity).
-- The signed error `e(k)` handed to the MM CDR and the adaptation loops selects the active rail by the data decision:
-
-| `d(k)` | Active error slicer | Sample condition | `e(k)` |
-|---|---|---|---|
-| +1 | top (threshold `+Vp_top`) | `y > +Vp_top` | +1 |
-| +1 | top (threshold `+Vp_top`) | `y ≤ +Vp_top` | −1 |
-| −1 | bottom (threshold `−Vp_bot`) | `y > −Vp_bot` | +1 |
-| −1 | bottom (threshold `−Vp_bot`) | `y ≤ −Vp_bot` | −1 |
-
-Equivalently `e = sign(y − d·Vp_rail)`, with the active rail selected by `d`.
+- A **data slicer** decides the transmitted bit. Its threshold is the vertical eye center (nominally 0 after offset cancellation).
+- An **error slicer** compares the same sample against a *reference amplitude* rather than against 0. Its output is the **sign of the residual** between the sample and that reference rail.
+- The data slicer uses a fixed 0 V threshold. Each error slicer has its own threshold DAC (`V_th = code · V_LSB`; `V_LSB` TBD pending slicer-input full-scale). How those DAC codes are adapted, how `e₊`/`e₋` are combined into the signed `e(k)` used by the CDR and loops, why both rails are instrumented, and how DC offset is removed are specified later (§5, §6, §7-3, §7-5).
 
 ![NRZ eye diagram with data and error slicer levels](./nrz_eye_slicer_levels.png)
 
-*Figure 2-1: NRZ eye with the three slicer levels. The red dashed line is the data slicer at 0 V; the green dashed lines are the two error slicers riding the rail medians at `+Vp_top ≈ +h₀` and `−Vp_bot ≈ −h₀` (§2-3). The vertical grey line is the CDR data sample phase (`h₋₁ = h₊₁`).*
-
-**Why two error slicers.** The MM CDR needs a signed `e(k)` on *every* UI at the data sample phase. A single upper-peak detector cannot see the bottom rail without time-multiplexing and would drop half the votes. Adapting `Vp_top` and `Vp_bot` **separately** means top/bottom asymmetry (e.g. one-sided compression in the optical path) does not bias the MM CDR or the AGC.
-
-**Impact of DC offset on the slicers.** Common DC shifts `y(k)` relative to all three thresholds. With the data slicer fixed at 0 V, offset biases `d` directly; the Vp loops partially absorb it as asymmetric codes (`code_top ≠ code_bot`), corrupting `e(k)` and every downstream loop until nulled. Offset is removed in two layers:
-
-1. **Coarse (TIA-integrated, architecture TBD)**: SE→diff and DCOC at the TIA (§5, 100 kHz corner). In the model: `SeToDiff` running mean (`mean_shift = 10`) — not an implementation.
-2. **Fine, continuous**: Offset/BLW loop (§7-5) drives a common offset DAC from Vp_top vs Vp_bot imbalance.
-
-The exact SE→diff conversion and DCOC architecture at the TIA is not yet determined; this document only levies the loop-interaction requirements above (and in §7-5, §7-8, §7-10) on whatever that block becomes.
+*Figure 2-1: NRZ eye with the three slicer levels. The red dashed line is the data slicer at 0 V; the green dashed lines are the two error slicers at `+Vp_top` and `−Vp_bot`. The vertical grey line is the CDR data sample phase.*
 
 ### 2-3 Channel response: `h_{−1}`, `h_0`, `h_{+1}`
 
-Sample the equalized single-bit (pulse) response at baud spacing, aligned so the largest sample is the **main cursor**:
+Sample the channel impulse response at baud spacing, aligned so the largest sample is the **main cursor**:
 
 | Cursor | Name | Meaning |
 |---|---|---|
@@ -155,7 +131,7 @@ Sample the equalized single-bit (pulse) response at baud spacing, aligned so the
 
 ![Equalized pulse response with baud-spaced cursor samples](./pulse_response_cursors.png)
 
-*Figure 2-2: Equalized single-bit pulse response sampled at baud spacing. `h₀` is the main cursor at the decision instant; `h₋₁` (pre-cursor) and `h₊₁` (post-cursor) sit one UI either side. The dashed level shows the MM CDR lock condition `h₋₁ = h₊₁` (§6-3).*
+*Figure 2-2: Single-bit pulse response sampled at baud spacing. `h₀` is the main cursor at the decision instant; `h₋₁` (pre-cursor) and `h₊₁` (post-cursor) sit one UI either side. The dashed level shows the MM CDR lock condition `h₋₁ = h₊₁` (§6-3).*
 
 
 **Vp and h₀ are the same quantity.** For ±1 NRZ data the ideal received sample is `y(k) = d(k)·h₀ + ISI`; with the CDR locked and the residual ISI nulled, the conditional median of the top (bottom) rail at the data sample phase *is* `+h₀` (`−h₀`). The Vp_top / Vp_bot median loops (§7-3) servo their threshold DACs onto exactly those medians, so the adapted Vp codes are the **digitized readback of the main cursor**: `Vp_top ≈ Vp_bot ≈ h₀` (they differ only by top/bottom asymmetry), and the merged value `(Vp_top + Vp_bot)/2` used by the AGC (§7-4) is the receiver's `|h₀|` estimate — the loop inventory (§7-2) treats the Vp loops as the h₀ digitiser (§7-3) for this reason. Everywhere this document says "amplitude" or "rail", `Vp` and `h₀` may be read interchangeably.
