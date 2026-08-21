@@ -1,4 +1,4 @@
-# L250 PMA Architecture Specification — 106.25 Gbps NRZ Optical Link
+# Gizmo PMA Architecture Specification — 106.25 Gbps NRZ Optical Link
 
 **Electrical PMA + PIC **
 
