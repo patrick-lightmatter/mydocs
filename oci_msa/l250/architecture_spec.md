@@ -11,7 +11,7 @@
 
 Conventions: parameter tables list a **placeholder variable** (the generic fixed-point template name), the **model/RTL name**, and the **default value**. Every dead-band or hysteresis mechanism is flagged with a **Dead-band / hysteresis** callout that states how it is implemented. Voltage-domain LSB sizes at the slicer/DAC interfaces (`V_LSB,vp`, `V_LSB,off`) are **TBD pending the slicer-input full-scale**: no absolute voltage numbers are committed at those interfaces, and quantities derived from them are expressed symbolically. The CTLE peaking range and step (`P_min` = 2.5 dB, `P_step` = 0.5 dB, `N_code,ctle` = 4-bit / 16 codes ⇒ 2.5–10.0 dB) are taken directly from the behavioral model's `CtleAdaptNrz` defaults (§5-1, §7-6) — this is a **simulation-derived working point, not a hardware-signed-off target** (see `simulation_revisit_items.md` for the open realizability question on the peaking topology's outer-pole placement). The AGC/transimpedance gain step (`G_step` = 0.5 dB) similarly has a first-cut hardware target (§5-1), but its code width (`N_code,agc`) is **intentionally left TBD pending the front-end design**; the loop logic (truth tables, dead-bands in normalized units, decimation, shifts) is specified independently of either code width.
 
-**Section outline:** 1. Link Overview · 2. Basic Background & Terminology · 3. TX Electrical Jitter Budget · 4. High-Speed Driver Specification · 5. TIA Specification · 6. Clock and Data Recovery (CDR) · 7. Digital Adaptation Loops · 8. Optical Transmitter & Modulator (MRM) Specification
+**Section outline:** 1. Link Overview · 2. Basic Background & Terminology · 3. TX Electrical Targets at TP1 · 4. High-Speed Driver Specification · 5. TIA Specification · 6. Clock and Data Recovery (CDR) · 7. Digital Adaptation Loops · 8. Optical Transmitter & Modulator (MRM) Specification
 
 ---
 
@@ -57,7 +57,7 @@ flowchart LR
 | UI | ≈ 9.41 ps | 1 / 106.25 GHz |
 | Nyquist | 53.125 GHz | `NYQUIST_HZ = DATA_RATE / 2` |
 | Reference-receiver bandwidth | 53.125 GHz (0.5 × baud, BT4) | Measurement/compliance reference (0.5 × baud rule scaled to 106.25 GBd); anchors the Nyquist-aligned driver/TIA corners (§4, §5) |
-| Raw (uncoded) BER — internal spec | **< 1e-12** | Committed internal target: this link is designed to close a raw BER < 1e-12 at the data slicer, i.e. FEC-free operation, and all eye/jitter/slicer margins (§3-1, §6-9, §2) are budgeted against it |
+| Raw (uncoded) BER — internal spec | **< 1e-12** | Committed internal target: this link is designed to close a raw BER < 1e-12 at the data slicer, i.e. FEC-free operation, and all eye/jitter/slicer margins (§4-4, §4-5, §6-9, §2) are budgeted against it |
 | Pre-FEC BER — standards anchor | 2.4E-4 | Used **only** where standards compliance methodology requires a pre-FEC reference (optical TDEC ≤ 3.4 dB and stressed-receiver SRS at 2.4E-4); it is a measurement anchor, not our operating target — the internal < 1e-12 spec above governs the design |
 | Energy efficiency, TX driver | 0.4 pJ/bit | First-cut analog-driver allocation (PMA architecture doc §3-7). Tallied **separately** from the SerDes power budget; not a partner deliverable |
 | Energy efficiency, RX TIA | 0.4 pJ/bit | First-cut analog-TIA allocation (PMA architecture doc §4-6). Tallied **separately** from the SerDes power budget; not a partner deliverable |
@@ -147,7 +147,7 @@ This link is the **106G NRZ** operating point of the OCI-MSA-aligned Gen2 co-pac
 | SJ | Sinusoidal jitter |
 | SMF | Single-mode fiber |
 | SNDR | Signal-to-noise-and-distortion ratio |
-| SNRISI | Signal-to-residual-ISI ratio (P802.3dj voltage-domain ISI bound, §3-1) |
+| SNRISI | Signal-to-residual-ISI ratio (P802.3dj voltage-domain ISI bound — explained but not adopted, §3-1) |
 | SSPR | Short stress pattern random (IEEE stress test pattern) |
 | TCMT | Temporal coupled-mode theory (MRM behavioral model) |
 | TDEC | Transmitter and dispersion eye closure |
@@ -159,7 +159,7 @@ This link is the **106G NRZ** operating point of the OCI-MSA-aligned Gen2 co-pac
 
 ### 2-2 Error slicers vs. data slicers
 
-The sampling front end has **three comparators**, all clocked at the same data sample phase. Each is the same structure: the sample `y(k)` is compared against a threshold voltage.
+The sampling front end has **three comparators**, all clocked at the same data sample phase. Each is the same structure: the sample `y(k)` is compared against a DAC-programmable threshold voltage.
 
 ```mermaid
 flowchart LR
@@ -172,17 +172,17 @@ flowchart LR
 
 | Slicer | Threshold | Output |
 |---|---|---|
-| **Data slicer** | 0 V (after centering) | `d = +1 if y ≥ 0 else −1` |
-| **Top error slicer** | `+Vp_top` | `e₊ = +1 if y > +Vp_top else −1` |
-| **Bottom error slicer** | `−Vp_bot` | `e₋ = +1 if y > −Vp_bot else −1` |
+| **Data slicer** | `V_th,d` — programmable, nominally mid-scale = 0 V (after centering) | `d = +1 if y ≥ V_th,d else −1` |
+| **Top error slicer** | `+Vp_top` — programmable, adapted (§7-3) | `e₊ = +1 if y > +Vp_top else −1` |
+| **Bottom error slicer** | `−Vp_bot` — programmable, adapted (§7-3) | `e₋ = +1 if y > −Vp_bot else −1` |
 
-- A **data slicer** decides the transmitted bit. Its threshold is the vertical eye center (nominally 0 after offset cancellation).
-- An **error slicer** compares the same sample against a *reference amplitude* rather than against 0. Its output is the **sign of the residual** between the sample and that reference rail.
-- The data slicer uses a fixed 0 V threshold. Each error slicer has its own threshold DAC (`V_th = code · V_LSB`; `V_LSB` TBD pending slicer-input full-scale). How those DAC codes are adapted, how `e₊`/`e₋` are combined into the signed `e(k)` used by the CDR and loops, why both rails are instrumented, and how DC offset is removed are specified later (§5, §6, §7-3, §7-5).
+- A **data slicer** decides the transmitted bit. Its programmable threshold is placed at the vertical eye center (nominally 0, i.e. mid-scale code, after offset cancellation).
+- An **error slicer** compares the same sample against a *reference amplitude* rather than against the eye center. Its output is the **sign of the residual** between the sample and that reference rail.
+- **Every slicer has a programmable threshold**: each of the three comparators has its own threshold DAC (`V_th = code · V_LSB`; `V_LSB` TBD pending slicer-input full-scale). The error-slicer DACs are adapted by the Vp loops (§7-3). The data-slicer DAC is **not** driven by any mission adaptation loop — vertical eye centering is owned by the offset/BLW loop (§7-5), so its code nominally stays at mid-scale (0 V); it is firmware-programmable for margining, diagnostics, and comparator-offset trim. How the error-slicer DAC codes are adapted, how `e₊`/`e₋` are combined into the signed `e(k)` used by the CDR and loops, why both rails are instrumented, and how DC offset is removed are specified later (§5, §6, §7-3, §7-5).
 
 ![NRZ eye diagram with data and error slicer levels](./nrz_eye_slicer_levels.png)
 
-*Figure 2-1: NRZ eye with the three slicer levels. The red dashed line is the data slicer at 0 V; the green dashed lines are the two error slicers at `+Vp_top` and `−Vp_bot`. The vertical grey line is the CDR data sample phase.*
+*Figure 2-1: NRZ eye with the three slicer levels. The red dashed line is the data slicer at its nominal (mid-scale) 0 V threshold; the green dashed lines are the two error slicers at `+Vp_top` and `−Vp_bot`. All three thresholds are DAC-programmable. The vertical grey line is the CDR data sample phase.*
 
 ### 2-3 Channel response: `h_{−1}`, `h_0`, `h_{+1}`
 
@@ -203,40 +203,26 @@ Sample the channel impulse response at baud spacing, aligned so the largest samp
 
 ---
 
-## Section 3: TX Electrical Jitter Budget
+## Section 3: TX Electrical Targets at TP1
 
-### 3-1 TX jitter and DDJ / ISI budget
+### 3-1 TX electrical targets at TP1 (IEEE P802.3dj Table 179-7)
 
-This section budgets electrical jitter at **TP1**, the electrical input to the MRM modulator (§2-1, Figure 3-1). The optical MSA specifies TX quality through the **TDEC** (Transmitter and Dispersion Eye Closure) family (≤ 3.4 dB at pre-FEC BER 2.4E-4; reference receiver = fourth-order Bessel–Thomson (**BT4**) low-pass at 0.5 × baud), but it does not provide the electrical decomposition needed to bind the CMOS driver. At 106.25 GBd, **UI = 9.412 ps**, so sub-picosecond pattern-dependent closure is architecture-significant and must be separated from random and bounded high-probability jitter.
+This section defines the electrical TX signal-quality targets at **TP1**, the electrical input to the MRM modulator (§2-1, Figure 3-1). The optical MSA specifies TX quality through the **TDEC** (Transmitter and Dispersion Eye Closure) family (≤ 3.4 dB at pre-FEC BER 2.4E-4; reference receiver = fourth-order Bessel–Thomson (**BT4**) low-pass at 0.5 × baud), but it does not provide the electrical decomposition needed to bind the CMOS driver. At 106.25 GBd, **UI = 9.412 ps**, so sub-picosecond pattern-dependent closure is architecture-significant and must be separated from random and bounded high-probability jitter.
 
-The deterministic-jitter allocation uses a worst-case additive decomposition:
+**Single normative source — jitter only.** The jitter limits in this section are taken from **IEEE P802.3dj D3.1 (June 2026), Table 179-7** (Clause 179, 200G/lane electrical TX) — the only standard that specifies an electrical lane at exactly our 106.25 GBd, and the standard through which the OCI MSA's normative reference chain runs. Note that the dj 200G/lane electrical clauses are **PAM4** — **no NRZ electrical standard exists at 106.25 GBd, in dj or anywhere else** — so the dj values are used as *exact-baud analogs* (justified in note (a) below). dj characterizes transmitter signal quality through five quantities: three output-jitter parameters (`JHRMS`, `JH4u`, `EOJ03` — 179.9.4.7) plus two amplitude-domain ratios (`SNRISI` — 179.9.4.4; `SNDR` — 179.9.4.6). **This document adopts only the jitter triplet.** The amplitude-domain ratios are intentionally not specified: they are defined through dj's PAM4 linear-fit and equalizer-preset machinery and are not actionable requirements for the engineers consuming this document — residual ISI and distortion are bounded physically instead, through the §4-4 transition-time window and the §4-5 TP1 eye mask. dj also deliberately defines **no** dual-Dirac RJ/DJ split, no `DDJ = DCD + ISI` sub-allocation, no BUJ, and no total-jitter-at-BER metric — see note (b). The internal dual-Dirac TX jitter budget this design needs at the raw-BER 1e-12 operating point is therefore **derived from first principles in the companion document `tx_jitter_budget_derivation.md`** (kept separate for now; to be folded into this spec after review).
 
-$$
-DJ_{\delta\delta} = DDJ + BUJ
-$$
-
-$$
-DDJ = DCD + ISI(t_r,t_f)
-$$
-
-**Two layers of numbers.** The budget table below mixes two kinds of values; keep them apart when reading it:
-
-1. **Governing internal targets** — link-budget-derived, dual-Dirac at the internal raw-BER target $10^{-12}$ ($TJ = DJ_{\delta\delta} + 2\,Q\,\sigma_{RJ}$, $Q = 7.035$; `OCI_Link_Budget_Summary.md` §1, §3, §8). These own the `J_RMS`, $DJ_{\delta\delta}$, and `TJ` rows. They replaced the original CEI-copied values, which §4-5 showed do not close at $10^{-12}$ (0.063 UI over $X_1$). The `DDJ`/`ISI`/`DCD`/`BUJ` rows are a working internal decomposition that no longer sums exactly to the new $DJ_{\delta\delta}$ and needs re-derivation (`TBD_from_link_budget`).
-2. **Standards reference ceilings** — sanity anchors only. The primary anchor is **IEEE P802.3dj**, because the OCI MSA's normative reference chain runs through dj and dj specifies the 200G/lane electrical TX at exactly our 106.25 GBd. Note that the dj 200G/lane electrical clauses are **PAM4** — **no NRZ electrical standard exists at 106.25 GBd, in dj or anywhere else** — so the dj values are used as *exact-baud analogs* (justified in note (a) below). OIF-CEI values are kept only as cross-checks (CEI-112G-XSR is PAM4 at ~56 GBd; CEI-56G-XSR-NRZ is the right modulation but half our baud).
-
-**P802.3dj TX reference ceilings adopted as TP1 design targets** (200G/lane electrical, **D3.1, June 2026**: Table 179-7, p. 427 — these supersede the D1.3 values previously quoted here; D3.1 renamed `JRMS03`/`J4u03` to `JHRMS`/`JH4u`, collapsed the per-host-class J4u values to one number, and added absolute SNDR limits):
+**P802.3dj TX limits adopted as TP1 design targets** (200G/lane electrical, **D3.1, June 2026**: Table 179-7, p. 427 — these supersede the D1.3 values previously quoted here; D3.1 renamed `JRMS03`/`J4u03` to `JHRMS`/`JH4u` and collapsed the per-host-class J4u values to one number):
 
 *dj notation used below.* The **“03” suffix** (`EOJ03`) means the metric is evaluated only on transitions between PAM4 (4-level pulse-amplitude modulation) levels **0 and 3** — the full-swing rising (**R03**) and falling (**F30**) edges, the direct analog of NRZ edges. The **`JH` metrics** (`JHRMS`, `JH4u`) use **multiple transitions between different PAM4 levels**: per transition, the timing spread $\sigma_i$ and signal slope $s_i$ are measured, the polynomial $\sigma_i^2 = a + b/s_i^2 + c/s_i^4$ is fit, and the metric is $\sqrt{a}$ — the extrapolation to infinite slope. This isolates **clock phase-noise jitter** and removes additive-noise leakage (whose loss dependence was why D1.3 carried per-host-class J4u03 values). **TP1** in the table below is the electrical input to the MRM modulator (IEEE optical-PMD convention); the IEEE P802.3dj Table 179-7 values are adopted as design targets at TP1, with verification by simulation, on-die instrumentation, and test-vehicle correlation (note (c) below and Figure 3-1).
 
-| dj metric | Target at TP1 (adopted from Table 179-7) | What it bounds |
-|---|---|---|
-| `JHRMS` | ≤ 0.023 UI rms | RMS clock jitter (slope-extrapolated; additive noise removed) |
-| `EOJ03` | ≤ 0.025 UI pp | Even–odd jitter — the DCD analog |
-| `JH4u` | ≤ 0.118 UI pp | Bounded high-probability clock jitter (all-but-1E-4 interval of the jitter distribution) |
-| `SNRISI` | ≥ 26.7 dB | Signal-to-residual-intersymbol-interference ratio: residual ISI bounded as a **voltage ratio**, not as jitter |
-| `SNDR` | ≥ 33.5 dB at preset 1 (no equalization); 27.5–31 dB at presets 2–6 | Absolute signal-to-noise-and-distortion, per TX-equalizer preset (Table 179-9) — **new in D3.1**; D1.3 had only the relative `dSNDR` ≥ 0 dB |
+| dj metric | dj subclause | Target at TP1 (adopted from Table 179-7) | Abs. @ 9.412 ps UI | What it bounds |
+|---|---|---|---|---|
+| Signaling rate | 179.9.4.1 | 106.25 GBd ± 50 ppm | — | Baud-rate accuracy; consistent with the §1-3 CDR frequency-tolerance rows (±50 ppm per end) |
+| `JHRMS` | 179.9.4.7.1 | ≤ 0.023 UI rms | ≤ 216 fs rms | RMS clock jitter (slope-extrapolated; additive noise removed) |
+| `EOJ03` | 179.9.4.7.3 | ≤ 0.025 UI pp | ≤ 235 fs pp | Even–odd jitter — the DCD analog |
+| `JH4u` | 179.9.4.7.2 | ≤ 0.118 UI pp | ≤ 1.11 ps pp | Bounded high-probability clock jitter (all-but-1E-4 interval of the jitter distribution) |
 
-Three things to know when comparing against these: **(a) the dj values are PAM4 numbers applied to an NRZ system, and the mapping is sound.** `EOJ03` is defined on full-swing edges — the only kind NRZ has — and the `JH` metrics isolate clock phase noise, which is modulation-agnostic: an NRZ TX at the same baud has the same serializer/clock path. **(b) dj books no ISI/DDJ jitter number.** Transition locations and thresholds are chosen to *minimize* the measured jitter, and the `JH` slope extrapolation removes amplitude-noise leakage — pattern-dependent closure is excluded by construction and bounded separately through `SNRISI`. Our `DDJ`/`ISI` rows therefore have no dj counterpart on purpose. **(c) TP1 is the electrical input to the MRM modulator** — the modulator drive terminals where the TX driver output meets the MRM. It is buried inside the package with no physical test access. The link's only accessible compliance points are optical: **TP2** (TX fiber output, MSA TDEC/OMA/ER) and **TP3** (RX fiber input, MSA stressed-receiver spec). The TP1 electrical targets adopted from IEEE P802.3dj Table 179-7 therefore bind *design verification* (simulation, on-die instrumentation, and test-vehicle correlation), not a bench compliance test. Figure 3-1 shows the test-point locations. Measurement conditions: 60 GHz BT4 response, clock-recovery unit (CRU) acting as a 4 MHz / 20 dB-per-decade jitter high-pass, PRBS13Q pattern (the quaternary/PAM4 form of PRBS13).
+Three things to know when comparing against these: **(a) the dj values are PAM4 numbers applied to an NRZ system, and the mapping is sound.** `EOJ03` is defined on full-swing edges — the only kind NRZ has — and the `JH` metrics isolate clock phase noise, which is modulation-agnostic: an NRZ TX at the same baud has the same serializer/clock path. **(b) dj books no ISI/DDJ jitter number.** Transition locations and thresholds are chosen to *minimize* the measured jitter, and the `JH` slope extrapolation removes amplitude-noise leakage — pattern-dependent closure is excluded by construction and pushed into `SNRISI`, a voltage-domain ratio this document intentionally does not adopt. Any DDJ/ISI-style jitter allocation therefore has no dj counterpart by design; the internal allocations are derived from first principles in `tx_jitter_budget_derivation.md` and enforced physically through the §4-4 transition-time window and §4-5 eye mask. **(c) TP1 is the electrical input to the MRM modulator** — the modulator drive terminals where the TX driver output meets the MRM. It is buried inside the package with no physical test access. The link's only accessible compliance points are optical: **TP2** (TX fiber output, MSA TDEC/OMA/ER) and **TP3** (RX fiber input, MSA stressed-receiver spec). The TP1 electrical targets adopted from IEEE P802.3dj Table 179-7 therefore bind *design verification* (simulation, on-die instrumentation, and test-vehicle correlation), not a bench compliance test. Figure 3-1 shows the test-point locations. Measurement conditions (179.9.4): fourth-order Bessel–Thomson response with 60 GHz 3 dB bandwidth, AC-coupled into 50 Ω single-ended loads; clock-recovery unit (CRU) acting as a 4 MHz / 20 dB-per-decade jitter high-pass; PRBS13Q pattern (the quaternary/PAM4 form of PRBS13; the jitter parameters may alternatively use PRBS9Q per 179.9.4.7).
 
 ```mermaid
 flowchart LR
@@ -263,27 +249,17 @@ flowchart LR
   style NTP2 fill:#f8f8f8,stroke-dasharray: 3 3
 ```
 
-*Figure 3-1: Transmit-direction test points in this CPO architecture. **TP1** is the electrical input to the MRM modulator (the modulator drive terminals) where all TX electrical requirements (§3 jitter budget, §4 driver specs) are defined; it is buried inside the package with no physical test access and is verified by simulation, on-die instrumentation, and test-vehicle correlation. **TP2** is the optical fiber output, the link's only accessible TX compliance point (IEEE optical-PMD convention), where the OCI MSA binds TDEC/OMA/ER (its RX counterpart TP3 appears in the MSA stressed-receiver spec).*
+*Figure 3-1: Transmit-direction test points in this CPO architecture. **TP1** is the electrical input to the MRM modulator (the modulator drive terminals) where all TX electrical requirements (§3 TP1 targets, §4 driver specs) are defined; it is buried inside the package with no physical test access and is verified by simulation, on-die instrumentation, and test-vehicle correlation. **TP2** is the optical fiber output, the link's only accessible TX compliance point (IEEE optical-PMD convention), where the OCI MSA binds TDEC/OMA/ER (its RX counterpart TP3 appears in the MSA stressed-receiver spec).*
 
-| Component | Symbol | Target / Default | Abs. @ 9.412 ps UI | Notes / Basis |
-|---|---|---|---|---|
-| RMS random jitter | `J_RMS` | ≤ 0.0150 UI rms | ≤ 141 fs rms | **Link-budget target**, tighter than the dj `JHRMS` ceiling above (a clock-jitter-only metric, the closest standards analog of our σ_RJ; CEI-112G-XSR's JRMS of 0.0224 UI rms also includes bounded jitter): analog-CDR state-of-the-art assumption needed to close BER = $10^{-12}$; a 0.0180 UI rms (169 fs) fallback is modeled and costs an additional 0.19 dB of link margin (`OCI_Link_Budget_Summary.md` §8; **low confidence** — kill-or-confirm item §9). |
-| Global deterministic jitter | $DJ_{\delta\delta}$ | ≤ 0.140 UIpp | ≤ 1.32 ps pp | **Link-budget target**, superseding the earlier 0.096 UIpp CEI envelope: FIR-retained baseline (includes ≈0.05 UI of FIR slice-DAC duty-cycle distortion). The recommended **no-FIR** driver architecture (§4) credits this down to ≤ 0.11 UIpp (≤ 1.04 ps pp), worth 0.27 dB of link margin (`OCI_Link_Budget_Summary.md` §5, §8). |
-| Data Dependent Jitter | `DDJ` | ≤ 0.060 UIpp | ≤ 0.565 ps pp | Internal sub-allocation (originally CEI-derived; no dj counterpart — see note (b) above); total pattern-dependent timing jitter evaluated using PRBS13 and PRBS31; `DDJ = DCD + ISI`. Retained pending re-derivation against the new $DJ_{\delta\delta}$ ceiling (`TBD_from_link_budget`). |
-| Intersymbol Interference jitter | `ISI` | ≤ 0.045 UIpp | ≤ 0.424 ps pp | Isolated finite-bandwidth and transition-settling contribution from $t_r/t_f$ and the 60 fF direct-attach load. Internal allocation; dj bounds residual ISI through `SNRISI` instead — see note (b) above. Retained pending re-derivation (`TBD_from_sim_sweep`). |
-| Duty Cycle Distortion | `DCD` | ≤ 0.015 UIpp | ≤ 0.141 ps pp | Static clock skew and rise/fall delay mismatch in the pre-driver and serialization buffers; dj analog is `EOJ03`. The link budget separately books a larger **FIR slice-DCD** term (≈0.05 UI ≈ 0.47 ps) against the FIR-DAC coefficient slices — eliminated in the recommended no-FIR baseline (§4; `OCI_Link_Budget_Summary.md` §5, Report §7 item 7). Retained pending re-derivation (`TBD_from_sim_sweep`). |
-| Bounded Uncorrelated Jitter | `BUJ` | ≤ 0.036 UIpp | ≤ 0.339 ps pp | Margin for electrical crosstalk between the multi-wavelength (WDM) channels and other bounded, data-uncorrelated aggressors. Retained pending re-derivation (`TBD_from_link_budget`). |
-| Bounded high-probability jitter | `J4u` / `J8u` | ≤ 0.15 UI pp | ≤ 1.412 ps pp | Standards ceiling: dj `JH4u` above (single 0.118 UI value in D3.1; `J8u` is the same construction at the deeper all-but-1E-8 interval). Cross-checks: CEI-112G-XSR TX J8u (0.1546 UI); CEI-56G-XSR-NRZ UUGJ / UBHPJ (uncorrelated unbounded Gaussian / uncorrelated bounded high-probability jitter, each 0.15 UI). Retained pending re-derivation (`TBD_from_link_budget`). |
-| Total jitter | `TJ` | ≤ 0.351 UI pp (at internal BER $10^{-12}$) | ≤ 3.30 ps pp | **Link-budget target**, superseding the 0.28 UIpp CEI-56G-XSR-NRZ sanity ceiling (which was only ever evaluated at the pre-FEC clause BER): dual-Dirac $TJ = DJ_{\delta\delta} + 2\,Q\,\sigma_{RJ}$ at $Q(10^{-12})=7.035$ (`OCI_Link_Budget_Summary.md` §1, §3, §8). dj has no TJ-at-BER metric. |
-| Signal-to-noise-and-distortion | `SNDR` | ≥ 32.5 dB | — | CEI-112G-XSR TX SNDR reference; caps residual jitter, noise, and nonlinearity. dj D3.1 now also specifies **absolute** TX SNDR per equalizer preset (Table 179-9); the binding case for our no-FIR baseline is **preset 1 (no equalization) ≥ 33.5 dB — tighter than CEI's 32.5 dB** and the candidate to supersede this row's target. Final value pending link-budget mapping (`TBD_from_link_budget`). |
+**Table 179-7 rows not adopted, and why.** The remaining rows of Table 179-7 are host-channel electrical requirements that do not transfer to this direct-drive CPO topology and are intentionally **not** adopted at TP1: the differential output-voltage rows (1 V max enabled, steady-state voltage $v_f$ 0.379–0.5 V per host class, linear-fit pulse peak ratio $R_{peak}$) assume a 50 Ω host channel and C2M receiver and directly conflict with the **2.0–3.0 Vppd** swing the MRM requires for ≥ 3.5 dB extinction ratio (§4-1); the level-separation mismatch ratio RLM (≥ 0.95) is a PAM4 four-level metric with no NRZ definition; effective return loss ERL (≥ 7.3 dB) and the common-mode return-loss requirements (Table 179-11) presume a transmission-line interface that does not exist in this architecture (§4-3: direct lumped-capacitive attach, no line, no back-termination); and the output-equalization coefficient ranges c(−3)…c(1) (179.9.4.2) describe dj's 5-tap host FFE, not this design's 3-tap FIR-DAC (§4-1). The two amplitude-domain ratios, `SNDR` (Table 179-9) and `SNRISI`, are likewise not adopted: both are defined through dj's PAM4 linear-fit and equalizer-preset machinery and are not meaningful requirements for the engineers consuming this document — residual ISI and distortion are bounded physically by the §4-4 transition-time window and the §4-5 TP1 eye mask instead. Only dj's jitter triplet transfers cleanly across both the PAM4→NRZ and host-channel→MRM-drive boundaries, and it is adopted unmodified in the table above.
 
-The `ISI` allocation is enforced directly by the electrical transition-time window in §4-4 and the TP1 eye mask defined in §4-5. The 20–80% edge is now specified against the link-budget-derived corners of **3.3 ps (0.35 UI, fast)**, **4.2 ps (0.45 UI, typical target)**, and **5.6 ps (0.60 UI, hard max)** rather than the earlier CEI-derived 3.2/4.5 ps window: the ceiling limits settling-induced ISI (each +0.15 UI of transition time costs roughly 0.5 dB of link margin), while the floor limits excessive high-frequency energy and overshoot at the unterminated capacitive microbump. See §4-4 for the full sign-off table.
+**Quantities P802.3dj does not specify.** dj contains no dual-Dirac jitter decomposition — no σ_RJ / $DJ_{\delta\delta}$ split, no $DDJ = DCD + ISI$ sub-allocation, no BUJ — and no total-jitter-at-BER metric: its jitter methodology isolates clock jitter by construction (note (b)) and bounds pattern-dependent closure through `SNRISI` in the voltage domain. dj also has no concept of this link's committed **raw BER < 1e-12 FEC-free** operating point (§1-3): every dj limit is anchored to RS-FEC operation at pre-FEC BER 2.4E-4. Consequently, the quantities this design needs at the internal BER target but cannot source from any standard — the 20–80% transition-time window, the TP1 eye-mask coordinates, and the dual-Dirac TJ/RJ/DJ allocations behind them — are carried as internal sign-off allocations in **§4-4 and §4-5**, individually tagged `TBD_from_link_budget` / `TBD_from_sim_sweep` there. The dual-Dirac allocations themselves are derived from first principles in the companion document **`tx_jitter_budget_derivation.md`**; once reviewed, its results supersede the interim §4-4 values. This section carries dj values only.
 
 ---
 
 ## Section 4: High-Speed Driver Specification
 
-**Link-budget update — no-FIR recommended baseline.** The GEN2 device trade study (`OCI_Link_Budget_Summary.md` §5; full derivation in `OCI_Link_Budget_Report.md` §6) finds that on this short, near-zero-loss channel the 3-tap FIR-DAC buys **no ISI improvement**: the joint FIR+CTLE optimizer converges to zero tap weight ($h_{-1}=0.09$, $h_{+1}=0.22$ — a mild post-cursor the CTLE removes at ≈1.04× noise cost). The FIR's only net effect is an incremental slice-DAC duty-cycle-distortion charge (≈0.05 UI, §3-1) that costs **0.27 dB of link margin** relative to a direct (no-FIR) path, before counting the ±0.47 ps delay-line-accuracy and slice-matching burden it adds. The **recommended baseline architecture is therefore a no-FIR, direct-drive path through a ≥60 GHz-class driver, paired with the TIA-B receiver class (§5-1)** — closing at **+1.63 dB** typical margin, degrading to +0.16 dB only in the worst-everything corner (5 µA TIA noise, 40 GHz MRM), never breaking. The three-tap FIR-DAC hardware is **retained as a single-post-cursor-tap design option** (§4-1a) pending measured MRM EO response: real MRM detuning peaking/overshoot is the one impairment a Tx FIR corrects that the CTLE cannot, and strong measured peaking would reverse the no-FIR call. Both configurations are specified below; CDNS deliverables (§4-2) and sign-off limits (§4-4) must close for either.
+**Link-budget update — no-FIR recommended baseline.** The GEN2 device trade study (`OCI_Link_Budget_Summary.md` §5; full derivation in `OCI_Link_Budget_Report.md` §6) finds that on this short, near-zero-loss channel the 3-tap FIR-DAC buys **no ISI improvement**: the joint FIR+CTLE optimizer converges to zero tap weight ($h_{-1}=0.09$, $h_{+1}=0.22$ — a mild post-cursor the CTLE removes at ≈1.04× noise cost). The FIR's only net effect is an incremental slice-DAC duty-cycle-distortion charge (≈0.05 UI; `OCI_Link_Budget_Summary.md` §5) that costs **0.27 dB of link margin** relative to a direct (no-FIR) path, before counting the ±0.47 ps delay-line-accuracy and slice-matching burden it adds. The **recommended baseline architecture is therefore a no-FIR, direct-drive path through a ≥60 GHz-class driver, paired with the TIA-B receiver class (§5-1)** — closing at **+1.63 dB** typical margin, degrading to +0.16 dB only in the worst-everything corner (5 µA TIA noise, 40 GHz MRM), never breaking. The three-tap FIR-DAC hardware is **retained as a single-post-cursor-tap design option** (§4-1a) pending measured MRM EO response: real MRM detuning peaking/overshoot is the one impairment a Tx FIR corrects that the CTLE cannot, and strong measured peaking would reverse the no-FIR call. Both configurations are specified below; CDNS deliverables (§4-2) and sign-off limits (§4-4) must close for either.
 
 The physical TX driver is a **three-tap, segmented FIR-DAC feeding a differential merged-cascode output stage**, operable either as the full 3-tap FFE (FIR-retained option) or, in the recommended no-FIR baseline, with the pre and post tap weights forced to (or near) zero and only the main (direct) path active — or with a single post-cursor tap retained per the option above. The NRZ stream fans out into pre, main, and post branches delayed by 0/1/2 UI; signed current-DAC slices set each coefficient, and the three branch currents sum at the common cascode output node that directly drives the MRM through the TX microbump. The merged-cascode devices sustain the required 2.0–3.0 Vppd output swing while isolating the coefficient DACs from the voltage-dependent MRM load, and must meet the ≥60 GHz driver-bandwidth class (large-signal, not small-signal — see §4-1a) that the link budget's preferred TIA-B pairing assumes.
 
@@ -296,7 +272,7 @@ The existing `FirDacDriver` model remains the system-level executable representa
 | **Number of taps** | `N_tap` | 3 (pre, main, post) | Branch delays fixed at 0/1/2 UI (`TBD_analog_design`). |
 | **TX equalization topology** | `FirDacDriver` | DAC-based Asymmetric FFE | Independent tap weights for rising versus falling optical edges compensate MRM carrier-depletion asymmetry (`TBD_analog_design`). |
 | **Tap weight boundaries** | `w_pre`, `w_post` | `w_pre`: 0 to −0.25<br>`w_post`: 0 to −0.35 | Asymmetric boundaries allow heavier post-cursor cancellation to counteract slower optical tail decay (`TBD_from_sim_sweep`). |
-| **Tap resolution** | `N_tapq` | 8 bits (signed per-slice) | Sign-magnitude grid, full scale 1.0; quantization noise must remain well below the target SNDR (`TBD_from_sim_sweep`). |
+| **Tap resolution** | `N_tapq` | 8 bits (signed per-slice) | Sign-magnitude grid, full scale 1.0; coefficient-quantization noise must remain a negligible contributor against the §4-4 jitter allocations and §4-5 eye-mask margins (`TBD_from_sim_sweep`). |
 | **Differential output swing** | `V_PP` | 2.0 Vppd to 3.0 Vppd | Hard clip after summation; required to achieve ≥3.5 dB optical extinction ratio on silicon MRMs (`TBD_from_partner`). |
 | **Inter-tap phase delay matching** | — | ≤±250 fs (≤2.6% UI) | Minimizes phase skew between FFE slices at 9.412 ps UI (`TBD_analog_design`). |
 | **Summing-node capacitive matching** | — | ≤±2 fF (≤3.3% of $C_L$) | Prevents differential impedance mismatch and even-order harmonic distortion across the merged-cascode array (`TBD_analog_design`). |
@@ -312,7 +288,7 @@ Real device brackets from `OCI_Link_Budget_Summary.md` §5 (`OCI_Link_Budget_Rep
 | Configuration | Margin (TIA B, 4 µA/60 GHz) | Basis |
 |---|---:|---|
 | **No-FIR, 60 GHz driver + MRM 60 GHz (recommended baseline)** | **+1.63 dB** | Zero-tap FIR+CTLE optimum on this channel; no ISI penalty from dropping the FIR |
-| FIR3, typical driver (0.45 UI) | +1.98 dB gross, **−0.27 dB net vs. no-FIR** once the FIR's slice-DCD jitter charge (DJ 0.14 vs. 0.11 UI, §3-1) is booked | 3-tap FFE fully enabled |
+| FIR3, typical driver (0.45 UI) | +1.98 dB gross, **−0.27 dB net vs. no-FIR** once the FIR's slice-DCD jitter charge (DJ 0.14 vs. 0.11 UI, `OCI_Link_Budget_Summary.md` §5, §8) is booked | 3-tap FFE fully enabled |
 | No-FIR, worst-everything corner (5 µA TIA noise, 40 GHz MRM) | **+0.16 dB** | Thin but closes; leans on the Tx-OMA relief valve (§8-2) |
 
 **Selection gates** (kill-or-confirm items, `OCI_Link_Budget_Summary.md` §9): (i) verify the §5-1 TIA magnitude-peaking / group-delay-ripple spec on real silicon before trusting any margin cell; (ii) measure MRM EO response (magnitude + phase) for peaking/overshoot — the one impairment that could reverse the no-FIR call in favor of the retained post-cursor tap; (iii) confirm the driver's **large-signal** 20–80% edge rate meets the ≥60 GHz-class assumption (a small-signal-only 60 GHz number would understate the real transition time — each +0.15 UI of transition costs ≈0.5 dB, §4-4).
@@ -328,7 +304,7 @@ $$
 
 ### 4-2 Input and pre-driver interface — CDNS deliverable
 
-The serializer-to-driver input interface and pre-driver implementation shall be completed by **CDNS** before schematic freeze. These parameters are intentionally not inferred from the behavioral `FirDacDriver`; CDNS shall provide values that close the §3-1 jitter allocation and the §4-4 loaded-pad sign-off limits.
+The serializer-to-driver input interface and pre-driver implementation shall be completed by **CDNS** before schematic freeze. These parameters are intentionally not inferred from the behavioral `FirDacDriver`; CDNS shall provide values that close the §3-1 TP1 jitter targets and the §4-4 loaded-pad sign-off limits.
 
 | Parameter | Placeholder / symbol | Target / Default | Notes / Basis |
 |---|---|---|---|
@@ -338,7 +314,7 @@ The serializer-to-driver input interface and pre-driver implementation shall be 
 | **Tap-delay generation** | — | To be filled out by CDNS | Define how the pre/main/post 0/1/2-UI phases are generated and distributed, including reset alignment (`TBD_analog_design`). |
 | **Pre-driver output swing and common mode** | — | To be filled out by CDNS | Define the interface into the signed FIR-DAC slices across all enabled tap codes (`TBD_analog_design`). |
 | **Pre-driver transition time and bandwidth** | $t_{r,pre}$, $t_{f,pre}$ | To be filled out by CDNS | Must support the §4-4 pad-level 20–80% transition-time window without becoming the dominant ISI source (`TBD_analog_design`). |
-| **Pre-driver jitter allocation** | $J_{pre}$ | To be filled out by CDNS | Allocate RJ, DCD, and bounded jitter within the parent limits in §3-1 (`TBD_from_link_budget`). |
+| **Pre-driver jitter allocation** | $J_{pre}$ | To be filled out by CDNS | Allocate RJ, DCD, and bounded jitter within the §3-1 TP1 jitter targets (`JHRMS`, `EOJ03`, `JH4u`) and the §4-4 internal allocations (`TBD_from_link_budget`). |
 | **Duty-cycle and inter-phase matching** | — | To be filled out by CDNS | Include static duty-cycle error, 1-UI delay accuracy, phase skew, and PVT limits (`TBD_analog_design`). |
 
 ### 4-3 Physical output network and MRM interface
@@ -356,15 +332,14 @@ All limits in this table are evaluated differentially at **TP1** (the electrical
 | Parameter | Placeholder / symbol | Target / Default | Notes / Basis |
 |---|---|---|---|
 | **Global deterministic jitter** | $DJ_{\delta\delta}$ | ≤0.140 UIpp (≤1.32 ps), ≤0.11 UIpp (≤1.04 ps) no-FIR | **Link-budget target** (`OCI_Link_Budget_Summary.md` §5, §8), superseding the 0.096 UIpp CEI envelope: FIR-retained value includes ≈0.05 UI FIR slice-DCD; the recommended no-FIR baseline (§4-1a) credits this to ≤0.11 UIpp, worth 0.27 dB of margin. |
-| **Data Dependent Jitter** | `DDJ` | ≤0.060 UIpp (≤0.565 ps) | CEI-112G-XSR-derived sub-allocation: total pattern-dependent timing jitter under PRBS13/PRBS31: $DDJ=DCD+ISI$. Retained pending re-derivation against the new $DJ_{\delta\delta}$ ceiling (§3-1) (`TBD_from_link_budget`). |
-| **Intersymbol Interference jitter** | `ISI` | ≤0.045 UIpp (≤0.424 ps) | Isolated finite-bandwidth, $t_r/t_f$ settling, and 60 fF microbump-load contribution. Retained pending re-derivation (§3-1) (`TBD_from_sim_sweep`). |
-| **Duty Cycle Distortion** | `DCD` | ≤0.015 UIpp (≤0.141 ps) | Static serializer/pre-driver skew and electrical rise/fall delay mismatch. The FIR-retained option separately books a larger FIR slice-DCD term (≈0.05 UI); eliminated in the no-FIR baseline (§3-1, §4-1a). Retained pending re-derivation (`TBD_from_sim_sweep`). |
-| **Bounded Uncorrelated Jitter** | `BUJ` | ≤0.036 UIpp (≤0.339 ps) | Allocation for simultaneous-lane WDM electrical crosstalk. Retained pending re-derivation (§3-1) (`TBD_from_link_budget`). |
+| **Data Dependent Jitter** | `DDJ` | ≤0.060 UIpp (≤0.565 ps) | CEI-112G-XSR-derived sub-allocation: total pattern-dependent timing jitter under PRBS13/PRBS31: $DDJ=DCD+ISI$. Retained pending re-derivation against the $DJ_{\delta\delta}$ ceiling in the row above (`TBD_from_link_budget`). |
+| **Intersymbol Interference jitter** | `ISI` | ≤0.045 UIpp (≤0.424 ps) | Isolated finite-bandwidth, $t_r/t_f$ settling, and 60 fF microbump-load contribution. Retained pending re-derivation (`TBD_from_sim_sweep`). |
+| **Duty Cycle Distortion** | `DCD` | ≤0.015 UIpp (≤0.141 ps) | Static serializer/pre-driver skew and electrical rise/fall delay mismatch. The FIR-retained option separately books a larger FIR slice-DCD term (≈0.05 UI); eliminated in the no-FIR baseline (§4-1a). Retained pending re-derivation (`TBD_from_sim_sweep`). |
+| **Bounded Uncorrelated Jitter** | `BUJ` | ≤0.036 UIpp (≤0.339 ps) | Allocation for simultaneous-lane WDM electrical crosstalk. Retained pending re-derivation (`TBD_from_link_budget`). |
 | **Electrical rise/fall time (20–80%)** | $t_{r,e}$, $t_{f,e}$ | 3.3 ps fast (0.35 UI) / 4.2 ps typical target (0.45 UI) / 5.6 ps hard max (0.60 UI) | **Link-budget update** (`OCI_Link_Budget_Summary.md` §5, §8; Report §4.2, §6.1), superseding the earlier 3.2/4.5 ps CEI-derived window: corners re-derived at the internal BER $10^{-12}$ closure point, two-pole fits at 105/82/61 GHz. Margin degrades ≈0.5 dB per +0.15 UI of transition time; the 5.6 ps hard ceiling still closes (+0.79 dB margin, no-FIR/TIA-B baseline) but with reduced headroom. Verify against the **large-signal** edge, not small-signal (§4-1a). |
 | **Electrical rise/fall mismatch** | $\Delta t_{rf,e}=\lvert t_{r,e}-t_{f,e}\rvert$ | ≤0.35 ps (≤3.7% UI) | Limits TP1 electrical asymmetry so the asymmetric FFE capacity corrects the optical ring's nonlinear depletion dynamics (`TBD_analog_design`). |
-| **Horizontal eye-mask coordinates (provisional)** | $X_1$, $X_2$ | $X_1=0.14$ UI; $X_2=0.40$ UI | $X_1=TJ_{pp}/2$ from the §3-1 total-jitter allocation; guarantees unclosed electrical eye width $1-2X_1 \ge 0.72$ UI = 6.78 ps. **Not yet re-derived from the link-budget $TJ=0.351$ UI (§3-1)**, which implies $X_1\approx0.176$ UI; the mask geometry (§4-5) needs a full re-run against the updated jitter budget, tracked as an open follow-up. Full mask definition in §4-5 (`TBD_from_link_budget`). |
+| **Horizontal eye-mask coordinates (provisional)** | $X_1$, $X_2$ | $X_1=0.14$ UI; $X_2=0.40$ UI | $X_1=TJ_{pp}/2$ from the internal total-jitter allocation (`OCI_Link_Budget_Summary.md` §1, §3); guarantees unclosed electrical eye width $1-2X_1 \ge 0.72$ UI = 6.78 ps. **Not yet re-derived from the link-budget $TJ=0.351$ UI**, which implies $X_1\approx0.176$ UI; the mask geometry (§4-5) needs a full re-run against the updated jitter budget, tracked as an open follow-up. Full mask definition in §4-5 (`TBD_from_link_budget`). |
 | **Vertical eye-mask coordinates (provisional)** | $Y_1$, $Y_2$ | $Y_1=400$ mV; $Y_2=1500$ mV | $Y_1$ is the rounded nominal static MRM $P(V)$ floor derived below (399.2 mV at the modeled $Q=5000$ corner); PVT and dynamic NRZ TDEC are not closed. $Y_2$ = maximum-amplitude bound = $V_{PP,max}/2$ hard-clip level (§4-1). Full mask definition in §4-5 (`TBD_from_link_budget`). |
-| **Signal-to-noise-and-distortion** | `SNDR` | ≥32.5 dB | Includes coefficient quantization, merged-cascode nonlinearity, supply noise, and loaded-pad distortion (`TBD_from_link_budget`). |
 | **Output impedance / electrical return loss** | — | N/A by architecture | Direct lumped-capacitive MRM attachment; no transmission line or back-termination (§4-3). |
 
 ### 4-5 TX electrical eye mask — normative definition (provisional coordinates)
@@ -375,7 +350,7 @@ This subsection is the single normative definition of the TP1 eye mask reference
 
 **Coordinate system.** The mask is evaluated on the differential voltage $v(t)=V_{TXP}-V_{TXN}$ (absolute millivolts, not normalized to measured swing) at **TP1** (the electrical input to the MRM modulator), with the extracted 60 fF MRM-plus-pad load present. Time is expressed in UI (9.412 ps at 106.25 GBd) over one full unit interval folded about the eye center at $t=0.5$ UI.
 
-**Alignment.** The eye is folded against the ideal (jitter-free) serializer symbol clock, with the fold phase chosen so that the mean 0 V differential-crossing time sits at $t=0$ UI (eye center at 0.5 UI). Recovered-clock or per-edge alignment is not permitted: it would absorb DCD and DDJ that are already budgeted in §3-1 and must remain visible to the mask.
+**Alignment.** The eye is folded against the ideal (jitter-free) serializer symbol clock, with the fold phase chosen so that the mean 0 V differential-crossing time sits at $t=0$ UI (eye center at 0.5 UI). Recovered-clock or per-edge alignment is not permitted: it would absorb even-odd and data-dependent jitter that the §3-1 TP1 targets (`EOJ03`) and the §4-4 internal allocations bound, and which must remain visible to the mask.
 
 **Mask regions.** Two region families define the mask:
 
@@ -391,18 +366,18 @@ This subsection is the single normative definition of the TP1 eye mask reference
 
 | Coordinate | Provisional value | Derivation / status |
 |---|---|---|
-| $X_1$ | 0.14 UI | $=TJ_{pp}/2=0.28/2$ UI from the earlier CEI-referenced §3-1 allocation. The link budget has since closed $TJ=0.351$ UI at the internal BER target (§3-1), which implies $X_1\approx0.176$ UI; this coordinate is **not yet updated** to that value — doing so also shifts $X_2$ and the mask geometry and needs a dedicated re-run of `tx_eye_mask.py` (`OCI_Link_Budget_Summary.md` §3, §8; `TBD_from_link_budget`). |
+| $X_1$ | 0.14 UI | $=TJ_{pp}/2=0.28/2$ UI from the earlier CEI-referenced allocation (since removed from §3-1 in favor of the dj-only metric set). The link budget has since closed $TJ=0.351$ UI at the internal BER target, which implies $X_1\approx0.176$ UI; this coordinate is **not yet updated** to that value — doing so also shifts $X_2$ and the mask geometry and needs a dedicated re-run of `tx_eye_mask.py` (`OCI_Link_Budget_Summary.md` §3, §8; `TBD_from_link_budget`). |
 | $X_2$ | 0.40 UI | CEI-56G-XSR-NRZ shoulder value adopted as-is; must be validated against the §4-4 3.2–4.5 ps transition-time envelope (`TBD_from_sim_sweep`). |
 | $Y_1$ | 400 mV | Provisional nominal static floor, rounded from 399.2 mV at the modeled $Q=5000$ corner with 25 pm/V tuning and ER ≥ 3.5 dB. OMA also passes when $P_{avg}=0$ dBm; partner PVT curves and dynamic NRZ TDEC remain open (`TBD_from_link_budget`). |
 | $Y_2$ | 1500 mV | $=V_{PP,max}/2$, the §4-1 hard-clip level at the 3.0 Vppd maximum swing. Supersedes an earlier 600 mV placeholder, which was inconsistent with the committed 2.0–3.0 Vppd swing under this mask construction (rails sit at ±1.0 to ±1.5 V). Final value set by MRM reverse-bias reliability and overshoot limits (`TBD_from_partner`). |
 
 **Pass/fail statistics (provisional).** Zero mask violations over an observation set of at least $10^6$ UI per corner, evaluated with PRBS13 and PRBS31, both asymmetric-FFE tap banks active at tap-code extrema, across supply/temperature/process corners and with simultaneous WDM-lane activity. The observation length, and whether a small violation-count allowance tied to a hit-ratio BER equivalent is adopted instead of strict zero-hit, are `TBD_from_link_budget`.
 
-**Mask-margin decomposition (provisional).** The mask coordinates are traceable to the §3-1 allocations, so the closure against each coordinate can be attributed per contributor rather than treated as a monolithic limit.
+**Mask-margin decomposition (provisional).** The mask coordinates are traceable to the §4-4 internal allocations, so the closure against each coordinate can be attributed per contributor rather than treated as a monolithic limit.
 
 ![Mask-margin decomposition](tx_eye_mask_budget.png)
 
-*Horizontal (exact, dual-Dirac).* Per eye side, the closure against the ideal-clock fold is $DJ_{\delta\delta}/2 + Q(\mathrm{BER})\cdot J_{RMS}$, with the deterministic half splitting per §3-1 into $ISI/2 + DCD/2 + BUJ/2$. At the pre-FEC clause BER of $2.4\times10^{-4}$ ($Q=3.49$):
+*Horizontal (exact, dual-Dirac).* Per eye side, the closure against the ideal-clock fold is $DJ_{\delta\delta}/2 + Q(\mathrm{BER})\cdot J_{RMS}$, with the deterministic half splitting per the §4-4 internal allocations into $ISI/2 + DCD/2 + BUJ/2$. At the pre-FEC clause BER of $2.4\times10^{-4}$ ($Q=3.49$):
 
 | Contributor (per eye side) | UI | ps | Share of $X_1$ |
 |---|---|---|---|
@@ -415,7 +390,7 @@ This subsection is the single normative definition of the TP1 eye mask reference
 
 Random jitter dominates the horizontal budget (55% of $X_1$), followed by ISI (16%), BUJ (13%), and DCD (5%). Two consequences: (i) $X_1$ is BER-sensitive — the same allocations evaluated at the committed internal raw-BER target of $10^{-12}$ give $Q=7.03$, an RJ term of 0.155 UI, and a total closure of 0.203 UI per side, **exceeding $X_1$ by 0.063 UI**. The provisional coordinates are therefore only self-consistent at the pre-FEC standards anchor, not at the internal BER target, and the mask's BER convention and/or allocations must be revised. (ii) Improving DCD or ISI buys comparatively little horizontal margin relative to the RJ allocation.
 
-*Vertical (electro-optic derivation, provisional).* SNDR is a waveform-quality metric containing fitted signal, residual ISI, noise, and distortion under a specified measurement procedure; it is **not** an input-referred Gaussian voltage-noise rms value and is not converted to $Q(\mathrm{BER})\sigma$ closure. Rise/fall time likewise constrains transition shape and $X_2$, but does not establish $Y_1$. Instead, `mrm_y1_derivation.py` evaluates symmetric electrical levels $\pm Y$ about the maximum-slope MRM bias. The §8 $Q=5000$–8000 range is represented by scaling the reference TCMT model's bus-coupling and intrinsic-loss rates together while preserving their ratio/notch shape, with 25 pm/V tuning. The resulting static ER ≥ 3.5 dB thresholds are 399.2, 306.3, and 248.7 mV for $Q=5000$, 6500, and 8000 respectively; the OMA constraint is weaker (230.2 mV worst case) when average launch power is scaled to its 0 dBm maximum. The mask therefore adopts **$Y_1=400$ mV as a provisional static lower bound**.
+*Vertical (electro-optic derivation, provisional).* No waveform-quality ratio is converted to $Q(\mathrm{BER})\sigma$ closure here (dj's SNDR, which this document does not adopt — §3-1, is a fitted measurement construct, not an input-referred Gaussian voltage-noise rms). Rise/fall time likewise constrains transition shape and $X_2$, but does not establish $Y_1$. Instead, `mrm_y1_derivation.py` evaluates symmetric electrical levels $\pm Y$ about the maximum-slope MRM bias. The §8 $Q=5000$–8000 range is represented by scaling the reference TCMT model's bus-coupling and intrinsic-loss rates together while preserving their ratio/notch shape, with 25 pm/V tuning. The resulting static ER ≥ 3.5 dB thresholds are 399.2, 306.3, and 248.7 mV for $Q=5000$, 6500, and 8000 respectively; the OMA constraint is weaker (230.2 mV worst case) when average launch power is scaled to its 0 dBm maximum. The mask therefore adopts **$Y_1=400$ mV as a provisional static lower bound**.
 
 ![Provisional MRM P(V)-derived Y1](mrm_y1_derivation.png)
 
@@ -688,7 +663,7 @@ The **integer parameters** currently exercised in this document (`cdr_width = 12
 - The **0.05 UI pk-pk high-frequency floor** of the CEI/dj masks, which persists from the corner out to ~10× the reference-CRU frequency and is essentially independent of loop bandwidth.
 - The **1/f slope residue** — the fraction of the low-frequency SJ ramp between the mask corner and the chosen closed-loop corner that the loop does not fully suppress. Pushing the design target to the upper end of the 4–6 MHz window shrinks this residue but trades against jitter peaking near the floor (§6-10).
 
-Adding these to the TX-side contributions imported in §3-1 (notably the J4u/J8u ≈ 0.15 UI pk-pk high-probability term), the combined horizontal closure is what the **slicer sampling margin** must survive at the **internal raw-BER spec of < 1e-12** (§1-3) — a far deeper eye than the 2.4E-4 standards compliance anchor demands. The first-iteration allocation keeps total untracked SJ under ~0.10–0.15 UI pk-pk so that, after TX jitter and residual ISI, the data-slicer decision point still sees a horizontal opening consistent with FEC-free < 1e-12 operation; this allocation is provisional (`TBD_from_link_budget`) and closes jointly with the vertical slicer-threshold budget (§2, `V_LSB,vp`).
+Adding these to the TX-side contributions imported in §3-1 (notably the dj `JH4u` ≤ 0.118 UI pk-pk high-probability term), the combined horizontal closure is what the **slicer sampling margin** must survive at the **internal raw-BER spec of < 1e-12** (§1-3) — a far deeper eye than the 2.4E-4 standards compliance anchor demands. The first-iteration allocation keeps total untracked SJ under ~0.10–0.15 UI pk-pk so that, after TX jitter and residual ISI, the data-slicer decision point still sees a horizontal opening consistent with FEC-free < 1e-12 operation; this allocation is provisional (`TBD_from_link_budget`) and closes jointly with the vertical slicer-threshold budget (§2, `V_LSB,vp`).
 
 ### 6-10 Cycle-slip policy and damping
 
@@ -797,7 +772,7 @@ All continuous loops share the **same dual-error-slicer observables**: the data 
 
 ```python
 y = x_se - running_mean                    # SeToDiff: coarse SE→diff centering (behavioral stand-in for the TIA SE→diff + DCOC)
-d = +1 if y >= 0 else -1                   # data slicer
+d = +1 if y >= 0 else -1                   # data slicer (threshold DAC at nominal mid-scale = 0 V)
 e_top = +1 if y > +vp_top else -1          # top error slicer
 e_bot = +1 if y > -vp_bot else -1          # bottom error slicer
 e = e_top if d == +1 else e_bot            # signed MM error = sign(y − d·Vp_rail)
@@ -1021,7 +996,7 @@ Setting `i = 0` recovers the Vp equilibrium check — `⟨d(k)·e(k)⟩ → 0` w
 - `ĥ₊₁` cross-checks CTLE convergence (should sit at the residual that `corr_deadband` tolerates);
 - `ĥ₋₁` vs `ĥ₊₁` cross-checks the MM lock condition `h(−1) = h(+1)` — a standing imbalance flags a lock-point offset (e.g. a CTLE group-delay change mid-tracking, §7-8) — and the ratio form is exactly what the balance check needs;
 - lags 2–6 quantify the long-tail residue that the CTLE's longer `lags` sense (§7-6);
-- together with the `|h₀|` readback already provided by the Vp codes, `{ĥ_i}` is an in-situ **baud-spaced pulse-response estimate at the mission sampling phase** (the §2-3 cursors), enabling on-die SNRISI / eye-margin estimation without external instrumentation.
+- together with the `|h₀|` readback already provided by the Vp codes, `{ĥ_i}` is an in-situ **baud-spaced pulse-response estimate at the mission sampling phase** (the §2-3 cursors), enabling on-die residual-ISI / eye-margin estimation without external instrumentation.
 
 **Truth table** (per lag, per UI; the product is accumulated, not stepped into a DAC):
 
@@ -1105,7 +1080,7 @@ Staged sequence, with entry/exit criteria and the freeze state of every loop per
 
 | Stage | Active | Frozen / state | Exit criterion |
 |---|---|---|---|
-| 0. Coarse presets | — | AGC code = mid-scale (0 dB), CTLE code = mid-scale (`2^(N_code,ctle−1)`), offset = mid-scale (0 V), Vp codes = `init_code_* = 32` (= `32·V_LSB,vp`), TIA DCOC acquiring / **live** (in the model: SE→diff running-mean tracking live) | Signal present; `d`, `e±` not stuck at a rail |
+| 0. Coarse presets | — | AGC code = mid-scale (0 dB), CTLE code = mid-scale (`2^(N_code,ctle−1)`), offset = mid-scale (0 V), data-slicer threshold code = mid-scale (0 V), Vp codes = `init_code_* = 32` (= `32·V_LSB,vp`), TIA DCOC acquiring / **live** (in the model: SE→diff running-mean tracking live) | Signal present; `d`, `e±` not stuck at a rail |
 | 1. CDR acquisition | **CDR** (P + F) | All DAC loops frozen (`adapt=False`); Vp thresholds at presets are good enough for vote *signs* | CDR lock detect: PI wander and `state_f/f_div` settled |
 | 2. Rail digitisation | CDR + **Vp_top/Vp_bot** | Offset, CTLE, AGC frozen | Vp codes dithering ±1 LSB (settled medians) |
 | 3. Vertical centering | + **Offset/BLW**; the **TIA DCOC goes quasi-static** here (one controller per DC node, §7-8; in the model: freeze the SE→diff running mean) | CTLE, AGC frozen | `\|imbalance_meas\| ≤ deadband_codes` for consecutive windows |
