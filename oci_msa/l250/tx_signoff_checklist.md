@@ -79,11 +79,13 @@ Sections I–VI inventory electrical-driver parameters. Sections VII–IX invent
 
 ## VI. Power & Efficiency
 
+Analog TX-driver energy is a **separate** line from the SerDes power budget. The 0.4 pJ/bit driver target covers analog pre-driver, FIR-DAC slices, merged-cascode output, and bias. Serializer, TX digital, and clocking are SerDes, not this table. See `architecture_spec.md` §1-3.
+
 | Spec Item | Placeholder / symbol | Value | TBD basis | Gen1 / standards reference (context only) |
 |---|---|---|---|---|
-| Energy efficiency, driver only | — | TBD | `TBD_from_partner` | — |
-| Energy efficiency, TX macro (driver + pre-driver + FIR control) | — | TBD | `TBD_from_partner` | — |
-| FOM, pJ/(bit·V), normalized to load | — | TBD | `TBD_from_partner` | — |
+| Energy efficiency, analog TX driver | — | 0.4 pJ/bit (first-cut) | Analog driver (separate from SerDes) | architecture_spec.md §1-3, §4-1; not a partner deliverable |
+| Energy efficiency, analog TX driver by block | — | TBD within 0.4 pJ/bit | `TBD_analog_design` | Split analog pre-driver / FIR DAC / cascode / bias; serializer is SerDes, not this split |
+| FOM, pJ/(bit·V), normalized to load | — | TBD | `TBD_analog_design` | — |
 
 ## VII. Optical Transmitter (Modulator) Requirements — *new, from `OCI_PMA_TxRx_Requirements.md` §4*
 
@@ -198,7 +200,7 @@ Status convention: unchecked = open; checked = closed and folded into `architect
 
 ### XI-E. Power, thermal, area, and physical reliability
 
-- [ ] **Allocate the TX energy target by block.** Split the top-level driver target among serializer interface, pre-driver, tap-delay generation, FIR DAC slices, merged-cascode output stage, biasing, and control logic. Owner: architecture + analog. Basis: `TBD_from_partner`.
+- [ ] **Allocate the analog TX-driver energy target by block.** Split the 0.4 pJ/bit analog-driver line among analog pre-driver, tap-delay generation, FIR DAC slices, merged-cascode output stage, and biasing. Do **not** fold serializer, TX digital, or clocking into this split — those belong to the SerDes budget (§1-3). Owner: architecture + analog. Basis: analog driver allocation (not `TBD_from_partner`, not SerDes).
 - [ ] **Specify static and dynamic power conditions.** Report nominal and worst-case current/power for PRBS activity, alternating `1010`, static data, disabled taps, training, and squelch across PVT. Owner: analog design. Basis: `TBD_analog_design`.
 - [ ] **Set area and placement limits.** Include the driver core, local decoupling, bias circuits, calibration logic, routing keep-outs, and lane-to-lane pitch. Owner: physical design. Basis: `TBD_analog_design`.
 - [ ] **Close thermal interaction with the PIC.** Define junction-temperature limits, lane-to-lane thermal coupling, MRM-heater proximity, temperature gradients across coefficient slices, and required thermal sensors/guard bands. Owner: thermal + analog + PIC. Basis: `TBD_analog_design`.
