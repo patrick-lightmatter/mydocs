@@ -1,79 +1,127 @@
 {
-  "name": "L250 OCI-MSA Gen2 TX electrical eye mask",
-  "spec_reference": "architecture_spec.md \u00a74-5 (provisional)",
-  "compliance_note": "Internal OCI-MSA Gen2 pad-level mask; geometry follows the OIF-CEI TX mask construction but this is not a CEI compliance claim.",
-  "test_point": "Differential TX microbump pad (V_TXP - V_TXN) before optical modulation, extracted 60 fF MRM-plus-pad load present",
-  "alignment": "Eye folded over 1 UI against the ideal (jitter-free) serializer symbol clock; phase chosen so the mean 0 V differential crossing sits at t = 0 UI (eye center at 0.5 UI). Recovered-clock alignment is not permitted: it would hide DCD/DDJ already budgeted in \u00a73-1.",
-  "pass_fail": "Zero samples inside the inner hexagon and zero samples with |v| > Y2 over the full observation set (provisional: >= 1e6 UI per corner, PRBS13 and PRBS31, both FFE banks, tap-code extrema, PVT corners, simultaneous-lane activity)",
+  "name": "Gizmo OCI-MSA TX electrical eye mask at TP1",
+  "spec_reference": "gizmo.md \u00a74-5",
+  "compliance_note": "Internal mask; geometry follows the OIF-CEI TX hexagon construction but this is not a CEI compliance claim.",
+  "test_point": "TP1, electrical input to the MRM modulator (V_TXP \u2212 V_TXN), extracted 60 fF MRM-plus-pad load present",
+  "alignment": "Eye folded over 1 UI against the ideal (jitter-free) serializer symbol clock; mean 0 V crossing at t = 0 UI.",
+  "ber_convention": "Raw BER 1e-12 (FEC-free internal spec). Q = 7.034, transition density \u03c1 = 1.",
   "ui_ps": 9.412,
-  "coordinates": {
-    "X1_ui": 0.14,
-    "X2_ui": 0.4,
-    "Y1_v": 0.4,
-    "Y2_v": 1.5
-  },
+  "x2_construction": "X2 = X1 + Y1/SR_min. SR_min is the linear-ramp slew of the \u00a74-4 hard-max 20\u201380% edge (5.6 ps) at the stated Vpp: T01 = 5.6/0.6 ps, SR = Vpp/T01.",
   "status": {
-    "X1": "provisional \u2014 derived as TJ_pp/2 = 0.28/2 UI (spec \u00a73-1); TBD_from_link_budget",
-    "X2": "provisional \u2014 CEI-56G-XSR-NRZ shoulder value, pending validation against the 3.2-4.5 ps transition-time envelope; TBD_from_sim_sweep",
-    "Y1": "provisional model-derived static floor \u2014 rounded from 399.2 mV at the Q=5000 corner using 25 pm/V and ER >= 3.5 dB; OMA passes at Pavg=0 dBm. Partner PVT P(V) and dynamic NRZ TDEC remain open; TBD_from_link_budget",
-    "Y2": "provisional \u2014 set to V_PP,max/2 = 1.5 V (hard-clip bound, spec \u00a74-1); supersedes the earlier 600 mV placeholder, which is inconsistent with a 2.0-3.0 Vppd swing under the standard CEI mask construction; TBD_from_partner"
+    "X1": "normative \u2014 TJ(1e-12)/2 from gizmo.md \u00a73-1 no-FIR baseline",
+    "X2": "derived from \u00a74-4 5.6 ps hard-max 20\u201380% edge and Y1; TBD_from_sim_sweep vs extracted two-pole edges",
+    "Y1": "model-derived static ER \u2265 3.5 dB floor (399.2 mV at Q=5000), rounded to 400 mV; TBD_from_link_budget for PVT/TDEC",
+    "Y2": "exact \u2014 Vpp/2 at the 2.0 Vppd and 3.0 Vppd sign-off swings"
   },
-  "derived": {
-    "eye_width_guarantee_ui": 0.72,
-    "eye_width_guarantee_ps": 6.777,
-    "inner_opening_pp_v": 0.8,
-    "amplitude_bound_pp_v": 3.0
-  },
-  "polygons": {
-    "inner_keepout_hexagon_t_ui_v_volts": [
-      [
-        0.14,
-        0.0
-      ],
-      [
-        0.4,
-        0.4
-      ],
-      [
-        0.6,
-        0.4
-      ],
-      [
-        0.86,
-        0.0
-      ],
-      [
-        0.6,
-        -0.4
-      ],
-      [
-        0.4,
-        -0.4
-      ]
-    ],
-    "upper_forbidden_region": "v > +1.5 V for all t",
-    "lower_forbidden_region": "v < -1.5 V for all t"
+  "variants": {
+    "2v": {
+      "vpp_v": 2.0,
+      "coordinates": {
+        "X1_ui": 0.158,
+        "X2_ui": 0.357,
+        "Y1_v": 0.4,
+        "Y2_v": 1.0
+      },
+      "derived": {
+        "eye_width_guarantee_ui": 0.684,
+        "eye_width_guarantee_ps": 6.4378,
+        "inner_opening_pp_v": 0.8,
+        "amplitude_bound_pp_v": 2.0
+      },
+      "polygons": {
+        "inner_keepout_hexagon_t_ui_v_volts": [
+          [
+            0.158,
+            0.0
+          ],
+          [
+            0.357,
+            0.4
+          ],
+          [
+            0.643,
+            0.4
+          ],
+          [
+            0.842,
+            0.0
+          ],
+          [
+            0.643,
+            -0.4
+          ],
+          [
+            0.357,
+            -0.4
+          ]
+        ],
+        "upper_forbidden_region": "v > +1.0 V for all t",
+        "lower_forbidden_region": "v < -1.0 V for all t"
+      }
+    },
+    "3v": {
+      "vpp_v": 3.0,
+      "coordinates": {
+        "X1_ui": 0.158,
+        "X2_ui": 0.291,
+        "Y1_v": 0.4,
+        "Y2_v": 1.5
+      },
+      "derived": {
+        "eye_width_guarantee_ui": 0.684,
+        "eye_width_guarantee_ps": 6.4378,
+        "inner_opening_pp_v": 0.8,
+        "amplitude_bound_pp_v": 3.0
+      },
+      "polygons": {
+        "inner_keepout_hexagon_t_ui_v_volts": [
+          [
+            0.158,
+            0.0
+          ],
+          [
+            0.291,
+            0.4
+          ],
+          [
+            0.709,
+            0.4
+          ],
+          [
+            0.842,
+            0.0
+          ],
+          [
+            0.709,
+            -0.4
+          ],
+          [
+            0.291,
+            -0.4
+          ]
+        ],
+        "upper_forbidden_region": "v > +1.5 V for all t",
+        "lower_forbidden_region": "v < -1.5 V for all t"
+      }
+    }
   },
   "budget_decomposition": {
-    "note": "Horizontal decomposition is dual-Dirac from the spec \u00a73-1 allocations. No vertical arithmetic decomposition is made: SNDR cannot validly be treated as Gaussian voltage sigma; Y1 requires an MRM P(V)-to-ER/OMA/TDEC derivation.",
-    "clause_ber": 0.00024,
+    "note": "Horizontal dual-Dirac from \u00a73-1 no-FIR allocations at BER 1e-12. X1 equals total closure by construction.",
     "internal_raw_ber": 1e-12,
+    "Q": 7.034,
+    "sigma_RJ_ui_rms": 0.015,
+    "DJ_pp_ui": 0.10600000000000001,
+    "TJ_pp_ui": 0.31702,
+    "X1_ui_polygon": 0.158,
+    "X1_ui_exact": 0.15851,
     "horizontal_per_side_ui": {
       "ISI/2": 0.0225,
-      "DCD/2": 0.0075,
+      "DCD/2": 0.0125,
       "BUJ/2": 0.018,
-      "RJ = Q(0.00024)*J_RMS": 0.07682,
-      "total": 0.12482
+      "RJ = Q(1e-12)\u00b7\u03c3_RJ": 0.10551
     },
-    "horizontal_margin_ui": 0.01518,
-    "horizontal_per_side_ui_at_internal_ber": {
-      "ISI/2": 0.0225,
-      "DCD/2": 0.0075,
-      "BUJ/2": 0.018,
-      "RJ = Q(1e-12)*J_RMS": 0.15476,
-      "total": 0.20276
-    },
-    "horizontal_margin_ui_at_internal_ber": -0.06276,
-    "vertical_status": "Not decomposed. Derive Y1 from MRM P(V), ER, OMA, and TDEC across PVT; validate with vertical eye distributions."
+    "horizontal_total_ui": 0.15851,
+    "horizontal_margin_ui": 0.0,
+    "vertical_status": "Y1 not decomposed arithmetically; MRM P(V) static floor. Y2 = Vpp/2 per variant."
   }
 }
