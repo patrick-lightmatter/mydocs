@@ -1,127 +1,209 @@
 {
   "name": "Gizmo OCI-MSA TX electrical eye mask at TP1",
-  "spec_reference": "gizmo.md \u00a74-5",
+  "spec_reference": "tx_eye_mask.md (normative text; gizmo.md \u00a74-4 is a pointer stub)",
   "compliance_note": "Internal mask; geometry follows the OIF-CEI TX hexagon construction but this is not a CEI compliance claim.",
   "test_point": "TP1, electrical input to the MRM modulator (V_TXP \u2212 V_TXN), extracted 60 fF MRM-plus-pad load present",
   "alignment": "Eye folded over 1 UI against the ideal (jitter-free) serializer symbol clock; mean 0 V crossing at t = 0 UI.",
   "ber_convention": "Raw BER 1e-12 (FEC-free internal spec). Q = 7.034, transition density \u03c1 = 1.",
   "ui_ps": 9.412,
-  "x2_construction": "X2 = X1 + Y1/SR_min. SR_min is the linear-ramp slew of the \u00a74-4 hard-max 20\u201380% edge (5.6 ps) at the stated Vpp: T01 = 5.6/0.6 ps, SR = Vpp/T01.",
+  "x2_construction": "X2 = X1 + Y1/SR_min. SR_min is the linear-ramp slew of the \u00a74-2 hard-max 20\u201380% edge (4.0 ps) at the stated Vpp: T01 = 4.0/0.6 ps, SR = Vpp/T01.",
   "status": {
-    "X1": "normative \u2014 TJ(1e-12)/2 from gizmo.md \u00a73-1 no-FIR baseline",
-    "X2": "derived from \u00a74-4 5.6 ps hard-max 20\u201380% edge and Y1; TBD_from_sim_sweep vs extracted two-pole edges",
+    "X1": "normative \u2014 TJ(1e-12)/2 per variant (gizmo.md \u00a73): no-FIR in 'coordinates', FIR-included in 'fir_retained'",
+    "X2": "derived from \u00a74-2 4.0 ps hard-max 20\u201380% edge and Y1; TBD_from_sim_sweep vs extracted two-pole edges",
     "Y1": "model-derived static ER \u2265 3.5 dB floor (399.2 mV at Q=5000), rounded to 400 mV; TBD_from_link_budget for PVT/TDEC",
     "Y2": "exact \u2014 Vpp/2 at the 2.0 Vppd and 3.0 Vppd sign-off swings"
   },
+  "tap_configuration": "Each swing carries two hexagon variants (gizmo.md \u00a74-4): 'fir_retained' is the operative baseline while the FIR is in the mission path (X1 = TJ_FIR/2, DJ includes the ~0.05 UI FIR slice-DCD of \u00a74-2; tap banks at tap-code extrema); 'coordinates'/'polygons' are the no-FIR variant for the FIR-removal study, signed off with all tap weights forced to zero. The Y2 amplitude bound applies in every configuration.",
   "variants": {
     "2v": {
       "vpp_v": 2.0,
       "coordinates": {
-        "X1_ui": 0.158,
-        "X2_ui": 0.357,
+        "X1_ui": 0.114,
+        "X2_ui": 0.256,
         "Y1_v": 0.4,
         "Y2_v": 1.0
       },
       "derived": {
-        "eye_width_guarantee_ui": 0.684,
-        "eye_width_guarantee_ps": 6.4378,
+        "eye_width_guarantee_ui": 0.772,
+        "eye_width_guarantee_ps": 7.2661,
         "inner_opening_pp_v": 0.8,
         "amplitude_bound_pp_v": 2.0
       },
       "polygons": {
         "inner_keepout_hexagon_t_ui_v_volts": [
           [
-            0.158,
+            0.114,
             0.0
           ],
           [
-            0.357,
+            0.256,
             0.4
           ],
           [
-            0.643,
+            0.744,
             0.4
           ],
           [
-            0.842,
+            0.886,
             0.0
           ],
           [
-            0.643,
+            0.744,
             -0.4
           ],
           [
-            0.357,
+            0.256,
             -0.4
           ]
         ],
         "upper_forbidden_region": "v > +1.0 V for all t",
         "lower_forbidden_region": "v < -1.0 V for all t"
+      },
+      "fir_retained": {
+        "applies": "Operative baseline while the FIR is in the mission path (gizmo.md \u00a74/\u00a74-4); tap banks exercised at tap-code extrema against this hexagon",
+        "DJ_pp_ui": 0.123,
+        "TJ_pp_ui": 0.277748,
+        "X1_ui": 0.139,
+        "X2_ui": 0.281,
+        "Y1_v": 0.4,
+        "Y2_v": 1.0,
+        "eye_width_guarantee_ui": 0.722,
+        "eye_width_guarantee_ps": 6.7955,
+        "inner_keepout_hexagon_t_ui_v_volts": [
+          [
+            0.139,
+            0.0
+          ],
+          [
+            0.281,
+            0.4
+          ],
+          [
+            0.719,
+            0.4
+          ],
+          [
+            0.861,
+            0.0
+          ],
+          [
+            0.719,
+            -0.4
+          ],
+          [
+            0.281,
+            -0.4
+          ]
+        ]
       }
     },
     "3v": {
       "vpp_v": 3.0,
       "coordinates": {
-        "X1_ui": 0.158,
-        "X2_ui": 0.291,
+        "X1_ui": 0.114,
+        "X2_ui": 0.208,
         "Y1_v": 0.4,
         "Y2_v": 1.5
       },
       "derived": {
-        "eye_width_guarantee_ui": 0.684,
-        "eye_width_guarantee_ps": 6.4378,
+        "eye_width_guarantee_ui": 0.772,
+        "eye_width_guarantee_ps": 7.2661,
         "inner_opening_pp_v": 0.8,
         "amplitude_bound_pp_v": 3.0
       },
       "polygons": {
         "inner_keepout_hexagon_t_ui_v_volts": [
           [
-            0.158,
+            0.114,
             0.0
           ],
           [
-            0.291,
+            0.208,
             0.4
           ],
           [
-            0.709,
+            0.792,
             0.4
           ],
           [
-            0.842,
+            0.886,
             0.0
           ],
           [
-            0.709,
+            0.792,
             -0.4
           ],
           [
-            0.291,
+            0.208,
             -0.4
           ]
         ],
         "upper_forbidden_region": "v > +1.5 V for all t",
         "lower_forbidden_region": "v < -1.5 V for all t"
+      },
+      "fir_retained": {
+        "applies": "Operative baseline while the FIR is in the mission path (gizmo.md \u00a74/\u00a74-4); tap banks exercised at tap-code extrema against this hexagon",
+        "DJ_pp_ui": 0.123,
+        "TJ_pp_ui": 0.277748,
+        "X1_ui": 0.139,
+        "X2_ui": 0.233,
+        "Y1_v": 0.4,
+        "Y2_v": 1.5,
+        "eye_width_guarantee_ui": 0.722,
+        "eye_width_guarantee_ps": 6.7955,
+        "inner_keepout_hexagon_t_ui_v_volts": [
+          [
+            0.139,
+            0.0
+          ],
+          [
+            0.233,
+            0.4
+          ],
+          [
+            0.767,
+            0.4
+          ],
+          [
+            0.861,
+            0.0
+          ],
+          [
+            0.767,
+            -0.4
+          ],
+          [
+            0.233,
+            -0.4
+          ]
+        ]
       }
     }
   },
   "budget_decomposition": {
-    "note": "Horizontal dual-Dirac from \u00a73-1 no-FIR allocations at BER 1e-12. X1 equals total closure by construction.",
+    "note": "Horizontal dual-Dirac from \u00a73 no-FIR allocations at BER 1e-12. X1 equals total closure by construction.",
     "internal_raw_ber": 1e-12,
     "Q": 7.034,
-    "sigma_RJ_ui_rms": 0.015,
-    "DJ_pp_ui": 0.10600000000000001,
-    "TJ_pp_ui": 0.31702,
-    "X1_ui_polygon": 0.158,
-    "X1_ui_exact": 0.15851,
+    "sigma_RJ_ui_rms": 0.011,
+    "DJ_pp_ui": 0.07300000000000001,
+    "TJ_pp_ui": 0.227748,
+    "X1_ui_polygon": 0.114,
+    "X1_ui_exact": 0.113874,
     "horizontal_per_side_ui": {
-      "ISI/2": 0.0225,
+      "ISI/2": 0.006,
       "DCD/2": 0.0125,
       "BUJ/2": 0.018,
-      "RJ = Q(1e-12)\u00b7\u03c3_RJ": 0.10551
+      "RJ = Q(1e-12)\u00b7\u03c3_RJ": 0.077374
     },
-    "horizontal_total_ui": 0.15851,
+    "horizontal_total_ui": 0.113874,
     "horizontal_margin_ui": 0.0,
-    "vertical_status": "Y1 not decomposed arithmetically; MRM P(V) static floor. Y2 = Vpp/2 per variant."
+    "vertical_status": "Y1 not decomposed arithmetically; MRM P(V) static floor. Y2 = Vpp/2 per variant.",
+    "fir_retained": {
+      "note": "FIR-enabled variant: DJ adds the ~0.05 UI FIR slice-DCD booked in gizmo.md \u00a74-2.",
+      "DJ_pp_ui": 0.123,
+      "TJ_pp_ui": 0.277748,
+      "X1_ui_polygon": 0.139,
+      "X1_ui_exact": 0.138874
+    }
   }
 }

@@ -37,9 +37,9 @@ The mission loops already provide two in-situ instruments, both pinned to the da
 
 What this buys, against the committed **internal raw-BER spec of < 1e-12** (§1-3):
 
-- Direct measurement of **eye height and eye width at a target BER** at the actual slicer input — the quantity the §3-1 / §6-9 jitter and margin budgets ultimately close against, measured where they bind rather than inferred from external instrumentation. In a CPO package with **no accessible electrical test point** (§3-1, Figure 3-1b), this is the only way to see the received electrical eye at all.
+- Direct measurement of **eye height and eye width at a target BER** at the actual slicer input — the quantity the §3 / §6-9 jitter and margin budgets ultimately close against, measured where they bind rather than inferred from external instrumentation. In a CPO package with **no accessible electrical test point** (§3, Figure 3-1b), this is the only way to see the received electrical eye at all.
 - **Margin monitoring during live traffic**: the measurement is non-destructive — the mission slicers, CDR, and adaptation loops are untouched while the monitor scans (constraints in §9-8).
-- **BER contour / bathtub estimation** and extrapolation toward the 1e-12 operating point using the same dual-Dirac / `Q` conventions as §3-1.
+- **BER contour / bathtub estimation** and extrapolation toward the 1e-12 operating point using the same dual-Dirac / `Q` conventions as §3.
 - **Adaptation diagnostics**: independent cross-checks of the Vp, offset, CTLE, and MM-CDR convergence points (§9-7).
 
 ### 9-2 Block description
@@ -195,7 +195,7 @@ for offs in range(-16, +16):                    # horizontal: ±0.5 UI in 1/32-U
 | 2^26 UI | ≈ 0.63 ms | ≈ 1.5e-8 | ≈ 10.3 s |
 | 2^32 UI | ≈ 40 ms | ≈ 2.3e-10 | ≈ 11 min |
 
-Directly resolving the **1e-12 internal-spec contour** is impractical per point (≳ 100 s/point for stable counts); the intended methodology is to measure contours in the 1e-4 … 1e-9 range and **extrapolate to 1e-12 with the dual-Dirac / `Q`-scale conventions already used by §3-1** (`Q(1e-12) = 7.035`; horizontal extrapolation per eye side, vertical per rail). The extrapolation validity bounds (minimum contour set, fit residual limits) are `TBD_from_sim_sweep`.
+Directly resolving the **1e-12 internal-spec contour** is impractical per point (≳ 100 s/point for stable counts); the intended methodology is to measure contours in the 1e-4 … 1e-9 range and **extrapolate to 1e-12 with the dual-Dirac / `Q`-scale conventions already used by §3** (`Q(1e-12) = 7.035`; horizontal extrapolation per eye side, vertical per rail). The extrapolation validity bounds (minimum contour set, fit residual limits) are `TBD_from_sim_sweep`.
 
 ### 9-7 Calibration and diagnostic cross-checks
 
@@ -230,7 +230,7 @@ And its row for the §7-11 dead-band summary:
 The observe-only property is structural (§7-8 rule 1: one controller per node — every node the monitor observes already has its owner), but two **analog** coupling paths do not vanish by architecture; together with one structural policy rule, they are explicit sign-off items:
 
 1. **Static input loading.** The monitor comparator's input capacitance on the `y(k)` node must be **constant regardless of monitor enable, threshold, or phase state** (present and biased even when idle): a load that toggles with monitor activity would modulate the very eye being measured, and the mission eye when the monitor is off would differ from the eye when it scans. The slicer-input full-scale / bandwidth budget of §2-2 and §5 must include the fourth comparator's load from the outset (`TBD_analog_design`).
-2. **Monitor-PI clock coupling.** During a scan, `pi_code_mon` sweeps every phase relative to the data-path clock, so supply/substrate coupling from the monitor clock branch arrives at the data-path PI at every possible phase relationship. Injected jitter on the data sample phase must remain negligible against the RX jitter allocations (§3-1 class); this closes with the extracted clock-distribution design (`TBD_analog_design`).
+2. **Monitor-PI clock coupling.** During a scan, `pi_code_mon` sweeps every phase relative to the data-path clock, so supply/substrate coupling from the monitor clock branch arrives at the data-path PI at every possible phase relationship. Injected jitter on the data sample phase must remain negligible against the RX jitter allocations (§3 class); this closes with the extracted clock-distribution design (`TBD_analog_design`).
 3. **Future auto-margining stays observe-only.** Any feature that would act on monitor results (e.g. margin-triggered re-adaptation) must gate through firmware policy, never close a hardware loop on a mission node — preserving §7-8 rule 1.
 
 **Bring-up and operating constraints** (§7-10 alignment):
