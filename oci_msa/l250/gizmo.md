@@ -812,6 +812,16 @@ if ui_count == decimation:                          # one vote per window
 
 `corr > 0 ⇔ h_m > 0 ⇔` **under-boosted** CTLE → raise peaking; `corr < 0 ⇔` over-boosted → lower. Lag 1 senses the first post-cursor (HF / Kh-like deficit); longer lags (3–6) sense the long-tail / Kl-like residue — `lags` sums a configurable set into **one** metric so a single code covers both.
 
+![Residual post-cursors in the three CTLE regimes](./ctle_postcursor_regimes.png)
+
+*Figure 7-1: Residual post-cursors on either side of the CTLE optimum. Under-boost leaves a slow settling tail (positive post-cursors → vote +1); at convergence the post-cursors sit inside `corr_deadband` (vote 0); over-boost rings the pulse (negative post-cursors → vote −1). All post-cursors slide through zero together as the single peaking code climbs, which is what makes one summed metric sufficient.*
+
+**Why the signed correlation, not a magnitude cost.** The quantity the equalizer ultimately protects is the eye opening, and the worst-case ISI closure is the peak-distortion sum `Σ|h_m|` — so one might expect the loop to minimize that directly. It deliberately does not, for three reasons. (i) *A magnitude cost loses the step direction:* `Σ|h_m|` is V-shaped in the peaking code, so a single reading cannot distinguish under- from over-boost — descending it requires dithering the code and comparing `ΔJ`, injecting deliberate disturbances into a knob whose every step moves the CDR lock point (§7-8). The signed correlation instead *crosses* zero at the optimum: one window measurement carries both the error and its direction, exactly the shape a vote → accumulate loop needs. (ii) *With one knob the two equilibria coincide:* every post-cursor responds monotonically to peaking in the same direction (Figure 7-1), so the signed sum's zero crossing lands at essentially the code where `Σ|h_m|` bottoms out — both criteria are projections of the same residual onto the same single degree of freedom. (iii) *The absolute value is statistically worse from one-bit observables:* the per-UI product `d(k−m)·e(k)` is an unbiased estimator whose noise averages to zero over the window, while a rectified `Σ|ĥ_m|` is biased upward near the noise floor (`E|ĥ| > |h|` when `|h| ≲ 1/√D`) — precisely in the converged regime it would stop measuring the channel and start measuring its own noise. The magnitude criterion remains available offline: firmware can sweep the peaking code against the §7-6a `ĥ_i` readbacks (or the eye monitor's measured opening) as a bring-up characterization or convergence cross-check.
+
+![Signed correlation vs magnitude cost across the peaking code](./ctle_cost_functions.png)
+
+*Figure 7-2: The two candidate cost functions against the peaking code. Left: the signed window correlation used by the loop — monotone through zero, so the sign of a single reading is the vote and the zero crossing (inside `corr_deadband`) is the equilibrium. Right: the magnitude cost `Σ|h_m|` — its minimum sits at essentially the same code, but the observable is blind to which side of the optimum the loop is on.*
+
 **Mapping to the common architecture:** observe = per-UI `(d, e)` pairs (exactly the outputs of `VpAdaptNrz.step`); average = `decimation`-UI correlation window; vote = dead-band comparison; DAC = `PeakingDac`; code maps **linear-in-dB** to peaking.
 
 **Truth table:**
