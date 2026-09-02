@@ -593,7 +593,8 @@ All first-order loops (Vp, AGC, offset, CTLE) share one digital template (the ob
 
 ```text
 (1) observe    — per-UI sample or readback (slicer outputs, Vp codes, …)
-(2) average    — accumulate over a decimation window (or per-UI for Vp)
+(2) average    — accumulate over a decimation window (firmware-programmable
+                 per loop, §7-9; the Vp default is a 1-UI window = per-UI voting)
 (3) vote       — truth table on the window measurement → vote ∈ {+1, 0, −1}
                  (dead-band / hysteresis lives HERE: vote 0 inside the band)
 (4) scale      — vote enters a sub-LSB accumulator with gain 1/2^shift LSB/vote
@@ -609,7 +610,7 @@ Shared fixed-point template (each loop instantiates this with its own values —
 | `N_code` | DAC / code register width | per loop (`dac_bits` / `code_bits`) |
 | `N_shift` | Sub-LSB gain shift | per loop (`*_shift`) |
 | `N_accum` | Accumulator width | `N_code + N_shift` (holds `0 … (2^N_code − 1)·2^N_shift`) |
-| `D` | Decimation (UI per vote) | per loop (`decimation`; 1 for Vp) |
+| `D` | Decimation (UI per vote) | per loop (`decimation`) — **firmware-programmable register on every loop**, not a synthesis constant (§7-9); Vp default 1 |
 | `T_LSB` | Min UI per code LSB | `D · 2^N_shift` |
 
 The accumulator classes are structurally identical across loops (`VpDac`, `GainDac`, `OffsetDac`, `PeakingDac`):
@@ -647,11 +648,20 @@ e_top = +1 if y > +vp_top else -1          # top error slicer
 e_bot = +1 if y > -vp_bot else -1          # bottom error slicer
 e = e_top if d == +1 else e_bot            # signed MM error = sign(y − d·Vp_rail)
 
-if d == +1:  dac_top.step(+e_top)          # valid-gated median vote, top rail
-else:        dac_bot.step(-e_bot)          # bottom rail (sign mirrored)
+# accumulate valid-gated votes into each rail's decimation window
+if d == +1:  vote_sum_top += e_top         # top rail active this UI
+else:        vote_sum_bot += -e_bot        # bottom rail (sign mirrored)
+ui_count += 1
+
+if ui_count == vp_decimation:              # window complete (default 1 = per-UI voting)
+    if vote_sum_top != 0: dac_top.step(+1 if vote_sum_top > 0 else -1)
+    if vote_sum_bot != 0: dac_bot.step(+1 if vote_sum_bot > 0 else -1)
+    vote_sum_top = 0; vote_sum_bot = 0; ui_count = 0
 ```
 
-**Mapping to the common architecture:** observe = per-UI slicer output; average = none (per-UI voting, the `1/2^vp_shift` sub-LSB gain *is* the filter); vote = the slicer output itself; DAC = `VpDac` saturating accumulator.
+The decimation window `vp_decimation` is a **firmware-programmable register** (as on every §7 loop, §7-9). At the default `vp_decimation = 1` the window holds a single UI — exactly one rail's valid-gated vote — and the loop reduces to per-UI stepping, in which case the `1/2^vp_shift` sub-LSB gain is the only filter. Larger windows take a **majority vote per rail per window** (the same construction as the CDR's `cdr_width`-UI vote dump, §6-4), trading update rate for vote-noise averaging per the §7-9 guidance; the majority collapse to a ±1 vote keeps the per-window DAC step fixed at `1/2^vp_shift` LSB, so the loop remains a bang-bang median lock at any window length.
+
+**Mapping to the common architecture:** observe = per-UI slicer output; average = `vp_decimation`-UI window per rail (majority vote; default 1 = per-UI); vote = sign of the window sum; DAC = `VpDac` saturating accumulator.
 
 **Truth tables** (one per rail; the loop only votes when its rail is active):
 
@@ -679,8 +689,8 @@ Vp_bot (valid only when `d = −1`; vote is `−e₋`):
 | `V_LSB,vp` | `v_lsb` | `V_LSB,vp` (TBD — slicer-input full-scale not yet determined) | Threshold = `code · v_lsb` (range `0 … (2^dac_bits − 1)·V_LSB,vp`) |
 | `N_shift` | `vp_shift` | 4 | Loop gain = 1/2⁴ LSB per valid vote |
 | `N_accum` | `VpDac.acc` (`acc_max` property) | 12 bits | `dac_bits + vp_shift`; saturate no wrap |
-| `D` | — | 1 (per-UI, valid-gated) | Valid votes arrive at ≈ rate/2 per rail |
-| `T_LSB` | — | ≈ 32 UI per LSB | `2^vp_shift` valid votes ≈ `2·2^vp_shift` UI |
+| `D` | `vp_decimation` | **1 UI** (programmable, 1 … 2¹² UI) | Window per vote, valid-gated per rail. At 1 (default) each window holds one rail's vote = per-UI voting; larger windows majority-vote each rail per window (§7-9 gear-shift / noise-averaging knob) |
+| `T_LSB` | — | ≈ 32 UI per LSB (at `D = 1`) | `2·2^vp_shift` UI at `D = 1` (valid votes at ≈ rate/2 per rail); `vp_decimation · 2^vp_shift` UI for `D ≫ 1` (every window produces a vote) |
 | — | `init_code_top`, `init_code_bot` | 32 (= `32·V_LSB,vp`) | Starting codes |
 | — | `mean_shift` | 10 | SE→diff running-mean bandwidth `1/2^10` per sample (model-only — stands in for the TIA DCOC loop, not RTL) |
 | — | `init_mean` | 0.0 | Starting SE→diff mean, set to TIA operating point if known (model-only — stands in for the TIA DCOC loop, not RTL) |
@@ -725,7 +735,7 @@ if ui_count == decimation:                      # one vote per window
 | `G_step` | `step_db` | **0.5 dB** / LSB (§4-1) | ±`2^(N_code,agc−1)·G_step` dB about mid-scale (`code_mid = 2^(N_code,agc−1)` = 0 dB) |
 | `N_shift` | `agc_shift` | 1 | Loop gain = 1/2 LSB per vote |
 | `N_accum` | `GainDac.acc` | `N_code,agc + agc_shift` bits | Saturate no wrap |
-| `D` | `decimation` | 4096 UI | Window length per vote |
+| `D` | `decimation` | 4096 UI (programmable, 2⁸ … 2¹⁶ UI) | Window length per vote; firmware-programmable rate knob (§7-9) |
 | `T_LSB` | — | ≥ 8192 UI per LSB | `decimation · 2^agc_shift` |
 | — | `init_code` | `None` → mid-scale (0 dB) | |
 
@@ -773,7 +783,7 @@ if ui_count == decimation:                       # one vote per window
 | `V_LSB,off` | `v_lsb` | `V_LSB,off` (TBD) | `offset_v = (code − code_mid)·v_lsb` ⇒ trim range `±2^(dac_bits−1)·V_LSB,off`; deliberately finer than `V_LSB,vp` (this loop is a fine trim resolving fractions of a Vp code) — constraint: `V_LSB,off < V_LSB,vp` |
 | `N_shift` | `offset_shift` | 1 | Loop gain = 1/2 LSB per vote |
 | `N_accum` | `OffsetDac.acc` | 9 bits | `dac_bits + offset_shift`; saturate no wrap |
-| `D` | `decimation` | 2048 UI | Window length per vote |
+| `D` | `decimation` | 2048 UI (programmable, 2⁸ … 2¹⁶ UI) | Window length per vote; firmware-programmable rate knob (§7-9) |
 | `DB` | `deadband_codes` | 1.0 Vp code | Dead-band half-width on mean imbalance |
 | `T_LSB` | — | ≥ 4096 UI per LSB | `decimation · 2^offset_shift` |
 | — | `init_code` | `None` → mid-scale (0 V) | |
@@ -819,7 +829,7 @@ if ui_count == decimation:                          # one vote per window
 | `N_code,ctle` | `code_bits` | **4-bit** (16 codes) | Peaking-code width (codes `0 … 2^N_code,ctle − 1` = `0…15`) |
 | `N_shift` | `ctle_shift` | 1 | Loop gain = 1/2 LSB per vote |
 | `N_accum` | `PeakingDac.acc` | `N_code,ctle + ctle_shift` bits | Saturate no wrap |
-| `D` | `decimation` | 2048 UI | Correlation window per vote |
+| `D` | `decimation` | 2048 UI (programmable, 2⁸ … 2¹⁶ UI) | Correlation window per vote; firmware-programmable rate knob (§7-9). Note the correlation noise floor `1/√(D·len(lags))` and hence the `corr_deadband` sizing move with `D` |
 | `M` | `lags` | `(1,)` | Decision lags summed into the metric (add 3–6 for long-tail) |
 | `DB` | `corr_deadband` | 0.02 | No-vote dead-band on the mean correlation |
 | `P_min`, `P_step` | `peak_min_db`, `peak_step_db` | **2.5 dB**, **0.5 dB**/LSB (§4-1) | `peaking_db = peak_min_db + code·peak_step_db` ⇒ `P_min … P_min + (2^N_code,ctle − 1)·P_step` = 2.5 … 10.0 dB |
@@ -882,7 +892,7 @@ Setting `i = 0` recovers the Vp equilibrium check — `⟨d(k)·e(k)⟩ → 0` w
 | Placeholder | Model/RTL name | Default | Meaning |
 |---|---|---|---|
 | `M_est` | `lags` | `(−1, +1, +2, +3)` | Lag set, all in parallel; the deepest lag sets the `d`-history depth |
-| `D_est` | `decimation` | 65536 UI | Window per readback snapshot; statistical floor of the mean is `1/√D_est ≈ 0.004` |
+| `D_est` | `decimation` | 65536 UI (programmable, 2¹² … 2²⁴ UI) | Window per readback snapshot; firmware-programmable (§7-9). Statistical floor of the mean is `1/√D_est` ≈ 0.004 at the default |
 | `N_acc,est` | `acc` width | 17 bits signed | Bounded by the window (`\|acc\| ≤ D_est`) — saturation impossible by construction, unlike the DAC accumulators |
 | — | `h_hat[i]` | signed fraction ∈ [−1, +1] | Normalized cursor readback (units of `σ_e`, see caveat above) |
 | — | `e` pipeline | 1 UI (lag −1 only) | Pre-cursor alignment of `e(k)` against `d(k+1)` |
@@ -925,13 +935,13 @@ Whether this is observable in practice (a dip/spike in `corr_meas` right after a
 
 ### 7-9 Recommended step sizes and bandwidth plan
 
-Each first-order loop's bandwidth is set by two knobs — decimation `D` (UI per vote) and shift `N_shift` (sub-LSB gain) — giving a **minimum update interval of `D · 2^N_shift` UI per code LSB**. The recommendation is roughly **a decade or more of separation between adjacent loops in the nesting order**, which the defaults satisfy:
+Each first-order loop's bandwidth is set by two knobs — decimation `D` (UI per vote) and shift `N_shift` (sub-LSB gain) — giving a **minimum update interval of `D · 2^N_shift` UI per code LSB**. **Every loop's `decimation` is a firmware-programmable register, not a synthesis-time constant** — including the Vp loops' `vp_decimation` (§7-3, default 1 = per-UI voting) — which is what enables the acquisition gear-shift below and post-silicon re-tuning of the nesting ladder without a respin. The recommendation is roughly **a decade or more of separation between adjacent loops in the nesting order**, which the defaults satisfy:
 
 | Loop | Knobs (default) | UI per code LSB (min) | Time per LSB @ 9.41 ps UI | Separation vs inner neighbour |
 |---|---|---|---|---|
 | CDR proportional | `p_step/p_div = 2/512`, `cdr_width = 128` | ≤ 0.5 PI code / 128-UI window (≤ 0.125 per 32 UI — per-UI slew unchanged) | ~1.2×10⁻⁴ UI phase step per window per unit `diff` | — (innermost) |
 | CDR frequency | `f_step/f_div = 2/64` | `f_div/f_step = 32` windows ≈ 4096 UI to change the ramp by 1 sub-code (unchanged in time) | — | 32 windows per f-quantum: F path ~2 decades below P path per UI |
-| Vp_top / Vp_bot | `vp_shift = 4`, per-UI valid-gated | ~32 UI (16 valid votes × ~2 UI/valid) | ~0.3 ns | ±1 LSB dither around lock across a 128-UI CDR window ✓ (up to ~4 LSB/window slew only during acquisition, §7-3) |
+| Vp_top / Vp_bot | `vp_shift = 4`, `vp_decimation = 1` (per-UI valid-gated at the default; programmable window, §7-3) | ~32 UI (16 valid votes × ~2 UI/valid at `D = 1`) | ~0.3 ns | ±1 LSB dither around lock across a 128-UI CDR window ✓ (up to ~4 LSB/window slew only during acquisition, §7-3) |
 | Offset / BLW | `decimation = 2048`, `offset_shift = 1` | ≥ 4096 UI | ~39 ns | ~128× slower than Vp ✓ |
 | CTLE | `decimation = 2048`, `ctle_shift = 1` | ≥ 4096 UI | ~39 ns | ~128× slower than the CDR dump ✓ |
 | AGC | `decimation = 4096`, `agc_shift = 1` | ≥ 8192 UI | ~77 ns | 2× slower than offset/CTLE, ~256× slower than Vp ✓ |
