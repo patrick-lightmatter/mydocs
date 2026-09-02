@@ -93,7 +93,7 @@ Setting `i = 0` recovers the Vp equilibrium check — `⟨d(k)·e(k)⟩ → 0` w
 | Placeholder | Model/RTL name | Default | Meaning |
 |---|---|---|---|
 | `M_est` | `lags` | `(−1, +1, +2, +3)` | Lag set, all in parallel; the deepest lag sets the `d`-history depth (`TBD_from_sim_sweep`) |
-| `D_est` | `decimation` | 65536 UI | Window per readback snapshot; statistical floor of the mean is `1/√D_est ≈ 0.004` |
+| `D_est` | `decimation` | 65536 UI (programmable, 2¹² … 2²⁴ UI) | Window per readback snapshot; firmware-programmable per the §7-9 convention (all §7 decimations are registers). Statistical floor of the mean is `1/√D_est` ≈ 0.004 at the default |
 | `N_acc,est` | `acc` width | 17 bits signed | Bounded by the window (`|acc| ≤ D_est`) — saturation impossible by construction, unlike the DAC accumulators |
 | — | `h_hat[i]` | signed fraction ∈ [−1, +1] | Normalized cursor readback (units of `σ_e`, see caveat above) |
 | — | `e` pipeline | 1 UI (lag −1 only) | Pre-cursor alignment of `e(k)` against `d(k+1)` |
