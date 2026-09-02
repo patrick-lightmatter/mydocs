@@ -638,7 +638,7 @@ All continuous loops share the **same dual-error-slicer observables**: the data 
 
 ### 7-3 Vp_top / Vp_bot — error-slicer threshold (h₀ digitisation)
 
-**Algorithm** (`VpAdaptNrz`). Each rail's threshold DAC is median/SAR-adjusted so its error slicer sits at ~50/50 duty for the active polarity — the threshold converges to the **conditional median** of the top / bottom rail amplitude at the data sample phase. Since that rail median *is* the main cursor (`y = d·h₀ + ISI`, §A-3), the converged thresholds satisfy `Vp_top ≈ Vp_bot ≈ h₀`: this loop **is** the h₀ digitizer, and its codes are the `|h₀|` readback consumed by the AGC and offset loops. Per UI:
+**Algorithm** (`VpAdaptNrz`). Each rail's threshold DAC is median/SAR-adjusted so its error slicer sits at ~50/50 duty for the active polarity — the threshold converges to the **conditional median** of the top / bottom rail amplitude at the data sample phase. It is the median, not the mean, because the slicer reports only the *sign* of the residual and every vote steps the DAC by the same fixed amount regardless of error magnitude: the loop's equilibrium is where up- and down-votes balance by count, `P(y > Vp) = P(y < Vp) = 1/2` — the 50th percentile — whereas a mean lock would require amplitude-weighted updates (a linear error measurement this slicer-based architecture deliberately does not have). Since that rail median *is* the main cursor (`y = d·h₀ + ISI`, §A-3), the converged thresholds satisfy `Vp_top ≈ Vp_bot ≈ h₀`: this loop **is** the h₀ digitizer, and its codes are the `|h₀|` readback consumed by the AGC and offset loops. Per UI:
 
 ```python
 y = x_se - running_mean                    # SeToDiff: coarse SE→diff centering (behavioral stand-in for the TIA SE→diff + DCOC)
