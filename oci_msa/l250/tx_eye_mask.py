@@ -28,7 +28,7 @@ OUT = Path(__file__).resolve().parent
 
 UI_PS = 9.412
 Q_1E12 = 7.034
-SIGMA_RJ = 0.011  # JH4u-bound (gizmo.md §2-3 tougher-spec rule); supersedes 0.015
+SIGMA_RJ = 0.011  # JH4u-bound (gizmo.md §2-3 tougher-spec rule)
 DCD = 0.025
 ISI = 0.012
 BUJ = 0.036
@@ -252,7 +252,7 @@ def write_json(x2s: dict[str, float], x2s_fir: dict[str, float]) -> None:
         "name": "Gizmo OCI-MSA TX electrical eye mask at TP1",
         "spec_reference": "tx_eye_mask.md (normative text; gizmo.md §3-4 is a pointer stub)",
         "compliance_note": "Internal mask; geometry follows the OIF-CEI TX hexagon construction but this is not a CEI compliance claim.",
-        "test_point": "TP1, electrical input to the MRM modulator (V_TXP − V_TXN), extracted 60 fF MRM-plus-pad load present",
+        "test_point": "TP1, electrical input to the MRM modulator (V_TXP − V_TXN), extracted 150 fF MRM-plus-pad load present (gizmo.md §3-3)",
         "alignment": "Eye folded over 1 UI against the ideal (jitter-free) serializer symbol clock; mean 0 V crossing at t = 0 UI.",
         "ber_convention": "Raw BER 1e-12 (FEC-free internal spec). Q = 7.034, transition density ρ = 1.",
         "ui_ps": UI_PS,

@@ -29,7 +29,7 @@
 
 | dj metric (§2-1) | dj limit | Internal analog (§2-2) | Internal value | Status |
 |---|---|---|---|---|
-
+ 
 ## Section 3: TX Pre-Driver & Driver Specification
 
 ### 3-1 Input pre-driver — CDNS deliverable
