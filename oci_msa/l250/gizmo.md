@@ -30,7 +30,7 @@ flowchart LR
     SL -->|"d(k), e(k)"| CDR["DigitalMmCdr<br/>majority-vote MM CDR"]
     CDR -->|pi_code 0…31| PI["Phase interpolator"]
     PI -->|sampling phase| SL
-    SL -->|"d(k), e(k)"| EST["ChanEstNrz<br/>ĥ_i cursor readback<br/>(digital correlator, §7-6a)"]
+    SL -->|"d(k), e(k)"| EST["ChanEstNrz<br/>ĥ_i cursor readback<br/>(digital correlator, §7-4)"]
   end
 
   style TP1 fill:#ffe1e1
@@ -446,11 +446,11 @@ state_p = wrap(state_p + delta)                          (±reg_max = ±16384)
 pi_code = floor(state_p / p_div) mod 32                  → PI, 1/32 UI per code
 ```
 
-The lock detector (`CdrLockDetector`, optional via the `lock_detector` field) is fed once per dump with the per-code proportional and frequency contributions (`p_inc/p_div`, `state_f/f_div`); lock gates the bring-up of the slower loops (Section 7-10). A separate **signal-valid gate** (§6-11) suppresses `en_p` and `en_f` on an invalid-signal condition, holding `pi_code`, `state_p`, and `state_f` so the CDR resumes from its held operating point rather than re-acquiring cold.
+The lock detector (`CdrLockDetector`, optional via the `lock_detector` field) is fed once per dump with the per-code proportional and frequency contributions (`p_inc/p_div`, `state_f/f_div`); lock gates the bring-up of the slower loops (Section 7-11). A separate **signal-valid gate** (§6-11) suppresses `en_p` and `en_f` on an invalid-signal condition, holding `pi_code`, `state_p`, and `state_f` so the CDR resumes from its held operating point rather than re-acquiring cold.
 
 ### 6-7a CDR lock detection
 
-**Purpose.** The lock detector distinguishes between the CDR's **acquisition transient** (where it is still pulling the sampling phase onto the correct data-eye location and frequency register is slewing) and **tracking / mission mode** (where the loop has converged and is in its steady-state dither around the lock point). Lock gates the bring-up of the downstream adaptation loops (§7-10): Vp, offset, CTLE, and AGC are held frozen at their presets until the CDR asserts lock, then released in their nested sequence. This prevents the slower loops from voting on an eye that is still moving — their observables (the data decision `d` and signed error `e`) are only meaningful at a settled sampling phase.
+**Purpose.** The lock detector distinguishes between the CDR's **acquisition transient** (where it is still pulling the sampling phase onto the correct data-eye location and frequency register is slewing) and **tracking / mission mode** (where the loop has converged and is in its steady-state dither around the lock point). Lock gates the bring-up of the downstream adaptation loops (§7-11): Vp, offset, CTLE, and AGC are held frozen at their presets until the CDR asserts lock, then released in their nested sequence. This prevents the slower loops from voting on an eye that is still moving — their observables (the data decision `d` and signed error `e`) are only meaningful at a settled sampling phase.
 
 **Lock criterion (proportional + frequency convergence).** The lock detector observes two quantities on every CDR dump:
 
@@ -472,14 +472,14 @@ where `lock_p_tol` and `lock_f_tol` are programmable thresholds in units of PI c
 | Frequency tolerance | `lock_f_tol` | 0.05 PI codes (≈ 0.0016 UI) | Passes if `state_f` is changing by ≤ 0.05 codes per dump; at 128 UI/dump this is ≈ 4 ppm resolution (0.05/128 ≈ 4E-4) |
 | Consecutive dumps | `lock_thresh` | 16 | Must see both conditions pass for 16 dumps in a row before asserting lock; prevents false lock during a transient glitch |
 
-**Lock lost (re-acquisition).** Once lock is asserted, the detector continues to monitor the same two observables. If either exceeds its threshold for a programmable number of consecutive dumps (`unlock_thresh`, typically equal to `lock_thresh`), lock is **de-asserted** and the CDR is declared to have lost lock. In this event the downstream loops are frozen (`adapt=False`) and the bring-up sequence (§7-10) re-enters at stage 1 — the CDR continues to run (with `en_p`/`en_f` still enabled) and the system waits for lock to be re-asserted before resuming Vp / offset / CTLE / AGC. This is a **warm re-entry**: because the CDR state (`pi_code`, `state_p`, `state_f`) is not reset, the loop resumes from wherever it was when lock was lost rather than re-acquiring from presets, which is faster and safer for transient disturbances.
+**Lock lost (re-acquisition).** Once lock is asserted, the detector continues to monitor the same two observables. If either exceeds its threshold for a programmable number of consecutive dumps (`unlock_thresh`, typically equal to `lock_thresh`), lock is **de-asserted** and the CDR is declared to have lost lock. In this event the downstream loops are frozen (`adapt=False`) and the bring-up sequence (§7-11) re-enters at stage 1 — the CDR continues to run (with `en_p`/`en_f` still enabled) and the system waits for lock to be re-asserted before resuming Vp / offset / CTLE / AGC. This is a **warm re-entry**: because the CDR state (`pi_code`, `state_p`, `state_f`) is not reset, the loop resumes from wherever it was when lock was lost rather than re-acquiring from presets, which is faster and safer for transient disturbances.
 
 **Lock detect vs. signal-valid gate (§6-11).** These are separate mechanisms with distinct purposes:
 
 - **Lock detect** distinguishes acquisition from tracking based on loop observables (phase/frequency convergence). It gates the adaptation-loop bring-up sequence but does **not** freeze the CDR itself — the CDR continues to update `pi_code` and track the data even during acquisition (before lock).
 - **Signal-valid gate** detects an **invalid signal** condition (e.g. loss of light, sustained rail-stuck) and **freezes the CDR** by suppressing `en_p`/`en_f`, holding `pi_code`, `state_p`, and `state_f` at their last mission values so the receiver can resume immediately when signal returns. It also freezes all adaptation loops. Signal-valid is an external assertion (from the optical/analog domain, e.g. loss-of-signal detector), not derived from the CDR's loop observables.
 
-In the behavioral model, the lock detector is instantiated via the optional `lock_detector` field in the `DigitalMmCdr` class; if omitted, lock is considered always-asserted and the bring-up gates in §7-10 are bypassed. The RTL/firmware implementation should provide programmable thresholds, counters, and a lock status readback.
+In the behavioral model, the lock detector is instantiated via the optional `lock_detector` field in the `DigitalMmCdr` class; if omitted, lock is considered always-asserted and the bring-up gates in §7-11 are bypassed. The RTL/firmware implementation should provide programmable thresholds, counters, and a lock status readback.
 
 ### 6-8 PI resolution and loop-gain rationale
 
@@ -487,7 +487,7 @@ The **5-bit** PI resolution (`n_pi_codes = 32`, one code ≈ 294 fs) is an **ill
 
 The proportional divider is set to `p_step/p_div = 2/512`, giving a per-window proportional phase step of `diff · 1.22×10⁻⁴` UI. This value of `p_div` keeps the loop's steady-state dither pinned at the quantisation floor of 1 PI code (1/32 UI ≈ 0.031 UI p-p, RMS ≈ 0.0040 UI); a smaller `p_div` was found in simulation to let the loop hunt across 2 PI codes (≈ 0.063 UI p-p) around lock instead of settling within 1.
 
-This configuration was validated end-to-end in a behavioral simulation study (Jul 2026, at the then-current `cdr_width = 32` / `f_div = 256` split): the loop locks immediately and tracks a ±200 ppm frequency offset, with `state_f` settling within 1 % of theory and zero counted bit errors, at the cost of a ~56k UI (~0.5 µs) acquisition time for the 200 ppm pull-in. Smaller `p_div` values acquire faster (~9–11k UI) but reintroduce the hunting noted above — hence the recommendation that `p_div` (and/or `f_step`) be **programmable** for an acquisition gear-shift (§7-9).
+This configuration was validated end-to-end in a behavioral simulation study (Jul 2026, at the then-current `cdr_width = 32` / `f_div = 256` split): the loop locks immediately and tracks a ±200 ppm frequency offset, with `state_f` settling within 1 % of theory and zero counted bit errors, at the cost of a ~56k UI (~0.5 µs) acquisition time for the 200 ppm pull-in. Smaller `p_div` values acquire faster (~9–11k UI) but reintroduce the hunting noted above — hence the recommendation that `p_div` (and/or `f_step`) be **programmable** for an acquisition gear-shift (§7-10).
 
 The move to `cdr_width = 128` / `f_div = 64` (Aug 2026) was re-validated two ways: (a) a synthetic-plant A/B of the two operating points shows identical lock from a 0.3 UI offset, identical phase dither, and 200 ppm tracking with `|state_f|` within 0.2 % of the 26 844-count theory value; (b) a full-chain A/B in `mrm_nrz_transceiver_106g25.py` (identical waveform, bits, and alignment) locks at the same PI code with the same settled phase (−0.295 UI) and zero counted errors at both window widths. This is expected by construction — the per-UI proportional gain is invariant in `cdr_width` (the vote sum scales with the window) and `f_div · cdr_width` was held constant — so the per-window numbers below are quoted at the 128/64 point without re-derivation.
 
@@ -526,7 +526,7 @@ The CDR is specified as a first-order-dominant tracking loop with the following 
 
 ![CDR small-signal JTOL tolerance curve (from cdr_closed_loop_analysis.md §4.2, computed at a 32-UI window) overlaid on the IEEE P802.3dj Table 179-12 and OIF CEI-112G-XSR Table 24-12 masks at 106.25 GBd. The analyzed loop (f_n≈8.8 MHz, ζ≈2.13) clears both masks with wide margin; a re-tune candidate at the middle of the 4–6 MHz design target (f_n≈5 MHz, ζ≈2.0) still clears them but with less margin, illustrating the bandwidth trade discussed below.](jtol_curve.png)
 
-The **integer parameters** currently exercised in this document (`cdr_width = 128`, `p_step/p_div = 2/512`, `f_step/f_div = 2/64`) are the discrete equivalent of a proportional–integral loop; they were chosen to satisfy dither and pull-in criteria (§6-8) and give a self-consistent worked example, not to hit the 4–6 MHz closed-loop bandwidth *per se*. The loop-gain selection must be **verified against, and if necessary re-tuned to**, this bandwidth target once the loop-latency and jitter budgets are frozen. The verification is a small-signal linearization of the per-window update (§6-7) at the mission-mode operating point; the acquisition gear-shift (§7-9) is a separate operating point and is not constrained by the mission bandwidth target. That linearization is carried out in **`cdr_closed_loop_analysis.md`** (Sonntag & Stonick JSSC 2006 methodology) at the `cdr_width = 32` / `f_div = 256` point: at the CEI-XSR RJ baseline (σ_φ ≈ 0.022 UI) the default gains yield f_n ≈ 8.8 MHz and f_3dB ≈ 39 MHz — wider than this 4–6 MHz target. The per-UI-equivalent gains are unchanged at the committed `cdr_width = 128` point (§6-8), so f_n carries over approximately, but the 4× longer update interval adds transport delay that lowers the phase-margin ceiling (see the table above) — the as-analyzed 8.8 MHz point sits at or above the delay-implied ceiling, so the mission-mode gain retuning toward 4–6 MHz (integral path first, holding ζ > 1 per §6-10) is **mandatory rather than optional**, and `cdr_closed_loop_analysis.md` must be re-run with the 128-UI update interval and delay in the model once the operating crossing jitter is frozen.
+The **integer parameters** currently exercised in this document (`cdr_width = 128`, `p_step/p_div = 2/512`, `f_step/f_div = 2/64`) are the discrete equivalent of a proportional–integral loop; they were chosen to satisfy dither and pull-in criteria (§6-8) and give a self-consistent worked example, not to hit the 4–6 MHz closed-loop bandwidth *per se*. The loop-gain selection must be **verified against, and if necessary re-tuned to**, this bandwidth target once the loop-latency and jitter budgets are frozen. The verification is a small-signal linearization of the per-window update (§6-7) at the mission-mode operating point; the acquisition gear-shift (§7-10) is a separate operating point and is not constrained by the mission bandwidth target. That linearization is carried out in **`cdr_closed_loop_analysis.md`** (Sonntag & Stonick JSSC 2006 methodology) at the `cdr_width = 32` / `f_div = 256` point: at the CEI-XSR RJ baseline (σ_φ ≈ 0.022 UI) the default gains yield f_n ≈ 8.8 MHz and f_3dB ≈ 39 MHz — wider than this 4–6 MHz target. The per-UI-equivalent gains are unchanged at the committed `cdr_width = 128` point (§6-8), so f_n carries over approximately, but the 4× longer update interval adds transport delay that lowers the phase-margin ceiling (see the table above) — the as-analyzed 8.8 MHz point sits at or above the delay-implied ceiling, so the mission-mode gain retuning toward 4–6 MHz (integral path first, holding ζ > 1 per §6-10) is **mandatory rather than optional**, and `cdr_closed_loop_analysis.md` must be re-run with the 128-UI update interval and delay in the model once the operating crossing jitter is frozen.
 
 **Untracked jitter charged to the eye.** The bandwidth window above splits the applied sinusoidal-jitter (SJ) mask into a tracked part and an untracked part. Below the closed-loop corner the loop follows the SJ and it costs no eye; above the corner the CDR cannot track and the residual lands directly on the sampling instant, so it must be **absorbed by the horizontal eye budget** rather than by the loop. Two terms dominate the untracked residue:
 
@@ -539,7 +539,7 @@ Adding these to the TX-side contributions imported in §2 (notably the dj `JH4u`
 
 - **Acquisition:** cycle slips **permitted** while pulling in phase/frequency (before mission data).
 - **Mission mode:** slips **not permitted** in tracking — OIF-CEI burst limits (bursts > 7 symbols < 1E-20) require slips to be vanishingly rare once data delivery has begun.
-- **Loop shaping:** mission gains must be **heavily damped** (ζ ≫ 1, minimal jitter peaking) — not the acquisition gear-shift values. Defaults: `p_step/p_div = 2/512` (1-LSB dither floor, §6-8), `f_step/f_div = 2/64` (frequency path ≈ two decades below proportional, §7-9); higher acquisition gain via smaller `p_div` only until lock (§6-8, §7-9).
+- **Loop shaping:** mission gains must be **heavily damped** (ζ ≫ 1, minimal jitter peaking) — not the acquisition gear-shift values. Defaults: `p_step/p_div = 2/512` (1-LSB dither floor, §6-8), `f_step/f_div = 2/64` (frequency path ≈ two decades below proportional, §7-10); higher acquisition gain via smaller `p_div` only until lock (§6-8, §7-10).
 
 ### 6-11 Signal-valid gate — CDR state hold
 
@@ -553,7 +553,7 @@ The behavior is a **signal-valid gate**, driven by an external `signal_valid` in
   - Equivalently: `en_p` and `en_f` are forced low; the ternary vote generator (`EarlyLateVoteGenNrz`) and voter (`CdrVoter`) may keep running, but their output cannot move the phase or frequency state.
 - Signal valid again:
   - The CDR resumes from the held state (**warm re-acquire**); it does not fall back to `init_pi` or reset `state_f`.
-  - The lock detector re-arms and gates downstream adaptation loops as per §7-10.
+  - The lock detector re-arms and gates downstream adaptation loops as per §7-11.
 
 The signal-valid gate is deliberately **separate from `CdrLockDetector`**: gating the CDR on `locked` would prevent acquisition from cold (the loop is unlocked *by definition* while pulling in). Signal validity is an external condition (receive AFE / link controller); lock is a loop-internal metric. The two combine additively — the CDR integrates only when signal is valid *and* the acquisition/tracking machinery has not been externally disabled.
 
@@ -575,26 +575,25 @@ The specified behavior during a CID run is:
 
 ## Section 7: Digital Adaptation Loops
 
-The digital adaptation machinery comprises four first-order control loops — `VpAdaptNrz`, `AgcVpNrz`, `OffsetAdaptNrz`, `CtleAdaptNrz` — plus an **observe-only channel estimator** (`ChanEstNrz`, §7-6a), built on a common architecture: the shared vote → scale → accumulate → DAC template (§7-1), the loop inventory (§7-2), per-loop truth tables (§7-3 – §7-6a), and the convergence hierarchy (§7-10).
+The digital adaptation machinery comprises four first-order control loops — `VpAdaptNrz`, `AgcVpNrz`, `OffsetAdaptNrz`, `CtleAdaptNrz` — plus an **observe-only channel estimator** (`ChanEstNrz`, §7-4), built on a common architecture: the shared vote → scale → accumulate → DAC template (§7-1), the loop inventory (§7-2), per-loop truth tables (§7-3 – §7-7), and the convergence hierarchy (§7-11).
 
-**Mapping to the cursor-named loops.** The outline names the loops "Offset, h₀, h₁, h₋₁". In this architecture they map onto what is actually implemented:
+**Terminology: "DAC" as a digital control knob.** Throughout this section, "DAC" refers to a **digital code controlling an analog setting** — a programmable knob, not necessarily a literal digital-to-analog converter producing a voltage or current output. The Vp threshold DACs and the offset DAC do drive comparator reference voltages; the AGC code controls a transimpedance gain (the mechanism is `TBD_analog_design` — switched resistor array, Gilbert cell bias, or otherwise); the CTLE peaking code controls an equalizer transfer function (capacitor array, degeneration resistance, or the partner-provided implementation). In every case the loop accumulates an integer code and writes it to a register or interface that moves an analog operating point — "DAC" is the generic term for that integer → analog-setting mapping, independent of the underlying circuit topology.
 
 | Outline loop | Implemented as | Block |
 |---|---|---|
-| Offset | Offset / BLW common vertical-offset loop | `OffsetAdaptNrz` (§7-5) |
-| h₀ (amplitude) | Vp_top / Vp_bot rail digitisation (§7-3) + AGC on the merged \|Vp\| (§7-4) | `VpAdaptNrz`, `AgcVpNrz` |
-| h₁ (post-cursor) | CTLE peaking loop nulling the residual post-cursor correlation | `CtleAdaptNrz` (§7-6) |
-| h₋₁ (pre-cursor) | **No dedicated loop.** The MM CDR lock condition `h(−1) = h(+1)` handles the pre/post balance: the sampling phase, not an equalizer tap, is the h₋₁ control variable. See §7-7. | `DigitalMmCdr` |
-| ĥ_i readback (any lag) | Observe-only channel estimator: the §7-3 sign-sign update gated by `d(k−i)`, accumulated in a digital register — computes the baud-spaced cursors without controlling anything | `ChanEstNrz` (§7-6a) |
+| Offset | Offset / BLW common vertical-offset loop | `OffsetAdaptNrz` (§7-6) |
+| h₀ (amplitude) | Vp_top / Vp_bot rail digitisation (§7-3) + AGC on the merged \|Vp\| (§7-5) | `VpAdaptNrz`, `AgcVpNrz` |
+| h₁ (post-cursor) | CTLE peaking loop nulling the residual post-cursor correlation | `CtleAdaptNrz` (§7-7) |
+| ĥ_i readback (any lag) | Observe-only channel estimator: the §7-3 sign-sign update gated by `d(k−i)`, accumulated in a digital register — computes the baud-spaced cursors without controlling anything | `ChanEstNrz` (§7-4) |
 
 ### 7-1 Common architecture: vote → scale → accumulate → DAC
 
-All first-order loops (Vp, AGC, offset, CTLE) share one digital template (the observe-only channel estimator, §7-6a, uses stages 1–2 only: it accumulates a readback register, not a DAC code):
+All first-order loops (Vp, AGC, offset, CTLE) share one digital template (the observe-only channel estimator, §7-4, uses stages 1–2 only: it accumulates a readback register, not a DAC code):
 
 ```text
 (1) observe    — per-UI sample or readback (slicer outputs, Vp codes, …)
 (2) average    — accumulate over a decimation window (firmware-programmable
-                 per loop, §7-9; the Vp default is a 1-UI window = per-UI voting)
+                 per loop, §7-10; the Vp default is a 1-UI window = per-UI voting)
 (3) vote       — truth table on the window measurement → vote ∈ {+1, 0, −1}
                  (dead-band / hysteresis lives HERE: vote 0 inside the band)
 (4) scale      — vote enters a sub-LSB accumulator with gain 1/2^shift LSB/vote
@@ -610,10 +609,10 @@ Shared fixed-point template (each loop instantiates this with its own values —
 | `N_code` | DAC / code register width | per loop (`dac_bits` / `code_bits`) |
 | `N_shift` | Sub-LSB gain shift | per loop (`*_shift`) |
 | `N_accum` | Accumulator width | `N_code + N_shift` (holds `0 … (2^N_code − 1)·2^N_shift`) |
-| `D` | Decimation (UI per vote) | per loop (`decimation`) — **firmware-programmable register on every loop**, not a synthesis constant (§7-9); Vp default 1 |
+| `D` | Decimation (UI per vote) | per loop (`decimation`) — **firmware-programmable register on every loop**, not a synthesis constant (§7-10); Vp default 1 |
 | `T_LSB` | Min UI per code LSB | `D · 2^N_shift` |
 
-The accumulator classes are structurally identical across loops (`VpDac`, `GainDac`, `OffsetDac`, `PeakingDac`):
+The accumulator classes are structurally identical across loops (`VpDac`, `GainDac`, `OffsetDac`, `CtleDac`):
 
 ```python
 # shared accumulator kernel (vote ∈ {+1, 0, −1})
@@ -629,13 +628,13 @@ The **CDR is the only second-order loop** and the only one allowed to wrap (phas
 |---|---|---|---|---|
 | CDR (phase + freq) | 5-bit PI code | `d(k±1)`, signed `e(k)` | 2nd | `DigitalMmCdr` |
 | Vp_top / Vp_bot | Dual error-slicer threshold DACs | per-UI `e₊`/`e₋` gated by `d` | 1st | `VpAdaptNrz` |
+| Channel estimator (ĥ_i) | Nothing — observe-only readback registers | per-UI `d(k−i)·e(k)` from the mission slicers | — (open-loop correlator) | `ChanEstNrz` (§7-4) |
 | Offset / BLW | Common offset DAC | Vp_top vs Vp_bot code imbalance | 1st | `OffsetAdaptNrz` |
 | CTLE | Peaking / boost DAC | sign-sign corr of `e` with past `d` | 1st | `CtleAdaptNrz` |
 | AGC | Front-end gain code | merged \|Vp\| vs target | 1st | `AgcVpNrz` |
-| Channel estimator (ĥ_i) | Nothing — observe-only readback registers | per-UI `d(k−i)·e(k)` from the mission slicers | — (open-loop correlator) | `ChanEstNrz` (§7-6a) |
 | Lock / freeze | Gates CTLE, AGC, offset, channel estimator | higher-level FSM | semi | `adapt=False` on each loop |
 
-All continuous loops share the **same dual-error-slicer observables**: the data decision `d` and the signed error `e` (or the Vp DAC codes, which are digitised readbacks of the rails). Eye partitioning: MM-CDR → horizontal; offset/BLW → vertical center; AGC → amplitude; CTLE → shape (residual ISI); Vp → digitisation thresholds feeding everything else. The channel estimator consumes exactly this shared `(d, e)` stream — **all-digital, no additional slicer, threshold DAC, or analog hardware** — and, being open-loop, moves nothing the mission loops observe (§7-6a).
+All continuous loops share the **same dual-error-slicer observables**: the data decision `d` and the signed error `e` (or the Vp DAC codes, which are digitised readbacks of the rails). Eye partitioning: MM-CDR → horizontal; offset/BLW → vertical center; AGC → amplitude; CTLE → shape (residual ISI); Vp → digitisation thresholds feeding everything else. The channel estimator consumes exactly this shared `(d, e)` stream — **all-digital, no additional slicer, threshold DAC, or analog hardware** — and, being open-loop, moves nothing the mission loops observe (§7-4).
 
 ### 7-3 Vp_top / Vp_bot — error-slicer threshold (h₀ digitisation)
 
@@ -659,7 +658,7 @@ if ui_count == vp_decimation:              # window complete (default 1 = per-UI
     vote_sum_top = 0; vote_sum_bot = 0; ui_count = 0
 ```
 
-The decimation window `vp_decimation` is a **firmware-programmable register** (as on every §7 loop, §7-9). At the default `vp_decimation = 1` the window holds a single UI — exactly one rail's valid-gated vote — and the loop reduces to per-UI stepping, in which case the `1/2^vp_shift` sub-LSB gain is the only filter. Larger windows take a **majority vote per rail per window** (the same construction as the CDR's `cdr_width`-UI vote dump, §6-4), trading update rate for vote-noise averaging per the §7-9 guidance; the majority collapse to a ±1 vote keeps the per-window DAC step fixed at `1/2^vp_shift` LSB, so the loop remains a bang-bang median lock at any window length.
+The decimation window `vp_decimation` is a **firmware-programmable register** (as on every §7 loop, §7-10). At the default `vp_decimation = 1` the window holds a single UI — exactly one rail's valid-gated vote — and the loop reduces to per-UI stepping, in which case the `1/2^vp_shift` sub-LSB gain is the only filter. Larger windows take a **majority vote per rail per window** (the same construction as the CDR's `cdr_width`-UI vote dump, §6-4), trading update rate for vote-noise averaging per the §7-10 guidance; the majority collapse to a ±1 vote keeps the per-window DAC step fixed at `1/2^vp_shift` LSB, so the loop remains a bang-bang median lock at any window length.
 
 **Mapping to the common architecture:** observe = per-UI slicer output; average = `vp_decimation`-UI window per rail (majority vote; default 1 = per-UI); vote = sign of the window sum; DAC = `VpDac` saturating accumulator.
 
@@ -689,7 +688,7 @@ Vp_bot (valid only when `d = −1`; vote is `−e₋`):
 | `V_LSB,vp` | `v_lsb` | `V_LSB,vp` (TBD — slicer-input full-scale not yet determined) | Threshold = `code · v_lsb` (range `0 … (2^dac_bits − 1)·V_LSB,vp`) |
 | `N_shift` | `vp_shift` | 4 | Loop gain = 1/2⁴ LSB per valid vote |
 | `N_accum` | `VpDac.acc` (`acc_max` property) | 12 bits | `dac_bits + vp_shift`; saturate no wrap |
-| `D` | `vp_decimation` | **1 UI** (programmable, 1 … 2¹² UI) | Window per vote, valid-gated per rail. At 1 (default) each window holds one rail's vote = per-UI voting; larger windows majority-vote each rail per window (§7-9 gear-shift / noise-averaging knob) |
+| `D` | `vp_decimation` | **1 UI** (programmable, 1 … 2¹² UI) | Window per vote, valid-gated per rail. At 1 (default) each window holds one rail's vote = per-UI voting; larger windows majority-vote each rail per window (§7-10 gear-shift / noise-averaging knob) |
 | `T_LSB` | — | ≈ 32 UI per LSB (at `D = 1`) | `2·2^vp_shift` UI at `D = 1` (valid votes at ≈ rate/2 per rail); `vp_decimation · 2^vp_shift` UI for `D ≫ 1` (every window produces a vote) |
 | — | `init_code_top`, `init_code_bot` | 32 (= `32·V_LSB,vp`) | Starting codes |
 | — | `mean_shift` | 10 | SE→diff running-mean bandwidth `1/2^10` per sample (model-only — stands in for the TIA DCOC loop, not RTL) |
@@ -699,7 +698,76 @@ Vp_bot (valid only when `d = −1`; vote is `−e₋`):
 
 **Nesting:** faster than AGC / CTLE / offset (inner loop). Relative to the CDR's 128-UI dump: around lock the Vp codes dither ±1 LSB about the rail median, so the error-slicer thresholds are consistent to within one LSB across any CDR window; during acquisition slew, however, a Vp code can move up to ~4 LSB within one 128-UI window (~32 UI per Vp LSB at the defaults). This is tolerated because cycle slips are permitted during acquisition (§6-10) and was verified benign in the full-chain A/B at `cdr_width = 128` (§6-8: identical lock point, zero errors).
 
-### 7-4 AGC — front-end gain (h₀ amplitude to target)
+### 7-4 Channel estimator — the Vp update law re-aimed as cursor readback ĥ_i (observe-only, all-digital)
+
+**Status.** Proposed digital block (`ChanEstNrz`) — **not yet in the behavioral model**. Lag set and window length are `TBD_from_sim_sweep`.
+
+**The Vp loop, re-aimed.** The channel estimator is not a new algorithm: it is the §7-3 sign–sign update running on the same shared `(d, e)` stream (§7-2), with the same valid-gated windowed accumulation. The entire delta from §7-3 fits in one table:
+
+| | Vp loop (§7-3) | Channel estimator (this section) |
+|---|---|---|
+| Gating decision | `d(k)` — the current decision selects the active rail | `d(k−i)` — the `i`-UI-old decision; one instance per lag `i` |
+| Accumulator terminates in | Threshold DAC — the estimate must physically move an error slicer | **Readback register** — the estimate exists only to *know* the channel; nothing moves |
+| Equilibrium | Nulls its observable: `⟨d(k)·e(k)⟩ → 0` locks the rails to the conditional medians (= `h₀`) | Nulls nothing: `⟨d(k−i)·e(k)⟩` settles at a value proportional to `h_i` and is read out as-is |
+| Role | Controller — the h₀ digitizer whose codes feed AGC and offset | Instrument — observe-only telemetry; closes no loop |
+
+Everything else carries over: the block is pure digital logic on the mission slicer outputs `(d, e)` that already exist, plus a decision-history shift register — no extra comparator, no threshold DAC, no analog hardware of any kind.
+
+With the Vp rails converged (`Vp ≈ h₀`, §7-3), the signed error is `e(k) = sign(Σ_{m≠0} h_m·d(k−m) + n(k))`, so the windowed product converges to
+
+```text
+ĥ_i = ⟨ d(k−i)·e(k) ⟩_D  →  2Φ(h_i/σ_e) − 1  ≈  √(2/π) · h_i/σ_e   (small cursors)
+```
+
+where `σ_e` is the RMS residual (ISI + noise) at the error slicer and `Φ` the Gaussian CDF: the readback is **sign-correct and monotone in `h_i`**, linear for small cursors. Per UI, per lag — all lags run **in parallel** (per-lag hardware is one XOR and a counter):
+
+```python
+# lags i ∈ M_est run concurrently on the shared (d, e) stream
+for i in lags:                        # d_hist[i−1] = d(k−i); for i = −1, pipeline e by 1 UI
+    acc[i] += d_hist[i - 1] * e       # sign-sign product, ±1 — the §7-3 vote, gated by d(k−i)
+ui_count += 1
+if ui_count == D_est:                 # window complete
+    h_hat[i] = acc[i] / D_est         # snapshot readback, mean ∈ [−1, +1]
+    acc[i] = 0; ui_count = 0
+```
+
+Setting `i = 0` recovers the Vp equilibrium check — `⟨d(k)·e(k)⟩ → 0` when the rails sit on the conditional medians — which is the precise sense in which this is the §7-3 update law re-aimed at lag `i`. The **pre-cursor** (`i = −1`) correlates `e(k)` against the *next* decision `d(k+1)`: a one-UI digital pipeline of `e`, nothing more.
+
+**Relationship to the CTLE loop.** Identical observable, opposite use: the CTLE loop (§7-7, later in this section) computes this same sign-sign correlation (summed over its `lags`) and **nulls** it through the peaking code; the estimator computes it **per lag** and **reports** it. `ĥ₊₁` is precisely the residual the CTLE drives into `corr_deadband`.
+
+**Normalization caveat.** Because `e` is one bit, the readback is in units of `σ_e`, not volts. Cursor-to-cursor **ratios are `σ_e`-independent** (`ĥ_i/ĥ_j ≈ h_i/h_j` in the small-cursor regime), which is sufficient for every use below; an absolute-volts conversion would need a separate `σ_e` calibration (`TBD_from_sim_sweep`, only if ever needed).
+
+**Observe-only — by design, not omission.** The block drives no analog knob and closes no loop. This is required by §7-9 rule 1 (one controller per node): `h₊₁` is already owned by the CTLE loop (§7-7) and the pre/post balance by the MM CDR lock condition (§6-3, §7-8). The estimator is the instrument, never the actuator. What the readback buys:
+
+- `ĥ₊₁` cross-checks CTLE convergence (should sit at the residual that `corr_deadband` tolerates);
+- `ĥ₋₁` vs `ĥ₊₁` cross-checks the MM lock condition `h(−1) = h(+1)` — a standing imbalance flags a lock-point offset (e.g. a CTLE group-delay change mid-tracking, §7-9) — and the ratio form is exactly what the balance check needs;
+- lags 2–6 quantify the long-tail residue that the CTLE's longer `lags` sense (§7-7);
+- together with the `|h₀|` readback already provided by the Vp codes, `{ĥ_i}` is an in-situ **baud-spaced pulse-response estimate at the mission sampling phase** (the §A-3 cursors), enabling on-die residual-ISI / eye-margin estimation without external instrumentation.
+
+**Truth table** (per lag, per UI; the product is accumulated, not stepped into a DAC):
+
+| `d(k−i)` | `e(k)` | Product | Meaning |
+|---|---|---|---|
+| +1 | +1 | +1 | Residual high given a lagged mark → `h_i` pulls up |
+| +1 | −1 | −1 | Residual low given a lagged mark → `h_i` pulls down |
+| −1 | −1 | +1 | Mirrored space rail |
+| −1 | +1 | −1 | Mirrored space rail |
+
+**Parameter table:**
+
+| Placeholder | Model/RTL name | Default | Meaning |
+|---|---|---|---|
+| `M_est` | `lags` | `(−1, +1, +2, +3)` | Lag set, all in parallel; the deepest lag sets the `d`-history depth |
+| `D_est` | `decimation` | 65536 UI (programmable, 2¹² … 2²⁴ UI) | Window per readback snapshot; firmware-programmable (§7-10). Statistical floor of the mean is `1/√D_est` ≈ 0.004 at the default |
+| `N_acc,est` | `acc` width | 17 bits signed | Bounded by the window (`\|acc\| ≤ D_est`) — saturation impossible by construction, unlike the DAC accumulators |
+| — | `h_hat[i]` | signed fraction ∈ [−1, +1] | Normalized cursor readback (units of `σ_e`, see caveat above) |
+| — | `e` pipeline | 1 UI (lag −1 only) | Pre-cursor alignment of `e(k)` against `d(k+1)` |
+
+**Dead-band / hysteresis (estimator):** **none, and none needed** — there is no code to dither and no vote quantization; the block is an open-loop measurement. The readback noise floor is statistical (`σ = 1/√D_est` per snapshot); average snapshots for a quieter estimate.
+
+**Nesting:** none in mission mode — the block actuates nothing, so it has no slot in the §7-9 disturbance ladder and no bandwidth constraint against the control loops. Enable it any time **from stage 2** of the bring-up sequence (§7-11): its observable is `e(k)`, which is measured against the Vp rails, so the readback presumes a locked sampling phase and converged rails; it becomes fully meaningful once the loops it instruments have converged (stages 4–5). Two validity caveats it shares with the other `d`-conditioned observables: (i) **white-data assumption** — during non-mission periodic patterns `d(k−i)` is correlated with the other symbols and the correlation is biased, so the estimator must be frozen (`adapt=False`, §7-11); (ii) a CDR phase step moves every cursor slightly (§7-9 CDR row), so snapshots spanning a re-acquisition should be discarded.
+
+### 7-5 AGC — front-end gain (h₀ amplitude to target)
 
 **Algorithm** (`AgcVpNrz`). Drive the programmable front-end gain so the **merged rail amplitude** — measured for free from the settled Vp DAC loops — hits a target:
 
@@ -735,7 +803,7 @@ if ui_count == decimation:                      # one vote per window
 | `G_step` | `step_db` | **0.5 dB** / LSB (§4-1) | ±`2^(N_code,agc−1)·G_step` dB about mid-scale (`code_mid = 2^(N_code,agc−1)` = 0 dB) |
 | `N_shift` | `agc_shift` | 1 | Loop gain = 1/2 LSB per vote |
 | `N_accum` | `GainDac.acc` | `N_code,agc + agc_shift` bits | Saturate no wrap |
-| `D` | `decimation` | 4096 UI (programmable, 2⁸ … 2¹⁶ UI) | Window length per vote; firmware-programmable rate knob (§7-9) |
+| `D` | `decimation` | 4096 UI (programmable, 2⁸ … 2¹⁶ UI) | Window length per vote; firmware-programmable rate knob (§7-10) |
 | `T_LSB` | — | ≥ 8192 UI per LSB | `decimation · 2^agc_shift` |
 | — | `init_code` | `None` → mid-scale (0 dB) | |
 
@@ -745,7 +813,7 @@ The AGC gain step (`G_step` = 0.5 dB) is the §4-1 TIA electrical spec target; t
 
 **Nesting:** **slowest continuous loop.** Every gain step rescales the entire eye, so the Vp DACs, the SE→diff DC-cancellation state, and the MM votes must re-settle before the next AGC window is trustworthy (defaults give ≥ 8192 UI per LSB vs ~32 UI per Vp LSB). On a code update the caller applies a **de-glitch strobe**: rescale the SE→diff DC estimate by `g_new/g_old` so the DC-cancellation state does not transiently bias the data slicer. In the real design this requirement lands on the TIA's DC-offset-cancellation loop (architecture TBD, §4); in the behavioral model it is implemented on the running-mean stage's `mean_shift = 10` (~1k UI) tracker.
 
-### 7-5 Offset / BLW — common vertical offset
+### 7-6 Offset / BLW — common vertical offset
 
 **Algorithm** (`OffsetAdaptNrz`). The waveform's vertical centering error is read out **for free from the Vp DAC codes**: with residual offset `r` (positive = waveform sits too high), rail half-amplitude `a`, Vp LSB `L`:
 
@@ -783,7 +851,7 @@ if ui_count == decimation:                       # one vote per window
 | `V_LSB,off` | `v_lsb` | `V_LSB,off` (TBD) | `offset_v = (code − code_mid)·v_lsb` ⇒ trim range `±2^(dac_bits−1)·V_LSB,off`; deliberately finer than `V_LSB,vp` (this loop is a fine trim resolving fractions of a Vp code) — constraint: `V_LSB,off < V_LSB,vp` |
 | `N_shift` | `offset_shift` | 1 | Loop gain = 1/2 LSB per vote |
 | `N_accum` | `OffsetDac.acc` | 9 bits | `dac_bits + offset_shift`; saturate no wrap |
-| `D` | `decimation` | 2048 UI (programmable, 2⁸ … 2¹⁶ UI) | Window length per vote; firmware-programmable rate knob (§7-9) |
+| `D` | `decimation` | 2048 UI (programmable, 2⁸ … 2¹⁶ UI) | Window length per vote; firmware-programmable rate knob (§7-10) |
 | `DB` | `deadband_codes` | 1.0 Vp code | Dead-band half-width on mean imbalance |
 | `T_LSB` | — | ≥ 4096 UI per LSB | `decimation · 2^offset_shift` |
 | — | `init_code` | `None` → mid-scale (0 V) | |
@@ -792,7 +860,7 @@ if ui_count == decimation:                       # one vote per window
 
 **Nesting:** slower than the Vp loops it observes (after every offset step the rails shift by `v_lsb` and the Vp codes need ~32 UI/LSB to re-settle) and faster than / inside CTLE and AGC. **Interaction constraint:** the correction is applied upstream of the TIA's DC-offset-cancellation loop's point of action, so that loop must be **quasi-static on the offset-loop timescale** (frozen after acquisition, or very slow) — a live DC-cancellation integrator would re-converge to the shifted mean and cancel the correction at DC; two integrators must not control the same node. This requirement is levied on whatever the TIA DCOC becomes (architecture TBD, §4); in the behavioral model the actor is the running-mean centering stage (`SeToDiff`), which is frozen after acquisition or given a large `mean_shift`. The TIA DCOC provides the *coarse* one-time centering; this loop is the *fine* trim, and also tracks slow **baseline wander** within its DAC range and decimation-limited slew rate.
 
-### 7-6 CTLE — peaking code (residual post-cursor h₁)
+### 7-7 CTLE — peaking code (residual post-cursor h₁)
 
 **Algorithm** (`CtleAdaptNrz`). Error-based **sign-sign** adaptation, no LMS estimator: with the Vp DACs tracking the rail medians, residual post-cursor ISI `h_m` shows up as correlation between the signed error and the `m`-UI-old decision:
 
@@ -816,13 +884,19 @@ if ui_count == decimation:                          # one vote per window
 
 *Figure 7-1: Residual post-cursors on either side of the CTLE optimum. Under-boost leaves a slow settling tail (positive post-cursors → vote +1); at convergence the post-cursors sit inside `corr_deadband` (vote 0); over-boost rings the pulse (negative post-cursors → vote −1). All post-cursors slide through zero together as the single peaking code climbs, which is what makes one summed metric sufficient.*
 
-**Why the signed correlation, not a magnitude cost.** The quantity the equalizer ultimately protects is the eye opening, and the worst-case ISI closure is the peak-distortion sum `Σ|h_m|` — so one might expect the loop to minimize that directly. It deliberately does not, for three reasons. (i) *A magnitude cost loses the step direction:* `Σ|h_m|` is V-shaped in the peaking code, so a single reading cannot distinguish under- from over-boost — descending it requires dithering the code and comparing `ΔJ`, injecting deliberate disturbances into a knob whose every step moves the CDR lock point (§7-8). The signed correlation instead *crosses* zero at the optimum: one window measurement carries both the error and its direction, exactly the shape a vote → accumulate loop needs. (ii) *With one knob the two equilibria coincide:* every post-cursor responds monotonically to peaking in the same direction (Figure 7-1), so the signed sum's zero crossing lands at essentially the code where `Σ|h_m|` bottoms out — both criteria are projections of the same residual onto the same single degree of freedom. (iii) *The absolute value is statistically worse from one-bit observables:* the per-UI product `d(k−m)·e(k)` is an unbiased estimator whose noise averages to zero over the window, while a rectified `Σ|ĥ_m|` is biased upward near the noise floor (`E|ĥ| > |h|` when `|h| ≲ 1/√D`) — precisely in the converged regime it would stop measuring the channel and start measuring its own noise. The magnitude criterion remains available offline: firmware can sweep the peaking code against the §7-6a `ĥ_i` readbacks (or the eye monitor's measured opening) as a bring-up characterization or convergence cross-check.
+**Why the signed correlation, not a magnitude cost.** The eye is closed by the peak-distortion sum `Σ|h_m|`, so one might expect the loop to minimize that directly. It does not, for three reasons:
+
+- *Direction.* `Σ|h_m|` is V-shaped in the peaking code: a single reading cannot tell under- from over-boost, so descending it requires deliberately dithering a knob whose every step moves the CDR lock point (§7-9). The signed correlation crosses zero at the optimum — one window carries both the error and its direction, exactly what a vote → accumulate loop needs.
+- *Same equilibrium.* When all post-cursors respond to peaking monotonically in the same direction (Figure 7-1), both optima are bracketed by the same narrow interval of cursor zero-crossings: nulling the signed sum lands at essentially the `Σ|h_m|` minimum. This is the one-knob projection of Lucky's zero-forcing criterion (which minimizes peak distortion exactly when every lag can be nulled independently). The premise holds when the residual tail is dominated by a single time constant — the channel class a one-zero CTLE targets — and is checkable in-system: sweep the peaking code and confirm the §7-4 `ĥ_m` zero-crossings cluster.
+- *Statistics.* The per-UI product `d(k−m)·e(k)` is unbiased and its noise averages out over the window; a rectified `Σ|ĥ_m|` is biased upward near the noise floor (`E|ĥ| > |h|` for `|h| ≲ 1/√D`) — worst exactly at convergence.
+
+The magnitude criterion remains available offline: firmware can sweep the peaking code against the §7-4 `ĥ_i` readbacks (or the eye monitor's measured opening) as a bring-up cross-check.
 
 ![Signed correlation vs magnitude cost across the peaking code](./ctle_cost_functions.png)
 
 *Figure 7-2: The two candidate cost functions against the peaking code. Left: the signed window correlation used by the loop — monotone through zero, so the sign of a single reading is the vote and the zero crossing (inside `corr_deadband`) is the equilibrium. Right: the magnitude cost `Σ|h_m|` — its minimum sits at essentially the same code, but the observable is blind to which side of the optimum the loop is on.*
 
-**Mapping to the common architecture:** observe = per-UI `(d, e)` pairs (exactly the outputs of `VpAdaptNrz.step`); average = `decimation`-UI correlation window; vote = dead-band comparison; DAC = `PeakingDac`; code maps **linear-in-dB** to peaking.
+**Mapping to the common architecture:** observe = per-UI `(d, e)` pairs (exactly the outputs of `VpAdaptNrz.step`); average = `decimation`-UI correlation window; vote = dead-band comparison; DAC = `CtleDac`; code maps **linear-in-dB** to peaking.
 
 **Truth table:**
 
@@ -838,8 +912,8 @@ if ui_count == decimation:                          # one vote per window
 |---|---|---|---|
 | `N_code,ctle` | `code_bits` | **4-bit** (16 codes) | Peaking-code width (codes `0 … 2^N_code,ctle − 1` = `0…15`) |
 | `N_shift` | `ctle_shift` | 1 | Loop gain = 1/2 LSB per vote |
-| `N_accum` | `PeakingDac.acc` | `N_code,ctle + ctle_shift` bits | Saturate no wrap |
-| `D` | `decimation` | 2048 UI (programmable, 2⁸ … 2¹⁶ UI) | Correlation window per vote; firmware-programmable rate knob (§7-9). Note the correlation noise floor `1/√(D·len(lags))` and hence the `corr_deadband` sizing move with `D` |
+| `N_accum` | `CtleDac.acc` | `N_code,ctle + ctle_shift` bits | Saturate no wrap |
+| `D` | `decimation` | 2048 UI (programmable, 2⁸ … 2¹⁶ UI) | Correlation window per vote; firmware-programmable rate knob (§7-10). Note the correlation noise floor `1/√(D·len(lags))` and hence the `corr_deadband` sizing move with `D` |
 | `M` | `lags` | `(1,)` | Decision lags summed into the metric (add 3–6 for long-tail) |
 | `DB` | `corr_deadband` | 0.02 | No-vote dead-band on the mean correlation |
 | `P_min`, `P_step` | `peak_min_db`, `peak_step_db` | **2.5 dB**, **0.5 dB**/LSB (§4-1) | `peaking_db = peak_min_db + code·peak_step_db` ⇒ `P_min … P_min + (2^N_code,ctle − 1)·P_step` = 2.5 … 10.0 dB |
@@ -851,71 +925,11 @@ The CTLE peaking range (`P_min = 2.5` dB, `P_max = 10.0` dB) and step (`P_step =
 
 **Nesting:** the slowest EQ loop — ≥ 4096 UI per LSB, 32× the CDR's 128-UI dump. It **must** be slower than the CDR because every peaking step reshapes the pulse the MM phase detector locks to (`h(−1) = h(+1)`), and the shared error slicers must be quasi-static on the CDR update timescale. On a code change the caller applies the de-glitch strobe (swap the CTLE response between UI; let Vp / CDR re-settle before trusting the next windows). Freeze via `adapt=False` (= `lock_ctle`).
 
-### 7-6a Channel estimator — baud-spaced cursor readback ĥ_i (observe-only, all-digital)
+### 7-8 h₋₁ (pre-cursor): no dedicated loop
 
-**Status.** Proposed digital block (`ChanEstNrz`) — **not yet in the behavioral model**. Lag set and window length are `TBD_from_sim_sweep`.
+There is deliberately **no pre-cursor adaptation loop** in this architecture. The Mueller–Müller CDR's lock condition is `h(−1) = h(+1)` on the equalized pulse (Section 6-3): the timing loop continuously steers the sampling phase to the point where the pre-cursor equals the first post-cursor, so the pre/post balance is owned by the **CDR**, and the absolute post-cursor magnitude at that phase is then driven down by the **CTLE** loop (§7-7). Adding a separate h₋₁ loop would put two controllers on the same observable and fight the CDR. (TX-side pre-cursor shaping, if used, is the static `w_pre` tap of the analog TX FIR, Section 3 — programmed at bring-up, not adapted by the RX.) The §7-4 channel estimator does provide an `ĥ₋₁` **readback** — used to monitor the `h(−1) = h(+1)` lock condition — but deliberately closes no loop on it, preserving the one-controller-per-node rule (§7-9).
 
-**Algorithm** (`ChanEstNrz`). The same sign–sign LMS update as the Vp loops (§7-3), with **one change: the gating decision is the `i`-UI-old decision `d(k−i)` instead of the current decision `d(k)`** — and one structural simplification: **no DAC**. In the Vp loop the accumulated estimate must physically move an error-slicer threshold, so it terminates in a threshold DAC; here the estimate is used for nothing but *knowing the channel coefficients*, so it terminates in a **readback register**. The block is pure digital logic on the mission slicer outputs `(d, e)` that already exist (§7-2) plus a decision-history shift register — no extra comparator, no threshold DAC, no analog hardware of any kind.
-
-With the Vp rails converged (`Vp ≈ h₀`, §7-3), the signed error is `e(k) = sign(Σ_{m≠0} h_m·d(k−m) + n(k))`, so the windowed product converges to
-
-```text
-ĥ_i = ⟨ d(k−i)·e(k) ⟩_D  →  2Φ(h_i/σ_e) − 1  ≈  √(2/π) · h_i/σ_e   (small cursors)
-```
-
-where `σ_e` is the RMS residual (ISI + noise) at the error slicer and `Φ` the Gaussian CDF: the readback is **sign-correct and monotone in `h_i`**, linear for small cursors. Per UI, per lag — all lags run **in parallel** (per-lag hardware is one XOR and a counter):
-
-```python
-# lags i ∈ M_est run concurrently on the shared (d, e) stream
-for i in lags:                        # d_hist[i−1] = d(k−i); for i = −1, pipeline e by 1 UI
-    acc[i] += d_hist[i - 1] * e       # sign-sign product, ±1 — the §7-3 vote, gated by d(k−i)
-ui_count += 1
-if ui_count == D_est:                 # window complete
-    h_hat[i] = acc[i] / D_est         # snapshot readback, mean ∈ [−1, +1]
-    acc[i] = 0; ui_count = 0
-```
-
-Setting `i = 0` recovers the Vp equilibrium check — `⟨d(k)·e(k)⟩ → 0` when the rails sit on the conditional medians — which is the precise sense in which this is the §7-3 update law re-aimed at lag `i`. The **pre-cursor** (`i = −1`) correlates `e(k)` against the *next* decision `d(k+1)`: a one-UI digital pipeline of `e`, nothing more.
-
-**Relationship to the CTLE loop.** Identical observable, opposite use: §7-6 computes this same sign-sign correlation (summed over its `lags`) and **nulls** it through the peaking code; the estimator computes it **per lag** and **reports** it. `ĥ₊₁` is precisely the residual the CTLE drives into `corr_deadband`.
-
-**Normalization caveat.** Because `e` is one bit, the readback is in units of `σ_e`, not volts. Cursor-to-cursor **ratios are `σ_e`-independent** (`ĥ_i/ĥ_j ≈ h_i/h_j` in the small-cursor regime), which is sufficient for every use below; an absolute-volts conversion would need a separate `σ_e` calibration (`TBD_from_sim_sweep`, only if ever needed).
-
-**Observe-only — by design, not omission.** The block drives no analog knob and closes no loop. This is required by §7-8 rule 1 (one controller per node): `h₊₁` is already owned by the CTLE loop (§7-6) and the pre/post balance by the MM CDR lock condition (§6-3, §7-7). The estimator is the instrument, never the actuator. What the readback buys:
-
-- `ĥ₊₁` cross-checks CTLE convergence (should sit at the residual that `corr_deadband` tolerates);
-- `ĥ₋₁` vs `ĥ₊₁` cross-checks the MM lock condition `h(−1) = h(+1)` — a standing imbalance flags a lock-point offset (e.g. a CTLE group-delay change mid-tracking, §7-8) — and the ratio form is exactly what the balance check needs;
-- lags 2–6 quantify the long-tail residue that the CTLE's longer `lags` sense (§7-6);
-- together with the `|h₀|` readback already provided by the Vp codes, `{ĥ_i}` is an in-situ **baud-spaced pulse-response estimate at the mission sampling phase** (the §A-3 cursors), enabling on-die residual-ISI / eye-margin estimation without external instrumentation.
-
-**Truth table** (per lag, per UI; the product is accumulated, not stepped into a DAC):
-
-| `d(k−i)` | `e(k)` | Product | Meaning |
-|---|---|---|---|
-| +1 | +1 | +1 | Residual high given a lagged mark → `h_i` pulls up |
-| +1 | −1 | −1 | Residual low given a lagged mark → `h_i` pulls down |
-| −1 | −1 | +1 | Mirrored space rail |
-| −1 | +1 | −1 | Mirrored space rail |
-
-**Parameter table:**
-
-| Placeholder | Model/RTL name | Default | Meaning |
-|---|---|---|---|
-| `M_est` | `lags` | `(−1, +1, +2, +3)` | Lag set, all in parallel; the deepest lag sets the `d`-history depth |
-| `D_est` | `decimation` | 65536 UI (programmable, 2¹² … 2²⁴ UI) | Window per readback snapshot; firmware-programmable (§7-9). Statistical floor of the mean is `1/√D_est` ≈ 0.004 at the default |
-| `N_acc,est` | `acc` width | 17 bits signed | Bounded by the window (`\|acc\| ≤ D_est`) — saturation impossible by construction, unlike the DAC accumulators |
-| — | `h_hat[i]` | signed fraction ∈ [−1, +1] | Normalized cursor readback (units of `σ_e`, see caveat above) |
-| — | `e` pipeline | 1 UI (lag −1 only) | Pre-cursor alignment of `e(k)` against `d(k+1)` |
-
-**Dead-band / hysteresis (estimator):** **none, and none needed** — there is no code to dither and no vote quantization; the block is an open-loop measurement. The readback noise floor is statistical (`σ = 1/√D_est` per snapshot); average snapshots for a quieter estimate.
-
-**Nesting:** none in mission mode — the block actuates nothing, so it has no slot in the §7-8 disturbance ladder and no bandwidth constraint against the control loops. Enable it any time **from stage 2** of the bring-up sequence (§7-10): its observable is `e(k)`, which is measured against the Vp rails, so the readback presumes a locked sampling phase and converged rails; it becomes fully meaningful once the loops it instruments have converged (stages 4–5). Two validity caveats it shares with the other `d`-conditioned observables: (i) **white-data assumption** — during non-mission periodic patterns `d(k−i)` is correlated with the other symbols and the correlation is biased, so the estimator must be frozen (`adapt=False`, §7-10); (ii) a CDR phase step moves every cursor slightly (§7-8 CDR row), so snapshots spanning a re-acquisition should be discarded.
-
-### 7-7 h₋₁ (pre-cursor): no dedicated loop
-
-There is deliberately **no pre-cursor adaptation loop** in this architecture. The Mueller–Müller CDR's lock condition is `h(−1) = h(+1)` on the equalized pulse (Section 6-3): the timing loop continuously steers the sampling phase to the point where the pre-cursor equals the first post-cursor, so the pre/post balance is owned by the **CDR**, and the absolute post-cursor magnitude at that phase is then driven down by the **CTLE** loop (§7-6). Adding a separate h₋₁ loop would put two controllers on the same observable and fight the CDR. (TX-side pre-cursor shaping, if used, is the static `w_pre` tap of the analog TX FIR, Section 3 — programmed at bring-up, not adapted by the RX.) The §7-6a channel estimator does provide an `ĥ₋₁` **readback** — used to monitor the `h(−1) = h(+1)` lock condition — but deliberately closes no loop on it, preserving the one-controller-per-node rule (§7-8).
-
-### 7-8 Loop interaction commentary
+### 7-9 Loop interaction commentary
 
 Every continuous loop in this receiver observes the eye through the **same three comparators** (data slicer + dual error slicers), and several loops act on nodes that other loops observe. The stability argument is therefore not per-loop — each loop is a trivially stable first-order bang-bang integrator in isolation — but about **who disturbs whose observable, and by how much per step**. The interaction matrix:
 
@@ -926,24 +940,24 @@ Every continuous loop in this receiver observes the eye through the **same three
 | **Offset** (offset code) | Vp codes (its own observable!), data-slicer bias | One offset LSB (`V_LSB,off`) shifts both rails by a fraction `V_LSB,off / V_LSB,vp` of a Vp LSB; the Vp codes it reads must re-settle (~32 UI/LSB) before the next imbalance window means anything | Offset ≥ 4096 UI/LSB ≫ Vp settling; 1.0-code dead-band ignores the Vp ±1 LSB dither; the **TIA DCOC loop must be quasi-static after acquisition** (in the model: freeze the SE→diff running mean) — two integrators (TIA DC cancellation + offset DAC) must not control the same DC node |
 | **Vp_top/bot** (threshold codes) | `e(k)` seen by CDR, CTLE, AGC | The error sign flips its decision boundary by `V_LSB,vp` per LSB; if the thresholds moved *within* a CDR window, the window's votes would be inconsistent | Vp moves ≤ 1/16 LSB per UI (`vp_shift = 4`): ±1 LSB dither around lock keeps windows internally consistent; the up-to-~4-LSB worst-case slew across a `cdr_width = 128` UI window occurs only during acquisition, where slips are permitted (§6-10, §7-3) |
 | **CDR** (PI code) | Sample instant for everything | A phase step moves where `y` is sampled, so rail medians (Vp) and correlations (CTLE) shift slightly | CDR is deliberately the **fastest** loop — everyone else treats the sampling phase as settled; its own step is tiny (`p_step/p_div = 2/512` ⇒ ≤ 0.125 PI code = 1/256 UI per window at full majority) |
-| **Channel estimator** (`ĥ_i` registers, §7-6a) | Nothing — observe-only | Pure digital correlator on the shared `(d, e)` stream; no analog actuation, no extra comparator, no DAC | Freeze during non-mission patterns (§7-10); discard snapshots spanning a CDR re-acquisition; readback floor is the statistical `1/√D_est` per snapshot |
+| **Channel estimator** (`ĥ_i` registers, §7-4) | Nothing — observe-only | Pure digital correlator on the shared `(d, e)` stream; no analog actuation, no extra comparator, no DAC | Freeze during non-mission patterns (§7-11); discard snapshots spanning a CDR re-acquisition; readback floor is the statistical `1/√D_est` per snapshot |
 
 Three structural rules fall out of this matrix:
 
-1. **One controller per node.** The TIA's DC-offset-cancellation loop (modeled by the SE→diff running-mean tracker) and the offset DAC both act on the waveform's DC value; the CDR and any hypothetical h₋₁ loop would both act on the pre/post balance (§7-7). In each case exactly one of them is allowed to integrate in mission mode — the TIA DCOC must be quasi-static (in the model: the mean tracker is frozen, or made very slow) once the offset loop takes over, and no h₋₁ loop exists (the §7-6a estimator reads `ĥ₋₁` but never acts on it).
+1. **One controller per node.** The TIA's DC-offset-cancellation loop (modeled by the SE→diff running-mean tracker) and the offset DAC both act on the waveform's DC value; the CDR and any hypothetical h₋₁ loop would both act on the pre/post balance (§7-8). In each case exactly one of them is allowed to integrate in mission mode — the TIA DCOC must be quasi-static (in the model: the mean tracker is frozen, or made very slow) once the offset loop takes over, and no h₋₁ loop exists (the §7-4 estimator reads `ĥ₋₁` but never acts on it).
 2. **Observer slower than observed.** Offset reads Vp codes → offset ≥ ~100× slower than Vp. AGC reads Vp thresholds → AGC slower still. A loop that votes on a measurement contaminated by another loop's un-settled transient will integrate garbage — the decimation windows are what guarantee each vote sees a settled plant.
 3. **Dead-bands absorb the dither budget of the loop below.** Vp is bang-bang and dithers ±1 LSB by design; the offset dead-band (`deadband_codes = 1.0`) is sized to exactly that; the AGC hysteresis is sized to its *own* step size (half a gain step) since its measurement (the window-mean of Vp thresholds) is already dither-averaged. If a lower loop's gain is increased (smaller `vp_shift`), the dead-bands above it must be re-checked.
 
 **Note on the CTLE de-glitch mitigation (row 2 of the matrix).** Follow-up analysis on whether the "discard the next windows" strobe is actually load-bearing, given the CTLE row's own ~128× separation from the CDR:
 
-1. *Not needed for stability.* `CtleAdaptNrz` (§7-6) is a bang-bang saturating accumulator, not a linear integrator — a corrupted vote from one contaminated window costs at most one wrong-direction LSB step, which the next (clean) window's vote corrects. Omitting the discard risks a little extra hunting or noisier settling near `corr_deadband`, not divergence.
+1. *Not needed for stability.* `CtleAdaptNrz` (§7-7) is a bang-bang saturating accumulator, not a linear integrator — a corrupted vote from one contaminated window costs at most one wrong-direction LSB step, which the next (clean) window's vote corrects. Omitting the discard risks a little extra hunting or noisier settling near `corr_deadband`, not divergence.
 2. *The real defense is dilution by averaging, and it's a ratio argument.* Each vote means `d(k−m)·e(k)` over the full `ctle_decimation`-UI window; if the post-step Vp/CDR re-settling transient occupies only a small fraction of that window, it's diluted into the clean majority and the vote direction is unaffected. This is exactly the reasoning behind the "~128× slower than the CDR dump" figure already in the mitigation cell, and at the spec's mission defaults (`ctle_decimation = 2048`, `ctle_shift = 1` ⇒ 4096 UI/LSB) that margin is large — the explicit discard is likely belt-and-suspenders there.
 3. *The margin is thinner at the reference script's actual (faster, simulation-budget-driven) rate.* `mrm_nrz_transceiver_106g25.py` defaults to `ctle_decimation = 512`, `ctle_shift = 0` ⇒ 512 UI/LSB, only ~4× the CDR's `cdr_width = 128` dump, not ~32×. Its own docstring notes a peaking step "shifts the CTLE group delay, so the CDR walks to a new lock point during the climb" — and since the CDR's proportional path moves ≤ 0.5 PI code per window (`p_step/p_div = 2/512` at full majority, unchanged per UI), fully walking to a new lock point after a larger group-delay jump can plausibly take several hundred to ~1000+ UI. At `decimation = 512` that is no longer a small fraction of the window, so the case for the discard is stronger at the script's rate than at the mission rate.
 4. *The single-sample discontinuity itself is negligible.* With `lags = (1,)`, only one `d(k−1)·e(k)` term per window straddles the waveform-bank swap — a 1-in-`decimation` weighted contribution. The multi-UI Vp/CDR re-settling in point 3, not this discontinuity, is the actual mechanism of concern.
 
 Whether this is observable in practice (a dip/spike in `corr_meas` right after a code change, relative to the steady-state noise floor) has not been checked empirically — tracked as an open item in `simulation_revisit_items.md`.
 
-### 7-9 Recommended step sizes and bandwidth plan
+### 7-10 Recommended step sizes and bandwidth plan
 
 Each first-order loop's bandwidth is set by two knobs — decimation `D` (UI per vote) and shift `N_shift` (sub-LSB gain) — giving a **minimum update interval of `D · 2^N_shift` UI per code LSB**. **Every loop's `decimation` is a firmware-programmable register, not a synthesis-time constant** — including the Vp loops' `vp_decimation` (§7-3, default 1 = per-UI voting) — which is what enables the acquisition gear-shift below and post-silicon re-tuning of the nesting ladder without a respin. The recommendation is roughly **a decade or more of separation between adjacent loops in the nesting order**, which the defaults satisfy:
 
@@ -955,7 +969,7 @@ Each first-order loop's bandwidth is set by two knobs — decimation `D` (UI per
 | Offset / BLW | `decimation = 2048`, `offset_shift = 1` | ≥ 4096 UI | ~39 ns | ~128× slower than Vp ✓ |
 | CTLE | `decimation = 2048`, `ctle_shift = 1` | ≥ 4096 UI | ~39 ns | ~128× slower than the CDR dump ✓ |
 | AGC | `decimation = 4096`, `agc_shift = 1` | ≥ 8192 UI | ~77 ns | 2× slower than offset/CTLE, ~256× slower than Vp ✓ |
-| Channel estimator (§7-6a) | `D_est = 65536` UI window, all lags in parallel | one snapshot per 65536 UI | ~0.6 µs per snapshot | exempt — observe-only, no slot in the disturbance ladder |
+| Channel estimator (§7-4) | `D_est = 65536` UI window, all lags in parallel | one snapshot per 65536 UI | ~0.6 µs per snapshot | exempt — observe-only, no slot in the disturbance ladder |
 
 Guidance on choosing / re-tuning these:
 
@@ -964,7 +978,7 @@ Guidance on choosing / re-tuning these:
 - **Keep the ratios, not the absolutes.** The load-bearing quantities are the separations: Vp ~100× slower than per-UI, offset/CTLE ~100× slower than Vp/CDR, AGC ≥ 2× slower again. Any retune (e.g. faster tracking for a drifty TIA) should scale the whole ladder, not one rung.
 - **CDR P/F balance.** The defaults `p_step/p_div = 2/512`, `f_step/f_div = 2/64` put the frequency path's quantum ~two decades below the proportional step (32 windows of unit `diff` ≈ 4096 UI to change the ramp by one sub-code), which is the classic type-II damping arrangement — raise `f_div` before touching `f_step` if frequency-path hunting is observed. If `cdr_width` is ever changed again, scale `f_div` inversely (keep `f_div · cdr_width` constant, §6-6) to preserve this balance.
 
-### 7-10 Bring-up sequence
+### 7-11 Bring-up sequence
 
 Staged sequence, with entry/exit criteria and the freeze state of every loop per stage:
 
@@ -973,15 +987,15 @@ Staged sequence, with entry/exit criteria and the freeze state of every loop per
 | 0. Coarse presets | — | AGC code = mid-scale (0 dB), CTLE code = mid-scale (`2^(N_code,ctle−1)`), offset = mid-scale (0 V), data-slicer threshold code = mid-scale (0 V), Vp codes = `init_code_* = 32` (= `32·V_LSB,vp`), TIA DCOC acquiring / **live** (in the model: SE→diff running-mean tracking live) | Signal present; `d`, `e±` not stuck at a rail |
 | 1. CDR acquisition | **CDR** (P + F) | All DAC loops frozen (`adapt=False`); Vp thresholds at presets are good enough for vote *signs* | CDR lock detect: PI wander and `state_f/f_div` settled |
 | 2. Rail digitisation | CDR + **Vp_top/Vp_bot** | Offset, CTLE, AGC frozen | Vp codes dithering ±1 LSB (settled medians) |
-| 3. Vertical centering | + **Offset/BLW**; the **TIA DCOC goes quasi-static** here (one controller per DC node, §7-8; in the model: freeze the SE→diff running mean) | CTLE, AGC frozen | `\|imbalance_meas\| ≤ deadband_codes` for consecutive windows |
+| 3. Vertical centering | + **Offset/BLW**; the **TIA DCOC goes quasi-static** here (one controller per DC node, §7-9; in the model: freeze the SE→diff running mean) | CTLE, AGC frozen | `\|imbalance_meas\| ≤ deadband_codes` for consecutive windows |
 | 4. Equalisation | + **CTLE** | AGC frozen | `\|corr_meas\| ≤ corr_deadband` for consecutive windows |
 | 5. Mission mode | All continuous loops, mission-rate knobs | Optionally `lock_ctle` / `lock_agc` for a fully static EQ/gain; CDR, Vp, offset keep tracking | — (monitor lock detect, `vp_meas`, `corr_meas`, `imbalance_meas`) |
 
-Rationale for the order: the CDR comes **first** among the continuous loops (stage 1) even though it is the fastest, because every other loop's observable is only meaningful at a stable sampling phase; conversely the CDR only needs the error *sign*, which the preset Vp thresholds already provide. Vp precedes offset because the offset loop's entire measurement is the Vp code pair. CTLE precedes AGC final trim because peaking changes the rail amplitude AGC is trying to hit. If any upstream stage re-fires (e.g. CDR loses lock), freeze the downstream loops and re-enter at that stage — the saturating DAC codes hold their last values, so re-acquisition resumes from a warm state rather than from presets. The observe-only channel estimator (§7-6a) may be enabled any time from stage 2 (its `e(k)` observable is measured against the Vp rails, so it needs a locked sampling phase and converged rails); it participates in no exit criterion, and its readbacks become fully meaningful once stages 4–5 converge.
+Rationale for the order: the CDR comes **first** among the continuous loops (stage 1) even though it is the fastest, because every other loop's observable is only meaningful at a stable sampling phase; conversely the CDR only needs the error *sign*, which the preset Vp thresholds already provide. Vp precedes offset because the offset loop's entire measurement is the Vp code pair. CTLE precedes AGC final trim because peaking changes the rail amplitude AGC is trying to hit. If any upstream stage re-fires (e.g. CDR loses lock), freeze the downstream loops and re-enter at that stage — the saturating DAC codes hold their last values, so re-acquisition resumes from a warm state rather than from presets. The observe-only channel estimator (§7-4) may be enabled any time from stage 2 (its `e(k)` observable is measured against the Vp rails, so it needs a locked sampling phase and converged rails); it participates in no exit criterion, and its readbacks become fully meaningful once stages 4–5 converge.
 
 **Signal-invalid hold and warm re-entry.** On an invalid-signal condition (§6-11) the CDR asserts the signal-valid gate and **holds** `pi_code`, `state_p`, and `state_f`; every continuous adaptation loop simultaneously freezes (`adapt=False` on Vp, offset, CTLE, AGC — their DAC codes are saturating registers and retain their last mission values). When signal returns, the CDR resumes from its held state (warm re-acquire, stage 1 with `en_p`/`en_f` re-armed); once lock is re-asserted, the downstream loops re-enable in the same order (Vp → offset → CTLE → AGC), each observing a plant that is already close to its pre-gate operating point. This is faster and safer than a cold re-run from stage 0 and is the reason all DAC codes and `state_f` are specified as **saturating (or held), never wrapping** except the intentionally-wrapping phase accumulator.
 
-**Non-mission patterns.** A periodic, non-white pattern (e.g. `0xCC` = 1100 repeat) presented before mission data can bias the sign-sign correlations used by CTLE and (via `d`-conditioning) the offset and AGC observables. While such a pattern is present the slower adaptation loops (CTLE, offset, AGC) and the channel estimator (§7-6a, whose conditional medians assume white data) must be **frozen (`adapt=False`)** and re-enabled only once the mission pattern is running; the CDR continues to run (transitions in these patterns are dense) but should be verified against the 72-UI CID coast case (§6-12) at the mission bandwidth target.
+**Non-mission patterns.** A periodic, non-white pattern (e.g. `0xCC` = 1100 repeat) presented before mission data can bias the sign-sign correlations used by CTLE and (via `d`-conditioning) the offset and AGC observables. While such a pattern is present the slower adaptation loops (CTLE, offset, AGC) and the channel estimator (§7-4, whose conditional medians assume white data) must be **frozen (`adapt=False`)** and re-enabled only once the mission pattern is running; the CDR continues to run (transitions in these patterns are dense) but should be verified against the 72-UI CID coast case (§6-12) at the mission bandwidth target.
 
 Nesting summary: CDR and Vp sit inside CTLE/AGC; CTLE must not outrun the CDR; the offset loop must be slower than the Vp loops it observes. The dual error slicers are shared by the MM-CDR, Vp, CTLE, and AGC — their thresholds must be quasi-static on the CDR update timescale. Each loop exposes a freeze control (`adapt=False` = `lock_agc` / `lock_ctle` / offset lock gate): the code is frozen but the window measurement keeps updating for observability.
 
@@ -991,7 +1005,7 @@ TIA → CTLE → [ d | e₊ | e₋ ] → MM-CDR → PI
                 └→ offset
 ```
 
-### 7-11 Dead-band / hysteresis summary (whole receiver)
+### 7-12 Dead-band / hysteresis summary (whole receiver)
 
 | Loop | Mechanism | Variable | Default | Implementation |
 |---|---|---|---|---|
@@ -1000,7 +1014,7 @@ TIA → CTLE → [ d | e₊ | e₋ ] → MM-CDR → PI
 | AGC | voltage hysteresis window on window-mean `Vp_meas` | `hyst_v` / `hysteresis_v` | auto = `vp_ideal·(10^(step_db/40)−1)` (half of one gain step's effect on the rail) | vote 0 inside band; sized to half a gain step so adjacent codes cannot dither |
 | Offset / BLW | dead-band in Vp codes on window-mean imbalance | `deadband_codes` | 1.0 code | vote 0 inside band; sized to the Vp loops' ±1 LSB dither |
 | CTLE | correlation dead-band on window-mean sign-sign metric | `corr_deadband` | 0.02 (≈ 0.9 σ of the noise floor `1/√(D·len(lags))`) | vote 0 inside band; statistical sizing |
-| Channel estimator | none (open-loop digital correlator — no code to dither; statistical floor `1/√D_est` per snapshot) | `D_est` | 65536 UI | §7-6a callout |
+| Channel estimator | none (open-loop digital correlator — no code to dither; statistical floor `1/√D_est` per snapshot) | `D_est` | 65536 UI | §7-4 callout |
 | TX disparity checker (TX-side, observe-only) | two-threshold hysteresis + persistence count on the snapshot flag; readback itself none (floor `1/√D_disp`) | `T_hi` / `T_lo` / `N_persist` | 0.25 / 0.125 / 2 windows | §8-4 callout |
 
 ---
@@ -1064,7 +1078,7 @@ Carrier-depletion modulators are nonlinear electrical-to-optical loads: the reve
 
 **Status.** Proposed digital block (`TxDisparityNrz`) — **not yet in the behavioral model**. Accumulation-window default, flag thresholds, and the thermal-tuning-loop consumption model are working proposals, individually tagged `TBD` below.
 
-The TX disparity checker is an **observe-only digital monitor in the TX digital (serializer-side) logic** that measures the running balance of 1's versus 0's in the transmitted bit stream and reports it to the **MRM thermal-tuning (heater-lock) loop** (§8-4). It is the TX-side counterpart of the RX channel estimator (§7-6a): pure digital logic on a data stream that already exists, terminating in readback registers and status flags rather than a DAC — the instrument, never the actuator. It drives no knob in the TX datapath and closes no loop of its own; the ring's thermal operating point remains owned by the thermal-tuning loop (one controller per node, §7-8 rule 1).
+The TX disparity checker is an **observe-only digital monitor in the TX digital (serializer-side) logic** that measures the running balance of 1's versus 0's in the transmitted bit stream and reports it to the **MRM thermal-tuning (heater-lock) loop** (§8-4). It is the TX-side counterpart of the RX channel estimator (§7-4): pure digital logic on a data stream that already exists, terminating in readback registers and status flags rather than a DAC — the instrument, never the actuator. It drives no knob in the TX datapath and closes no loop of its own; the ring's thermal operating point remains owned by the thermal-tuning loop (one controller per node, §7-9 rule 1).
 
 ### 9-1 Motivation — MRM sensitivity to transmit-data disparity
 
@@ -1116,9 +1130,9 @@ if ui_count == D_disp:                     # window complete (D_disp = multiple 
     acc = 0; ui_count = 0
 ```
 
-`dens_meas = 0` is a balanced stream (50 % ones density); `dens_meas = +1` is all-ones. For random data the snapshot has a statistical floor of `1/√D_disp` per window — ≈ 0.004 at the default 65536-UI window, the same construction as the channel estimator's readback floor (§7-6a) — so any genuine density event of interest sits orders of magnitude above the noise.
+`dens_meas = 0` is a balanced stream (50 % ones density); `dens_meas = +1` is all-ones. For random data the snapshot has a statistical floor of `1/√D_disp` per window — ≈ 0.004 at the default 65536-UI window, the same construction as the channel estimator's readback floor (§7-4) — so any genuine density event of interest sits orders of magnitude above the noise.
 
-**Mapping to the common architecture:** observe = per-word popcount of the serializer-input word; average = `D_disp`-UI window accumulation; **no vote, no DAC** — the block instantiates stages (1)–(2) of the §7-1 template only, exactly as the channel estimator does (§7-6a). The §8-4 threshold/hysteresis stage is a reporting comparator, not a control vote. The accumulator is bounded by the window (`|acc| ≤ D_disp`), so saturation is impossible by construction — consistent with the document-wide rule that only the CDR phase accumulator may wrap and everything else saturates or is bounded (§6-5, §7-1).
+**Mapping to the common architecture:** observe = per-word popcount of the serializer-input word; average = `D_disp`-UI window accumulation; **no vote, no DAC** — the block instantiates stages (1)–(2) of the §7-1 template only, exactly as the channel estimator does (§7-4). The §8-4 threshold/hysteresis stage is a reporting comparator, not a control vote. The accumulator is bounded by the window (`|acc| ≤ D_disp`), so saturation is impossible by construction — consistent with the document-wide rule that only the CDR phase accumulator may wrap and everything else saturates or is bounded (§6-5, §7-1).
 
 **Secondary observable — peak CID run length (proposed).** The same tap cheaply supports a per-window longest-run monitor: `cid_max` = the longest consecutive-identical-digit run observed in the window (run state carried across word boundaries), with a flag threshold `T_cid` defaulting to the **72-UI** OIF-CEI CID stressor already adopted in §6-12. A mission stream exceeding that run-length class is outside what the CDR's CID coast (§6-12) and the TIA LF-cutoff sizing (§4-1) were provisioned for, so `cid_flag` is a link-health observable as much as a thermal one. Whether the CID monitor is retained in hardware is `TBD_from_sim_sweep`.
 
@@ -1142,11 +1156,11 @@ The checker exports the following, all synchronous to the TX word clock:
 | `\|dens_meas\| ≤ T_lo` for `N_persist` consecutive windows | deassert `disp_flag` | Balance restored |
 | `T_lo < \|dens_meas\| < T_hi` (either run broken) | hold `disp_flag` | Inside hysteresis band |
 
-**Dead-band / hysteresis (disparity checker):** implemented as a **two-threshold hysteresis pair plus a persistence count on the window snapshot** — `disp_flag` asserts only after `N_persist` consecutive windows at `\|dens_meas\| ≥ T_hi` and deasserts only after `N_persist` consecutive windows at `\|dens_meas\| ≤ T_lo` (`T_lo < T_hi`), so a density hovering near threshold cannot chatter the flag at the snapshot rate. The snapshot readback itself carries **no dead-band** — like the channel estimator (§7-6a) it is an open-loop measurement whose noise floor is the statistical `1/√D_disp` per snapshot.
+**Dead-band / hysteresis (disparity checker):** implemented as a **two-threshold hysteresis pair plus a persistence count on the window snapshot** — `disp_flag` asserts only after `N_persist` consecutive windows at `\|dens_meas\| ≥ T_hi` and deasserts only after `N_persist` consecutive windows at `\|dens_meas\| ≤ T_lo` (`T_lo < T_hi`), so a density hovering near threshold cannot chatter the flag at the snapshot rate. The snapshot readback itself carries **no dead-band** — like the channel estimator (§7-4) it is an open-loop measurement whose noise floor is the statistical `1/√D_disp` per snapshot.
 
 **Consumption by the thermal-tuning loop.** How the loop incorporates the report — a feed-forward term scaled into the heater drive to pre-compensate data-dependent heating, a gain-scheduling input, or a firmware-level alarm only — is a property of the thermal-tuning loop, whose architecture is not specified in this document (`TBD_from_partner`; the EIC-side digital interface into it is `TBD_analog_design`). The checker's contract is only the exported observables above. This mirrors the CDR's posture toward the squelch/relink handshake (§6-11): expose the observable, leave the policy to its owner.
 
-**Squelch / invalid-input gating.** During TX squelch (§7-4) the serializer input is not mission data, and a disparity measured on a squelched (static) input must not reach the thermal-tuning loop — which is at that moment relying on the constant-average-power squelch state to hold heater lock. The checker therefore follows the CDR's signal-valid discipline (§6-11): while the TX-side squelch/invalid condition is asserted, `meas_valid` is forced low and `disp_flag` is **held**; on exit, the window accumulator and persistence counters are cleared so the first post-squelch snapshot is not contaminated by a partial window.
+**Squelch / invalid-input gating.** During TX squelch (§8-4) the serializer input is not mission data, and a disparity measured on a squelched (static) input must not reach the thermal-tuning loop — which is at that moment relying on the constant-average-power squelch state to hold heater lock. The checker therefore follows the CDR's signal-valid discipline (§6-11): while the TX-side squelch/invalid condition is asserted, `meas_valid` is forced low and `disp_flag` is **held**; on exit, the window accumulator and persistence counters are cleared so the first post-squelch snapshot is not contaminated by a partial window.
 
 ### 9-5 Parameter table
 
@@ -1154,7 +1168,7 @@ The checker exports the following, all synchronous to the TX word clock:
 |---|---|---|---|
 | `W_tx` | `word_width` | **128** UI (proposed) | Parallel word per checker cycle; at 128 the word clock is 106.25 GBd / 128 ≈ 830 MHz (< 1 GHz digital convention, §6-4). Final width follows the CDNS serializer lane interface (§3-1, `TBD_from_partner`); the checker logic is width-agnostic |
 | `D_disp` | `decimation` | **65536** UI (≈ 0.62 µs) | Accumulation window per snapshot; integer multiple of `W_tx`; programmable 2¹² … 2²⁴ UI (≈ 39 ns … 158 µs). Default sized to give several snapshots per ring thermal time constant `τ_th` (µs-class assumed, `TBD_from_partner`) |
-| `N_acc,disp` | `acc` width | 25 bits signed | `⌈log2(D_disp,max)⌉ + 1`; bounded by the window (`\|acc\| ≤ D_disp`) — saturation impossible by construction (cf. `ChanEstNrz`, §7-6a) |
+| `N_acc,disp` | `acc` width | 25 bits signed | `⌈log2(D_disp,max)⌉ + 1`; bounded by the window (`\|acc\| ≤ D_disp`) — saturation impossible by construction (cf. `ChanEstNrz`, §7-4) |
 | `T_hi` | `thresh_hi` | 0.25 (proposed) | Flag-assert threshold on `\|dens_meas\|` (ones density outside 37.5 % … 62.5 %); ≈ 64× the random-data floor at the default window. Final value set by the MRM's resonance sensitivity to absorbed-power change (`TBD_from_partner`) |
 | `T_lo` | `thresh_lo` | 0.125 (proposed) | Flag-deassert threshold; hysteresis requires `T_lo < T_hi` (`TBD_from_partner`) |
 | `N_persist` | `persist` | 2 windows | Consecutive-window persistence for both assert and deassert |
@@ -1162,15 +1176,15 @@ The checker exports the following, all synchronous to the TX word clock:
 | — | `flip_sign` | `False` | Negates the exported `dens_meas` so + always means "toward the hotter symbol", independent of driver/modulator polarity (`TBD_from_partner`); cf. `flip_dir`, §6-2 |
 | — | `disp_meas`, `dens_meas` | signed count / fraction ∈ [−1, +1] | Snapshot readbacks, one per window, qualified by `meas_valid` |
 | — | `dens_peak`, `cid_max` | sticky watermarks | Max-magnitude snapshot (sign preserved) and longest run since last clear |
-| — | `enable` | 1 | Freeze control per the §7-10 convention: exports to the thermal-tuning loop gate off, but the window measurement keeps updating for observability |
+| — | `enable` | 1 | Freeze control per the §7-11 convention: exports to the thermal-tuning loop gate off, but the window measurement keeps updating for observability |
 
 Per the operating-mode disclaimer, all defaults above assume 106G full-rate; at 53 Gbps half-rate the UI-denominated windows double in absolute time and the defaults are **TBD**.
 
 ### 9-6 Interaction, timescales, and open items
 
-**Timescale placement.** Three timescales bracket the design: the symbol (9.41 ps), the snapshot window (0.62 µs default, ≈ 1.6 MHz snapshot rate), and the thermal plant (`τ_th` µs-class assumed, heater-control settling ms-class — cf. the 60–75 ms squelch/relink budget, §7-4). The default window therefore oversamples the τ_th-limited disturbance band by several snapshots per thermal time constant, and the flag's `N_persist = 2` adds ≈ 1.2 µs of notification latency — negligible against the thermal response it reports on. If partner data places `τ_th` faster than the µs class, shorten `D_disp` by the same ratio (the `1/√D_disp` readback floor degrades only as the square root).
+**Timescale placement.** Three timescales bracket the design: the symbol (9.41 ps), the snapshot window (0.62 µs default, ≈ 1.6 MHz snapshot rate), and the thermal plant (`τ_th` µs-class assumed, heater-control settling ms-class — cf. the 60–75 ms squelch/relink budget, §8-4). The default window therefore oversamples the τ_th-limited disturbance band by several snapshots per thermal time constant, and the flag's `N_persist = 2` adds ≈ 1.2 µs of notification latency — negligible against the thermal response it reports on. If partner data places `τ_th` faster than the µs class, shorten `D_disp` by the same ratio (the `1/√D_disp` readback floor degrades only as the square root).
 
-**Nesting / disturbance ladder.** The checker itself is observe-only and TX-side, so — like the channel estimator (§7-6a) — it has **no slot in the §7-8 disturbance ladder** and no bandwidth constraint against the RX loops. The actuation it informs does touch an observable the RX cares about: a heater step moves the ring operating point, hence OMA/ER, hence the rail amplitude seen by the Vp/AGC loops. This is safe by construction: the heater's own thermal response low-passes any disparity-informed action into the µs–ms class, more than four decades slower than the slowest RX loop (AGC, ≥ 8192 UI ≈ 77 ns per LSB, §7-9), so to the RX ladder it is the same slow environmental drift the Vp/offset/AGC loops already track.
+**Nesting / disturbance ladder.** The checker itself is observe-only and TX-side, so — like the channel estimator (§7-4) — it has **no slot in the §7-9 disturbance ladder** and no bandwidth constraint against the RX loops. The actuation it informs does touch an observable the RX cares about: a heater step moves the ring operating point, hence OMA/ER, hence the rail amplitude seen by the Vp/AGC loops. This is safe by construction: the heater's own thermal response low-passes any disparity-informed action into the µs–ms class, more than four decades slower than the slowest RX loop (AGC, ≥ 8192 UI ≈ 77 ns per LSB, §7-10), so to the RX ladder it is the same slow environmental drift the Vp/offset/AGC loops already track.
 
 **Power accounting.** The checker is TX digital logic and books against the **SerDes** energy line (§1-3), not the analog TX-driver allocation.
 
@@ -1196,7 +1210,7 @@ Per the operating-mode disclaimer, all defaults above assume 106G full-rate; at 
 | `h_k` | Channel pulse-response cursor at lag `k` UI (esp. `h_{−1}`, `h_0`, `h_{+1}`) |
 | PI code | 5-bit phase-interpolator control word (0…31) |
 | Vp_top / Vp_bot | Adapted error-slicer thresholds at `+Vp` / `−Vp`; at convergence `Vp ≈ h₀` (the two are the same quantity — see §A-3) |
-| `ĥ_i` | Channel-estimator readback of cursor `h_i` — the §7-3 sign-sign update gated by `d(k−i)` instead of `d(k)`, accumulated digitally (normalized units; observe-only, §7-6a) |
+| `ĥ_i` | Channel-estimator readback of cursor `h_i` — the §7-3 sign-sign update gated by `d(k−i)` instead of `d(k)`, accumulated digitally (normalized units; observe-only, §7-4) |
 | Vote | Ternary loop update decision `∈ {+1, 0, −1}` |
 | DAC code | Saturating integer register driving an analog knob (threshold, gain, offset, peaking) |
 | Dead-band | A no-vote region around the loop target — vote 0 while the measured error is inside the band |
@@ -1282,7 +1296,7 @@ flowchart LR
 
 - A **data slicer** decides the transmitted bit. Its programmable threshold is placed at the vertical eye center (nominally 0, i.e. mid-scale code, after offset cancellation).
 - An **error slicer** compares the same sample against a *reference amplitude* rather than against the eye center. Its output is the **sign of the residual** between the sample and that reference rail.
-- **Every slicer has a programmable threshold**: each of the three comparators has its own threshold DAC. The error-slicer DACs are adapted by the Vp loops (§7-3). The data-slicer DAC is **not** driven by any mission adaptation loop — vertical eye centering is owned by the offset/BLW loop (§7-5), so its code nominally stays at mid-scale (0 V); it is firmware-programmable for margining, diagnostics, and comparator-offset trim. How the error-slicer DAC codes are adapted, how `e₊`/`e₋` are combined into the signed `e(k)` used by the CDR and loops, why both rails are instrumented, and how DC offset is removed are specified later (§4, §5, §7-3, §7-5).
+- **Every slicer has a programmable threshold**: each of the three comparators has its own threshold DAC. The error-slicer DACs are adapted by the Vp loops (§7-3). The data-slicer DAC is **not** driven by any mission adaptation loop — vertical eye centering is owned by the offset/BLW loop (§7-6), so its code nominally stays at mid-scale (0 V); it is firmware-programmable for margining, diagnostics, and comparator-offset trim. How the error-slicer DAC codes are adapted, how `e₊`/`e₋` are combined into the signed `e(k)` used by the CDR and loops, why both rails are instrumented, and how DC offset is removed are specified later (§4, §5, §7-3, §7-6).
 
 ![NRZ eye diagram with data and error slicer levels](./nrz_eye_slicer_levels.png)
 
@@ -1303,4 +1317,4 @@ Sample the channel impulse response at baud spacing, aligned so the largest samp
 *Figure A-2: Single-bit pulse response sampled at baud spacing. `h₀` is the main cursor at the decision instant; `h₋₁` (pre-cursor) and `h₊₁` (post-cursor) sit one UI either side. The dashed level shows the MM CDR lock condition `h₋₁ = h₊₁` (§6-3).*
 
 
-**Vp and h₀ are the same quantity.** For ±1 NRZ data the ideal received sample is `y(k) = d(k)·h₀ + ISI`; with the CDR locked and the residual ISI nulled, the conditional median of the top (bottom) rail at the data sample phase *is* `+h₀` (`−h₀`). The Vp_top / Vp_bot median loops (§7-3) servo their threshold DACs onto exactly those medians, so the adapted Vp codes are the **digitized readback of the main cursor**: `Vp_top ≈ Vp_bot ≈ h₀` (they differ only by top/bottom asymmetry), and the merged value `(Vp_top + Vp_bot)/2` used by the AGC (§7-4) is the receiver's `|h₀|` estimate — the loop inventory (§7-2) treats the Vp loops as the h₀ digitiser (§7-3) for this reason. Everywhere this document says "amplitude" or "rail", `Vp` and `h₀` may be read interchangeably.
+**Vp and h₀ are the same quantity.** For ±1 NRZ data the ideal received sample is `y(k) = d(k)·h₀ + ISI`; with the CDR locked and the residual ISI nulled, the conditional median of the top (bottom) rail at the data sample phase *is* `+h₀` (`−h₀`). The Vp_top / Vp_bot median loops (§7-3) servo their threshold DACs onto exactly those medians, so the adapted Vp codes are the **digitized readback of the main cursor**: `Vp_top ≈ Vp_bot ≈ h₀` (they differ only by top/bottom asymmetry), and the merged value `(Vp_top + Vp_bot)/2` used by the AGC (§7-5) is the receiver's `|h₀|` estimate — the loop inventory (§7-2) treats the Vp loops as the h₀ digitiser (§7-3) for this reason. Everywhere this document says "amplitude" or "rail", `Vp` and `h₀` may be read interchangeably.

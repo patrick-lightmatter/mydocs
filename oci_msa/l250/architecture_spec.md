@@ -742,7 +742,7 @@ Shared fixed-point template (each loop instantiates this with its own values —
 | `D` | Decimation (UI per vote) | per loop (`decimation`; 1 for Vp) |
 | `T_LSB` | Min UI per code LSB | `D · 2^N_shift` |
 
-The accumulator classes are structurally identical across loops (`VpDac`, `GainDac`, `OffsetDac`, `PeakingDac`):
+The accumulator classes are structurally identical across loops (`VpDac`, `GainDac`, `OffsetDac`, `CtleDac`):
 
 ```python
 # shared accumulator kernel (vote ∈ {+1, 0, −1})
@@ -932,7 +932,7 @@ if ui_count == decimation:                          # one vote per window
 
 `corr > 0 ⇔ h_m > 0 ⇔` **under-boosted** CTLE → raise peaking; `corr < 0 ⇔` over-boosted → lower. Lag 1 senses the first post-cursor (HF / Kh-like deficit); longer lags (3–6) sense the long-tail / Kl-like residue — `lags` sums a configurable set into **one** metric so a single code covers both.
 
-**Mapping to the common architecture:** observe = per-UI `(d, e)` pairs (exactly the outputs of `VpAdaptNrz.step`); average = `decimation`-UI correlation window; vote = dead-band comparison; DAC = `PeakingDac`; code maps **linear-in-dB** to peaking.
+**Mapping to the common architecture:** observe = per-UI `(d, e)` pairs (exactly the outputs of `VpAdaptNrz.step`); average = `decimation`-UI correlation window; vote = dead-band comparison; DAC = `CtleDac`; code maps **linear-in-dB** to peaking.
 
 **Truth table:**
 
@@ -948,7 +948,7 @@ if ui_count == decimation:                          # one vote per window
 |---|---|---|---|
 | `N_code,ctle` | `code_bits` | **4-bit** (16 codes) | Peaking-code width (codes `0 … 2^N_code,ctle − 1` = `0…15`) |
 | `N_shift` | `ctle_shift` | 1 | Loop gain = 1/2 LSB per vote |
-| `N_accum` | `PeakingDac.acc` | `N_code,ctle + ctle_shift` bits | Saturate no wrap |
+| `N_accum` | `CtleDac.acc` | `N_code,ctle + ctle_shift` bits | Saturate no wrap |
 | `D` | `decimation` | 2048 UI | Correlation window per vote |
 | `M` | `lags` | `(1,)` | Decision lags summed into the metric (add 3–6 for long-tail) |
 | `DB` | `corr_deadband` | 0.02 | No-vote dead-band on the mean correlation |

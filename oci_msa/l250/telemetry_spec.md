@@ -14,11 +14,11 @@ This architecture includes **three observe-only digital telemetry instruments** 
 
 All three instruments share these structural characteristics:
 
-1. **Observe-only, never actuate.** Each terminates in readback registers and status flags, not DAC control codes. This is a design constraint, not an omission: it preserves §7-8 rule 1 (one controller per node) — every observable these blocks measure already has an owner.
+1. **Observe-only, never actuate.** Each terminates in readback registers and status flags, not DAC control codes. This is a design constraint, not an omission: it preserves §7-9 rule 1 (one controller per node) — every observable these blocks measure already has an owner.
 
 2. **All-digital or minimal-analog hardware.** Two instruments (channel estimator, disparity checker) are pure digital logic on data streams that already exist in the mission path; one (eye monitor) adds a single analog comparator plus a phase interpolator. All consume the shared mission observables `(d, e)` or tap existing parallel words.
 
-3. **No slot in the disturbance ladder.** Because they actuate nothing, none appear in the §7-8 loop-interaction matrix as disturbers, and none constrain the bandwidth of any mission loop.
+3. **No slot in the disturbance ladder.** Because they actuate nothing, none appear in the §7-9 loop-interaction matrix as disturbers, and none constrain the bandwidth of any mission loop.
 
 4. **Dwell-windowed accumulation, statistical noise floors.** Each accumulates a correlation or count over a programmable window (65 k–1 M UI class); readback precision is statistical, `1/√D` per snapshot.
 
@@ -66,15 +66,15 @@ Setting `i = 0` recovers the Vp equilibrium check — `⟨d(k)·e(k)⟩ → 0` w
 
 ### T-1.2 What the readback buys
 
-**Relationship to the CTLE loop.** Identical observable, opposite use: §7-6 computes this same sign-sign correlation (summed over its `lags`) and **nulls** it through the peaking code; the estimator computes it **per lag** and **reports** it. `ĥ₊₁` is precisely the residual the CTLE drives into `corr_deadband`.
+**Relationship to the CTLE loop.** Identical observable, opposite use: §7-7 computes this same sign-sign correlation (summed over its `lags`) and **nulls** it through the peaking code; the estimator computes it **per lag** and **reports** it. `ĥ₊₁` is precisely the residual the CTLE drives into `corr_deadband`.
 
 **Normalization caveat.** Because `e` is one bit, the readback is in units of `σ_e`, not volts. Cursor-to-cursor **ratios are `σ_e`-independent** (`ĥ_i/ĥ_j ≈ h_i/h_j` in the small-cursor regime), which is sufficient for every use below; an absolute-volts conversion would need a separate `σ_e` calibration (`TBD_from_sim_sweep`, only if ever needed).
 
-**Observe-only — by design, not omission.** The block drives no analog knob and closes no loop. This is required by §7-8 rule 1 (one controller per node): `h₊₁` is already owned by the CTLE loop (§7-6) and the pre/post balance by the MM CDR lock condition (§6-3, §7-7). The estimator is the instrument, never the actuator. What the readback buys:
+**Observe-only — by design, not omission.** The block drives no analog knob and closes no loop. This is required by §7-9 rule 1 (one controller per node): `h₊₁` is already owned by the CTLE loop (§7-7) and the pre/post balance by the MM CDR lock condition (§6-3, §7-8). The estimator is the instrument, never the actuator. What the readback buys:
 
 - `ĥ₊₁` cross-checks CTLE convergence (should sit at the residual that `corr_deadband` tolerates);
-- `ĥ₋₁` vs `ĥ₊₁` cross-checks the MM lock condition `h(−1) = h(+1)` — a standing imbalance flags a lock-point offset (e.g. a CTLE group-delay change mid-tracking, §7-8) — and the ratio form is exactly what the balance check needs;
-- lags 2–6 quantify the long-tail residue that the CTLE's longer `lags` sense (§7-6);
+- `ĥ₋₁` vs `ĥ₊₁` cross-checks the MM lock condition `h(−1) = h(+1)` — a standing imbalance flags a lock-point offset (e.g. a CTLE group-delay change mid-tracking, §7-9) — and the ratio form is exactly what the balance check needs;
+- lags 2–6 quantify the long-tail residue that the CTLE's longer `lags` sense (§7-7);
 - together with the `|h₀|` readback already provided by the Vp codes, `{ĥ_i}` is an in-situ **baud-spaced pulse-response estimate at the mission sampling phase** (the §2-3 cursors), enabling on-die residual-ISI / eye-margin estimation without external instrumentation.
 
 ### T-1.3 Truth table and parameters
@@ -93,7 +93,7 @@ Setting `i = 0` recovers the Vp equilibrium check — `⟨d(k)·e(k)⟩ → 0` w
 | Placeholder | Model/RTL name | Default | Meaning |
 |---|---|---|---|
 | `M_est` | `lags` | `(−1, +1, +2, +3)` | Lag set, all in parallel; the deepest lag sets the `d`-history depth (`TBD_from_sim_sweep`) |
-| `D_est` | `decimation` | 65536 UI (programmable, 2¹² … 2²⁴ UI) | Window per readback snapshot; firmware-programmable per the §7-9 convention (all §7 decimations are registers). Statistical floor of the mean is `1/√D_est` ≈ 0.004 at the default |
+| `D_est` | `decimation` | 65536 UI (programmable, 2¹² … 2²⁴ UI) | Window per readback snapshot; firmware-programmable per the §7-10 convention (all §7 decimations are registers). Statistical floor of the mean is `1/√D_est` ≈ 0.004 at the default |
 | `N_acc,est` | `acc` width | 17 bits signed | Bounded by the window (`|acc| ≤ D_est`) — saturation impossible by construction, unlike the DAC accumulators |
 | — | `h_hat[i]` | signed fraction ∈ [−1, +1] | Normalized cursor readback (units of `σ_e`, see caveat above) |
 | — | `e` pipeline | 1 UI (lag −1 only) | Pre-cursor alignment of `e(k)` against `d(k+1)` |
@@ -102,7 +102,7 @@ Setting `i = 0` recovers the Vp equilibrium check — `⟨d(k)·e(k)⟩ → 0` w
 
 ### T-1.4 Nesting and bring-up
 
-**Nesting:** none in mission mode — the block actuates nothing, so it has no slot in the §7-8 disturbance ladder and no bandwidth constraint against the control loops. Enable it any time **from stage 2** of the bring-up sequence (§7-10): its observable is `e(k)`, which is measured against the Vp rails, so the readback presumes a locked sampling phase and converged rails; it becomes fully meaningful once the loops it instruments have converged (stages 4–5). Two validity caveats it shares with the other `d`-conditioned observables: (i) **white-data assumption** — during non-mission periodic patterns `d(k−i)` is correlated with the other symbols and the correlation is biased, so the estimator must be frozen (`adapt=False`, §7-10); (ii) a CDR phase step moves every cursor slightly (§7-8 CDR row), so snapshots spanning a re-acquisition should be discarded.
+**Nesting:** none in mission mode — the block actuates nothing, so it has no slot in the §7-9 disturbance ladder and no bandwidth constraint against the control loops. Enable it any time **from stage 2** of the bring-up sequence (§7-11): its observable is `e(k)`, which is measured against the Vp rails, so the readback presumes a locked sampling phase and converged rails; it becomes fully meaningful once the loops it instruments have converged (stages 4–5). Two validity caveats it shares with the other `d`-conditioned observables: (i) **white-data assumption** — during non-mission periodic patterns `d(k−i)` is correlated with the other symbols and the correlation is biased, so the estimator must be frozen (`adapt=False`, §7-11); (ii) a CDR phase step moves every cursor slightly (§7-9 CDR row), so snapshots spanning a re-acquisition should be discarded.
 
 ---
 
@@ -291,7 +291,7 @@ Directly resolving the **1e-12 internal-spec contour** is impractical per point 
 
 **Calibration and diagnostic cross-checks:**
 
-- **Vertical zero (`code_zero_mon`).** With `mon_phase_offset = 0` and `V_mon = 0`, the monitor replicates the data slicer (`m ≡ d = sign(y)`), so the hit ratio collapses to the comparator's own offset/metastability residue. Sweeping `mon_thresh_code` through zero locates the code of minimum hit ratio; firmware stores it as `code_zero_mon` and references all subsequent threshold programming to it, absorbing the monitor comparator's input offset. (A dedicated analog offset-trim DAC on the monitor comparator is the alternative; choice is `TBD_analog_design`.) Note the mission slicers get their vertical zero from the offset/BLW loop (§7-5); the monitor, being outside all loops, needs this explicit one-time calibration.
+- **Vertical zero (`code_zero_mon`).** With `mon_phase_offset = 0` and `V_mon = 0`, the monitor replicates the data slicer (`m ≡ d = sign(y)`), so the hit ratio collapses to the comparator's own offset/metastability residue. Sweeping `mon_thresh_code` through zero locates the code of minimum hit ratio; firmware stores it as `code_zero_mon` and references all subsequent threshold programming to it, absorbing the monitor comparator's input offset. (A dedicated analog offset-trim DAC on the monitor comparator is the alternative; choice is `TBD_analog_design`.) Note the mission slicers get their vertical zero from the offset/BLW loop (§7-6); the monitor, being outside all loops, needs this explicit one-time calibration.
 
 - **Horizontal zero (`phase_zero_mon`).** With `V_mon = 0` (post-vertical-cal), sweeping `mon_phase_offset` yields a hit-ratio bathtub whose minimum should sit at offset 0; a displaced minimum measures the **static skew between the monitor-PI and data-path-PI clock distribution branches**. Firmware stores the displacement as `phase_zero_mon` and references horizontal sweeps to it. The residual (sub-code) skew budget is `TBD_analog_design`.
 
@@ -300,22 +300,22 @@ Both calibrations are observe-only, run any time after CDR lock, and should be r
 **Adaptation cross-checks** enabled by the calibrated monitor:
 
 - **Vp / h₀ (§7-3):** in rail-CDF mode (`mon_gate_sel = +1`), the monitor at `s = +1` with `code` set to the settled `Vp_top` code should read a conditional hit ratio ≈ 0.5 — the monitor sitting on the adapted rail median. A standing deviation flags Vp mis-convergence or `V_LSB,mon`/`V_LSB,vp` grid mismatch.
-- **Offset / BLW (§7-5):** upper and lower BER contours should be symmetric about `V_mon = 0`; a standing vertical asymmetry beyond the Vp top/bottom asymmetry flags residual centering error.
-- **CTLE (§7-6) / channel estimator (§T-1):** eye-opening changes across a peaking-code sweep give a direct margin-vs-code curve; the monitor's measured eye complements the `σ_e`-normalized `ĥ_i` readbacks with an absolute (code-unit) 2D view.
+- **Offset / BLW (§7-6):** upper and lower BER contours should be symmetric about `V_mon = 0`; a standing vertical asymmetry beyond the Vp top/bottom asymmetry flags residual centering error.
+- **CTLE (§7-7) / channel estimator (§T-1):** eye-opening changes across a peaking-code sweep give a direct margin-vs-code curve; the monitor's measured eye complements the `σ_e`-normalized `ĥ_i` readbacks with an absolute (code-unit) 2D view.
 - **MM lock point (§6-3):** left/right eye-width asymmetry about the data sample phase cross-checks the `h(−1) = h(+1)` lock condition, corroborating the `ĥ₋₁` vs `ĥ₊₁` comparison of §T-1.
 - **JTOL / stress correlation (§6-9, §6-12):** eye-width erosion under applied SJ or CID stress patterns is directly observable at the slicer, closing the loop between the mask-derived untracked-jitter allocations and the physical eye.
 
 ### T-2.7 Interaction with the mission loops — non-intrusiveness constraints
 
-The observe-only property is structural (§7-8 rule 1: one controller per node — every node the monitor observes already has its owner), but two **analog** coupling paths do not vanish by architecture; together with one structural policy rule, they are explicit sign-off items:
+The observe-only property is structural (§7-9 rule 1: one controller per node — every node the monitor observes already has its owner), but two **analog** coupling paths do not vanish by architecture; together with one structural policy rule, they are explicit sign-off items:
 
 1. **Static input loading.** The monitor comparator's input capacitance on the `y(k)` node must be **constant regardless of monitor enable, threshold, or phase state** (present and biased even when idle): a load that toggles with monitor activity would modulate the very eye being measured, and the mission eye when the monitor is off would differ from the eye when it scans. The slicer-input full-scale / bandwidth budget of §2-2 and §5 must include the fourth comparator's load from the outset (`TBD_analog_design`).
 2. **Monitor-PI clock coupling.** During a scan, `pi_code_mon` sweeps every phase relative to the data-path clock, so supply/substrate coupling from the monitor clock branch arrives at the data-path PI at every possible phase relationship. Injected jitter on the data sample phase must remain negligible against the RX jitter allocations (§3 class); this closes with the extracted clock-distribution design (`TBD_analog_design`).
-3. **Future auto-margining stays observe-only.** Any feature that would act on monitor results (e.g. margin-triggered re-adaptation) must gate through firmware policy, never close a hardware loop on a mission node — preserving §7-8 rule 1.
+3. **Future auto-margining stays observe-only.** Any feature that would act on monitor results (e.g. margin-triggered re-adaptation) must gate through firmware policy, never close a hardware loop on a mission node — preserving §7-9 rule 1.
 
 **Bring-up and operating constraints:**
 
-- Enable **any time from stage 2**: the horizontal axis is slaved to `pi_code`, so a locked CDR is required; Vp convergence is *not* required (the comparison reference is `d(k)`, not `e(k)`), but measured margins are fully meaningful once stages 4–5 have converged (§7-10).
+- Enable **any time from stage 2**: the horizontal axis is slaved to `pi_code`, so a locked CDR is required; Vp convergence is *not* required (the comparison reference is `d(k)`, not `e(k)`), but measured margins are fully meaningful once stages 4–5 have converged (§7-11).
 - Discard points or scans spanning a CDR re-acquisition, gear-shift, or signal-valid gate event (§6-11), as for §T-1 snapshots.
 - Unlike the channel estimator, the monitor carries **no white-data assumption** — it measures the actual eye under whatever traffic is present and needs no freeze during non-mission patterns. Note only that a contour measured on a periodic pattern (e.g. `0xCC`, §6-12) reflects that pattern's ISI content, not the mission eye.
 - The monitor's counters are held (not cleared) across the §6-11 signal-valid gate, consistent with the receiver-wide hold-don't-wrap convention; firmware discards any dwell in flight when the gate fires.
@@ -328,7 +328,7 @@ The observe-only property is structural (§7-8 rule 1: one controller per node �
 
 ### T-3.1 Purpose and motivation
 
-The TX disparity checker is an **observe-only digital monitor in the TX digital (serializer-side) logic** that measures the running balance of 1's versus 0's in the transmitted bit stream and reports it to the **MRM thermal-tuning (heater-lock) loop** (§8-4). It is the TX-side counterpart of the RX channel estimator (§T-1): pure digital logic on a data stream that already exists, terminating in readback registers and status flags rather than a DAC — the instrument, never the actuator. It drives no knob in the TX datapath and closes no loop of its own; the ring's thermal operating point remains owned by the thermal-tuning loop (one controller per node, §7-8 rule 1).
+The TX disparity checker is an **observe-only digital monitor in the TX digital (serializer-side) logic** that measures the running balance of 1's versus 0's in the transmitted bit stream and reports it to the **MRM thermal-tuning (heater-lock) loop** (§8-4). It is the TX-side counterpart of the RX channel estimator (§T-1): pure digital logic on a data stream that already exists, terminating in readback registers and status flags rather than a DAC — the instrument, never the actuator. It drives no knob in the TX datapath and closes no loop of its own; the ring's thermal operating point remains owned by the thermal-tuning loop (one controller per node, §7-9 rule 1).
 
 **MRM sensitivity to transmit-data disparity.** The carrier-depletion MRM (§8) is sensitive to the density of 1's vs 0's in the transmit stream through two mechanisms, both landing on the ring resonance:
 
@@ -424,7 +424,7 @@ The checker exports the following, all synchronous to the TX word clock:
 | — | `flip_sign` | `False` | Negates the exported `dens_meas` so + always means "toward the hotter symbol", independent of driver/modulator polarity (`TBD_from_partner`); cf. `flip_dir`, §6-2 |
 | — | `disp_meas`, `dens_meas` | signed count / fraction ∈ [−1, +1] | Snapshot readbacks, one per window, qualified by `meas_valid` |
 | — | `dens_peak`, `cid_max` | sticky watermarks | Max-magnitude snapshot (sign preserved) and longest run since last clear |
-| — | `enable` | 1 | Freeze control per the §7-10 convention: exports to the thermal-tuning loop gate off, but the window measurement keeps updating for observability |
+| — | `enable` | 1 | Freeze control per the §7-11 convention: exports to the thermal-tuning loop gate off, but the window measurement keeps updating for observability |
 
 Per the operating-mode disclaimer, all defaults above assume 106G full-rate; at 53 Gbps half-rate the UI-denominated windows double in absolute time and the defaults are **TBD**.
 
@@ -432,7 +432,7 @@ Per the operating-mode disclaimer, all defaults above assume 106G full-rate; at 
 
 **Timescale placement.** Three timescales bracket the design: the symbol (9.41 ps), the snapshot window (0.62 µs default, ≈ 1.6 MHz snapshot rate), and the thermal plant (`τ_th` µs-class assumed, heater-control settling ms-class — cf. the 60–75 ms squelch/relink budget, §8-4). The default window therefore oversamples the τ_th-limited disturbance band by several snapshots per thermal time constant, and the flag's `N_persist = 2` adds ≈ 1.2 µs of notification latency — negligible against the thermal response it reports on. If partner data places `τ_th` faster than the µs class, shorten `D_disp` by the same ratio (the `1/√D_disp` readback floor degrades only as the square root).
 
-**Nesting / disturbance ladder.** The checker itself is observe-only and TX-side, so — like the channel estimator (§T-1) — it has **no slot in the §7-8 disturbance ladder** and no bandwidth constraint against the RX loops. The actuation it informs does touch an observable the RX cares about: a heater step moves the ring operating point, hence OMA/ER, hence the rail amplitude seen by the Vp/AGC loops. This is safe by construction: the heater's own thermal response low-passes any disparity-informed action into the µs–ms class, more than four decades slower than the slowest RX loop (AGC, ≥ 8192 UI ≈ 77 ns per LSB, §7-9), so to the RX ladder it is the same slow environmental drift the Vp/offset/AGC loops already track.
+**Nesting / disturbance ladder.** The checker itself is observe-only and TX-side, so — like the channel estimator (§T-1) — it has **no slot in the §7-9 disturbance ladder** and no bandwidth constraint against the RX loops. The actuation it informs does touch an observable the RX cares about: a heater step moves the ring operating point, hence OMA/ER, hence the rail amplitude seen by the Vp/AGC loops. This is safe by construction: the heater's own thermal response low-passes any disparity-informed action into the µs–ms class, more than four decades slower than the slowest RX loop (AGC, ≥ 8192 UI ≈ 77 ns per LSB, §7-10), so to the RX ladder it is the same slow environmental drift the Vp/offset/AGC loops already track.
 
 **Power accounting.** The checker is TX digital logic and books against the **SerDes** energy line (§1-3), not the analog TX-driver allocation.
 

@@ -7,7 +7,7 @@
 
 1. Insert the section below. It is numbered **Section 9** to avoid renumbering the existing Section 8 (Optical TX/MRM); if it is instead inserted between Section 7 (Digital Adaptation Loops) and Section 8, renumber accordingly.
 2. Append `· 9. RX Eye Monitor` to the **Section outline** line in the front matter.
-3. Add the §7-8 interaction-matrix row and the §7-11 dead-band-summary row provided in §9-8 below to those tables.
+3. Add the §7-9 interaction-matrix row and the §7-12 dead-band-summary row provided in §9-8 below to those tables.
 4. Optionally add to the §2-1 terminology table: `m(k)` — *Monitor-slicer decision at symbol `k`, `m ∈ {−1, +1}`, taken at the monitor sample phase* — and `V_mon` — *Programmable eye-monitor threshold (signed about 0 V)*.
 
 Everything above this rule is integration scaffolding and is deleted on merge.
@@ -23,16 +23,16 @@ The eye monitor provides **in-situ, non-destructive 2D eye measurement at the sl
 - **Vertical (amplitude):** a programmable threshold DAC sets the monitor slicing level `V_mon`, signed about the vertical eye center.
 - **Horizontal (timing):** a **dedicated phase interpolator**, separate from the data-path PI, sets the monitor sample phase as a programmable offset from the CDR-recovered data sample phase.
 
-Comparing the monitor decision `m(k)` against the mission data decision `d(k)` and accumulating mismatches over a dwell window yields the eye's hit ratio at any `(phase, threshold)` point; rastering both axes yields the full 2D eye/BER contour. The block is **observe-only** in exactly the §7-6a / §7-8 sense: it drives no analog knob in the mission path, closes no loop, and has no slot in the loop-nesting ladder.
+Comparing the monitor decision `m(k)` against the mission data decision `d(k)` and accumulating mismatches over a dwell window yields the eye's hit ratio at any `(phase, threshold)` point; rastering both axes yields the full 2D eye/BER contour. The block is **observe-only** in exactly the §7-4 / §7-9 sense: it drives no analog knob in the mission path, closes no loop, and has no slot in the loop-nesting ladder.
 
 ### 9-1 Purpose and overview
 
-The mission loops already provide two in-situ instruments, both pinned to the data sample phase: the Vp codes digitise `|h₀|` (§7-3) and the channel estimator reads back the baud-spaced cursors `ĥ_i` (§7-6a). The eye monitor completes the set — it is the only instrument that measures **off the mission sampling point**, at sub-UI phase resolution and arbitrary amplitude:
+The mission loops already provide two in-situ instruments, both pinned to the data sample phase: the Vp codes digitise `|h₀|` (§7-3) and the channel estimator reads back the baud-spaced cursors `ĥ_i` (§7-4). The eye monitor completes the set — it is the only instrument that measures **off the mission sampling point**, at sub-UI phase resolution and arbitrary amplitude:
 
 | Instrument | Observable | Units | Coverage |
 |---|---|---|---|
 | Vp_top / Vp_bot codes (§7-3) | Rail medians = \|h₀\| | `V_LSB,vp` codes | Vertical, rails only, at the data sample phase |
-| Channel estimator `ĥ_i` (§7-6a) | Baud-spaced cursors | Normalized (units of `σ_e`) | Horizontal at baud-spaced lags, at the data sample phase |
+| Channel estimator `ĥ_i` (§7-4) | Baud-spaced cursors | Normalized (units of `σ_e`) | Horizontal at baud-spaced lags, at the data sample phase |
 | **Eye monitor (this section)** | Hit ratio / BER at any `(Δt, V)` point | `V_LSB,mon` codes × 1/32 UI | Full 2D eye interior, off the data sample point |
 
 What this buys, against the committed **internal raw-BER spec of < 1e-12** (§1-3):
@@ -160,12 +160,12 @@ In hardware the per-UI loop above is a **popcount over each 128-UI deserialized 
 | Placeholder | Model/RTL name | Default | Meaning |
 |---|---|---|---|
 | `D_mon` | `mon_dwell` | 2^13 words = **2^20 UI** ≈ 9.9 µs (proposed, `TBD_from_sim_sweep`) | Dwell per measurement point, in `cdr_width`-UI words; register width 32 bits ⇒ max dwell 2^39 UI ≈ 5.2 s per point |
-| `N_hit` | `mon_hit_count` | 40 bits unsigned | Hit counter; bounded by the max dwell in UI — saturation impossible by construction, as with the §7-6a accumulator |
+| `N_hit` | `mon_hit_count` | 40 bits unsigned | Hit counter; bounded by the max dwell in UI — saturation impossible by construction, as with the §7-4 accumulator |
 | — | `mon_valid_count` | 40 bits unsigned | Samples passing the polarity gate; the denominator for gated modes (= dwell in UI when `mon_gate_sel = 0`) |
 | — | `mon_gate_sel` | 0 | 0: count all mismatches (BER mode); +1 / −1: count only `d(k) = ±1` samples (per-rail CDF mode, used by the §9-7 rail cross-check) |
 | — | `mon_start`, `mon_done` | — | Single-point handshake: firmware programs `(s, code, offset)`, asserts start, polls done, reads counters |
 
-**Dead-band / hysteresis (eye monitor):** **none, and none needed** — the block is an open-loop instrument with no code to dither and no vote quantization, exactly as for the channel estimator (§7-6a). The per-point noise floor is statistical: a dwell of `D_mon` UI cannot resolve hit ratios below `1/D_mon` (single-hit floor), and a contour at hit ratio `p` needs of order `10–100/p` UI of dwell near the contour for a stable estimate.
+**Dead-band / hysteresis (eye monitor):** **none, and none needed** — the block is an open-loop instrument with no code to dither and no vote quantization, exactly as for the channel estimator (§7-4). The per-point noise floor is statistical: a dwell of `D_mon` UI cannot resolve hit ratios below `1/D_mon` (single-hit floor), and a contour at hit ratio `p` needs of order `10–100/p` UI of dwell near the contour for a stable estimate.
 
 ### 9-6 2D eye-scan and measurement procedure
 
@@ -199,7 +199,7 @@ Directly resolving the **1e-12 internal-spec contour** is impractical per point 
 
 ### 9-7 Calibration and diagnostic cross-checks
 
-**Vertical zero (`code_zero_mon`).** With `mon_phase_offset = 0` and `V_mon = 0`, the monitor replicates the data slicer (`m ≡ d = sign(y)`), so the hit ratio collapses to the comparator's own offset/metastability residue. Sweeping `mon_thresh_code` through zero locates the code of minimum hit ratio; firmware stores it as `code_zero_mon` and references all subsequent threshold programming to it, absorbing the monitor comparator's input offset. (A dedicated analog offset-trim DAC on the monitor comparator is the alternative; choice is `TBD_analog_design`.) Note the mission slicers get their vertical zero from the offset/BLW loop (§7-5); the monitor, being outside all loops, needs this explicit one-time calibration.
+**Vertical zero (`code_zero_mon`).** With `mon_phase_offset = 0` and `V_mon = 0`, the monitor replicates the data slicer (`m ≡ d = sign(y)`), so the hit ratio collapses to the comparator's own offset/metastability residue. Sweeping `mon_thresh_code` through zero locates the code of minimum hit ratio; firmware stores it as `code_zero_mon` and references all subsequent threshold programming to it, absorbing the monitor comparator's input offset. (A dedicated analog offset-trim DAC on the monitor comparator is the alternative; choice is `TBD_analog_design`.) Note the mission slicers get their vertical zero from the offset/BLW loop (§7-6); the monitor, being outside all loops, needs this explicit one-time calibration.
 
 **Horizontal zero (`phase_zero_mon`).** With `V_mon = 0` (post-vertical-cal), sweeping `mon_phase_offset` yields a hit-ratio bathtub whose minimum should sit at offset 0; a displaced minimum measures the **static skew between the monitor-PI and data-path-PI clock distribution branches**. Firmware stores the displacement as `phase_zero_mon` and references horizontal sweeps to it. The residual (sub-code) skew budget is `TBD_analog_design`.
 
@@ -208,34 +208,34 @@ Both calibrations are observe-only, run any time after CDR lock, and should be r
 **Adaptation cross-checks** enabled by the calibrated monitor:
 
 - **Vp / h₀ (§7-3):** in rail-CDF mode (`mon_gate_sel = +1`), the monitor at `s = +1` with `code` set to the settled `Vp_top` code should read a conditional hit ratio ≈ 0.5 — the monitor sitting on the adapted rail median. A standing deviation flags Vp mis-convergence or `V_LSB,mon`/`V_LSB,vp` grid mismatch.
-- **Offset / BLW (§7-5):** upper and lower BER contours should be symmetric about `V_mon = 0`; a standing vertical asymmetry beyond the Vp top/bottom asymmetry flags residual centering error.
-- **CTLE (§7-6) / channel estimator (§7-6a):** eye-opening changes across a peaking-code sweep give a direct margin-vs-code curve; the monitor's measured eye complements the `σ_e`-normalized `ĥ_i` readbacks with an absolute (code-unit) 2D view.
-- **MM lock point (§6-3):** left/right eye-width asymmetry about the data sample phase cross-checks the `h(−1) = h(+1)` lock condition, corroborating the `ĥ₋₁` vs `ĥ₊₁` comparison of §7-6a.
+- **Offset / BLW (§7-6):** upper and lower BER contours should be symmetric about `V_mon = 0`; a standing vertical asymmetry beyond the Vp top/bottom asymmetry flags residual centering error.
+- **CTLE (§7-7) / channel estimator (§7-4):** eye-opening changes across a peaking-code sweep give a direct margin-vs-code curve; the monitor's measured eye complements the `σ_e`-normalized `ĥ_i` readbacks with an absolute (code-unit) 2D view.
+- **MM lock point (§6-3):** left/right eye-width asymmetry about the data sample phase cross-checks the `h(−1) = h(+1)` lock condition, corroborating the `ĥ₋₁` vs `ĥ₊₁` comparison of §7-4.
 - **JTOL / stress correlation (§6-9, §6-12):** eye-width erosion under applied SJ or CID stress patterns is directly observable at the slicer, closing the loop between the mask-derived untracked-jitter allocations and the physical eye.
 
 ### 9-8 Interaction with the mission loops — non-intrusiveness constraints
 
-The eye monitor's row in the §7-8 interaction matrix (to be added there on integration):
+The eye monitor's row in the §7-9 interaction matrix (to be added there on integration):
 
 | Actor ↓ steps… | …and disturbs | Mechanism | Mitigation |
 |---|---|---|---|
 | **Eye monitor** (`mon_thresh_*`, `mon_phase_offset`) | Nothing in the digital loops — observe-only | Fourth comparator + counters on the shared `d(k)`; no DAC vote into any mission loop, no actuation | Same exemption as the channel estimator: no slot in the disturbance ladder. Residual *analog* coupling constrained by the sign-off items below |
 
-And its row for the §7-11 dead-band summary:
+And its row for the §7-12 dead-band summary:
 
 | Loop | Mechanism | Variable | Default | Implementation |
 |---|---|---|---|---|
 | Eye monitor | none (open-loop instrument — no code to dither; statistical floor `1/D_mon` per point) | `D_mon` | 2^20 UI | §9-5 callout |
 
-The observe-only property is structural (§7-8 rule 1: one controller per node — every node the monitor observes already has its owner), but two **analog** coupling paths do not vanish by architecture; together with one structural policy rule, they are explicit sign-off items:
+The observe-only property is structural (§7-9 rule 1: one controller per node — every node the monitor observes already has its owner), but two **analog** coupling paths do not vanish by architecture; together with one structural policy rule, they are explicit sign-off items:
 
 1. **Static input loading.** The monitor comparator's input capacitance on the `y(k)` node must be **constant regardless of monitor enable, threshold, or phase state** (present and biased even when idle): a load that toggles with monitor activity would modulate the very eye being measured, and the mission eye when the monitor is off would differ from the eye when it scans. The slicer-input full-scale / bandwidth budget of §2-2 and §5 must include the fourth comparator's load from the outset (`TBD_analog_design`).
 2. **Monitor-PI clock coupling.** During a scan, `pi_code_mon` sweeps every phase relative to the data-path clock, so supply/substrate coupling from the monitor clock branch arrives at the data-path PI at every possible phase relationship. Injected jitter on the data sample phase must remain negligible against the RX jitter allocations (§3 class); this closes with the extracted clock-distribution design (`TBD_analog_design`).
-3. **Future auto-margining stays observe-only.** Any feature that would act on monitor results (e.g. margin-triggered re-adaptation) must gate through firmware policy, never close a hardware loop on a mission node — preserving §7-8 rule 1.
+3. **Future auto-margining stays observe-only.** Any feature that would act on monitor results (e.g. margin-triggered re-adaptation) must gate through firmware policy, never close a hardware loop on a mission node — preserving §7-9 rule 1.
 
-**Bring-up and operating constraints** (§7-10 alignment):
+**Bring-up and operating constraints** (§7-11 alignment):
 
 - Enable **any time from stage 2**: the horizontal axis is slaved to `pi_code`, so a locked CDR is required; Vp convergence is *not* required (the comparison reference is `d(k)`, not `e(k)`), but measured margins are fully meaningful once stages 4–5 have converged.
-- Discard points or scans spanning a CDR re-acquisition, gear-shift, or signal-valid gate event (§6-11), as for §7-6a snapshots.
+- Discard points or scans spanning a CDR re-acquisition, gear-shift, or signal-valid gate event (§6-11), as for §7-4 snapshots.
 - Unlike the channel estimator, the monitor carries **no white-data assumption** — it measures the actual eye under whatever traffic is present and needs no freeze during non-mission patterns. Note only that a contour measured on a periodic pattern (e.g. `0xCC`, §6-12) reflects that pattern's ISI content, not the mission eye.
 - The monitor's counters are held (not cleared) across the §6-11 signal-valid gate, consistent with the receiver-wide hold-don't-wrap convention; firmware discards any dwell in flight when the gate fires.

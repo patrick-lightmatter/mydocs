@@ -1,0 +1,211 @@
+{
+  "description": "CTLE parameters extracted from OIF CEI-224G draft implementation agreements. Derived magnitudes are computed from those equations at 106.25 GBd; they are not tabulated in the drafts.",
+  "figure_baud_rate_GBd": 106.25,
+  "documents": [
+    {
+      "id": "OIF2023.235.13",
+      "path": "temp/food/oif2023.235.13.224glr 1.pdf",
+      "title": "CEI-224G-LR-PAM4 Long Reach Interface",
+      "clause": 33,
+      "date": "2026-06-30",
+      "ctle_role": "COM reference continuous-time filter",
+      "parameter_table": "Table 33-1",
+      "reprints_transfer_function": false,
+      "transfer_function_source": "IEEE Std 802.3 COM continuous-time filter, Equation (93A-22). This draft supplies the parameter values only."
+    },
+    {
+      "id": "OIF2024.058.12",
+      "path": "temp/food/oif2024.058.12.224gmr 1.pdf",
+      "title": "CEI-224G-MR-PAM4 Medium Reach Interface",
+      "clause": 32,
+      "date": "2026-03-30",
+      "ctle_role": "COM reference continuous-time filter",
+      "parameter_table": "Table 32-1",
+      "reprints_transfer_function": false,
+      "transfer_function_source": "IEEE Std 802.3 COM continuous-time filter, Equation (93A-22). This draft supplies the parameter values only. The CTLE rows match OIF2023.235.13."
+    },
+    {
+      "id": "OIF2024.522.05",
+      "path": "temp/food/oif2024.522.05.CEI224GLinearPAM4.pdf",
+      "title": "CEI-224G-LINEAR-PAM4 Interface",
+      "clause": 30,
+      "date": "2026-03-09",
+      "ctle_role": "TP1a and TP4 reference-receiver CTLE",
+      "section": "30.4.1.5",
+      "equations": ["(30-3)", "(30-4)"],
+      "gain_table": "Table 30-14",
+      "recommended_settings_table": "Table 30-9",
+      "figures": [
+        {
+          "id": "Figure 30-10",
+          "g_dc_dB": [0, 10],
+          "g_dc_step_dB": 1.0,
+          "g_dc2_dB": 0,
+          "caption": "0 to 10 dB of high-frequency gain and 0 dB of low-frequency gain at 106.25 Gsym/s"
+        },
+        {
+          "id": "Figure 30-11",
+          "g_dc_dB": 10,
+          "g_dc2_dB": [0, 2.0],
+          "g_dc2_step_dB": 0.5,
+          "caption": "10 dB of high-frequency gain and 0 to 2.0 dB of low-frequency gain at 106.25 Gsym/s"
+        }
+      ],
+      "note": "CTLE equation, pole ratios, gain ranges, and the recommended IL table are the same as OIF2024.522.06. Table and figure numbers differ."
+    },
+    {
+      "id": "OIF2024.522.06",
+      "path": "temp/food/oif2024.522.06.224glinear 1.pdf",
+      "title": "CEI-224G-LINEAR-PAM4 Interface",
+      "clause": 30,
+      "date": "2026-06-29",
+      "ctle_role": "TP1a and TP4 reference-receiver CTLE",
+      "section": "30.4.1.5",
+      "equations": ["(30-3)", "(30-4)"],
+      "gain_table": "Table 30-13",
+      "recommended_settings_table": "Table 30-8",
+      "figures": [
+        {
+          "id": "Figure 30-12",
+          "g_dc_dB": [0, 10],
+          "g_dc_step_dB": 1.0,
+          "g_dc2_dB": 0,
+          "caption": "0 to 10 dB of high-frequency gain and 0 dB of low-frequency gain at 106.25 Gsym/s"
+        },
+        {
+          "id": "Figure 30-13",
+          "g_dc_dB": 10,
+          "g_dc2_dB": [0, 2.0],
+          "g_dc2_step_dB": 0.5,
+          "caption": "10 dB of high-frequency gain and 0 to 2.0 dB of low-frequency gain at 106.25 Gsym/s"
+        }
+      ]
+    }
+  ],
+  "families": [
+    {
+      "id": "com_2z3p",
+      "name": "CEI-224G-LR and CEI-224G-MR COM continuous-time filter",
+      "documents": ["OIF2023.235.13", "OIF2024.058.12"],
+      "gain_convention": "g_dc and g_dc2 are DC gains in dB. Both are zero or negative. DC gain of H(f) is g_dc + g_dc2. High-frequency peaking is the rise above that DC gain.",
+      "transfer_function": {
+        "source": "IEEE Std 802.3 Equation (93A-22), parameters from the OIF COM tables",
+        "H_f": "(10^(g_dc/20) + j*f/f_z) * (10^(g_dc2/20) + j*f/f_LF) / ((1 + j*f/f_p1) * (1 + j*f/f_p2) * (1 + j*f/f_LF))"
+      },
+      "frequencies_relative_to_fb": {
+        "f_z": "fb/2.5",
+        "f_p1": "fb/2.5",
+        "f_p2": "fb",
+        "f_LF": "fb/80"
+      },
+      "g_dc_dB": {"min": -20, "max": 0, "step": 1},
+      "g_dc2_dB": {"min": -6, "max": 0, "step": 1},
+      "at_106_25_GBd_Hz": {
+        "f_z": 42500000000.0,
+        "f_p1": 42500000000.0,
+        "f_p2": 106250000000.0,
+        "f_LF": 1328125000.0,
+        "nyquist": 53125000000.0
+      },
+      "derived_curves_106_25_GBd": {
+        "note": "Computed from the equation above. Peaking is |H|_peak minus |H| at 1 MHz. The drafts do not plot this family.",
+        "g_dc2_dB": 0,
+        "rows": [
+          {"g_dc_dB": 0, "H_1MHz_dB": 0.0, "H_nyquist_dB": -0.97, "H_peak_dB": 0.0, "f_peak_GHz": 0.0, "peaking_dB": 0.0},
+          {"g_dc_dB": -5, "H_1MHz_dB": -5.0, "H_nyquist_dB": -2.32, "H_peak_dB": -2.31, "f_peak_GHz": 55.35, "peaking_dB": 2.69},
+          {"g_dc_dB": -10, "H_1MHz_dB": -10.0, "H_nyquist_dB": -2.85, "H_peak_dB": -2.74, "f_peak_GHz": 63.83, "peaking_dB": 7.26},
+          {"g_dc_dB": -15, "H_1MHz_dB": -15.0, "H_nyquist_dB": -3.03, "H_peak_dB": -2.87, "f_peak_GHz": 66.15, "peaking_dB": 12.13},
+          {"g_dc_dB": -20, "H_1MHz_dB": -20.0, "H_nyquist_dB": -3.09, "H_peak_dB": -2.91, "f_peak_GHz": 66.79, "peaking_dB": 17.09}
+        ],
+        "g_dc_dB_fixed": -20,
+        "g_dc2_rows": [
+          {"g_dc2_dB": 0, "H_1MHz_dB": -20.0, "H_nyquist_dB": -3.09, "peaking_dB": 17.09},
+          {"g_dc2_dB": -2, "H_1MHz_dB": -22.0, "H_nyquist_dB": -3.09, "peaking_dB": 19.09},
+          {"g_dc2_dB": -4, "H_1MHz_dB": -24.0, "H_nyquist_dB": -3.09, "peaking_dB": 21.09},
+          {"g_dc2_dB": -6, "H_1MHz_dB": -26.0, "H_nyquist_dB": -3.09, "peaking_dB": 23.09}
+        ]
+      }
+    },
+    {
+      "id": "linear_reference_rx",
+      "name": "CEI-224G-LINEAR-PAM4 TP1a/TP4 reference CTLE",
+      "documents": ["OIF2024.522.06", "OIF2024.522.05"],
+      "gain_convention": "g_dc and g_dc2 are non-negative high-frequency and low-frequency gain settings. DC gain of H(f) stays 0 dB. g_dc lowers the high-frequency zero; g_dc2 lowers the low-frequency zero. Peaking, as defined in the draft, is the difference between the response at 1 MHz and the maximum high-frequency response.",
+      "transfer_function": {
+        "equation": "(30-3)",
+        "H_f": "(1 + j*10^(g_dc/20)*f/f_Z) * (1 + j*10^(g_dc2/20)*f/f_LF) / ((1 + j*f/f_p1) * (1 + j*f/f_p2) * (1 + j*f/f_LF))"
+      },
+      "frequencies_relative_to_fb": {
+        "equation": "(30-4)",
+        "f_p1": "fb/1.8839",
+        "f_p2": "fb",
+        "f_Z": "fb/2.862",
+        "f_LF": "fb/40"
+      },
+      "g_dc_dB": {"min": 0, "max": 10, "step": 1.0, "locations": ["TP1a", "TP4"]},
+      "g_dc2_dB": {
+        "min": 0,
+        "max": 2,
+        "step": 0.5,
+        "locations": ["TP1a", "TP4"],
+        "rounding": "For a non-integer g_dc2, round the absolute value down to the nearest allowed step and keep the sign."
+      },
+      "at_106_25_GBd_Hz": {
+        "f_p1": 56398959605.07,
+        "f_p2": 106250000000.0,
+        "f_Z": 37124388539.48,
+        "f_LF": 2656250000.0,
+        "nyquist": 53125000000.0
+      },
+      "recommended_settings_vs_channel_il": {
+        "il_measurement": "Channel insertion loss from host ASIC die bump to TP1a",
+        "rows": [
+          {"il_dB": 8, "g_dc_dB": 0, "g_dc2_dB": 0},
+          {"il_dB": 9, "g_dc_dB": 1, "g_dc2_dB": 0},
+          {"il_dB": 10, "g_dc_dB": 2, "g_dc2_dB": 0},
+          {"il_dB": 11, "g_dc_dB": 3, "g_dc2_dB": 0.5},
+          {"il_dB": 12, "g_dc_dB": 4, "g_dc2_dB": 0.5},
+          {"il_dB": 13, "g_dc_dB": 5, "g_dc2_dB": 0.5},
+          {"il_dB": 14, "g_dc_dB": 6, "g_dc2_dB": 0.5},
+          {"il_dB": 15, "g_dc_dB": 7, "g_dc2_dB": 1},
+          {"il_dB": 16, "g_dc_dB": 8, "g_dc2_dB": 1},
+          {"il_dB": 17, "g_dc_dB": 9, "g_dc2_dB": 1},
+          {"il_dB": 18, "g_dc_dB": 10, "g_dc2_dB": 1},
+          {"il_dB": 19, "g_dc_dB": 10, "g_dc2_dB": 1},
+          {"il_dB": 20, "g_dc_dB": 10, "g_dc2_dB": 1},
+          {"il_dB": 21, "g_dc_dB": 10, "g_dc2_dB": 1},
+          {"il_dB": 22, "g_dc_dB": 10, "g_dc2_dB": 1}
+        ]
+      },
+      "derived_curves_106_25_GBd": {
+        "note": "Computed from Equation (30-3). These are the curves drawn in the reference-CTLE figures. Peaking is |H|_peak minus |H| at 1 MHz, which is the draft's definition.",
+        "high_frequency_gain_figure": {
+          "g_dc2_dB": 0,
+          "rows": [
+            {"g_dc_dB": 0, "H_1MHz_dB": 0.0, "H_nyquist_dB": 1.11, "H_peak_dB": 1.11, "f_peak_GHz": 53.41, "peaking_dB": 1.11},
+            {"g_dc_dB": 1, "H_1MHz_dB": 0.0, "H_nyquist_dB": 1.81, "H_peak_dB": 1.83, "f_peak_GHz": 59.25, "peaking_dB": 1.83},
+            {"g_dc_dB": 2, "H_1MHz_dB": 0.0, "H_nyquist_dB": 2.55, "H_peak_dB": 2.63, "f_peak_GHz": 63.62, "peaking_dB": 2.63},
+            {"g_dc_dB": 3, "H_1MHz_dB": 0.0, "H_nyquist_dB": 3.34, "H_peak_dB": 3.47, "f_peak_GHz": 66.58, "peaking_dB": 3.47},
+            {"g_dc_dB": 4, "H_1MHz_dB": 0.0, "H_nyquist_dB": 4.16, "H_peak_dB": 4.36, "f_peak_GHz": 68.99, "peaking_dB": 4.36},
+            {"g_dc_dB": 5, "H_1MHz_dB": 0.0, "H_nyquist_dB": 5.01, "H_peak_dB": 5.26, "f_peak_GHz": 70.81, "peaking_dB": 5.26},
+            {"g_dc_dB": 6, "H_1MHz_dB": 0.0, "H_nyquist_dB": 5.89, "H_peak_dB": 6.19, "f_peak_GHz": 72.20, "peaking_dB": 6.19},
+            {"g_dc_dB": 7, "H_1MHz_dB": 0.0, "H_nyquist_dB": 6.79, "H_peak_dB": 7.14, "f_peak_GHz": 73.38, "peaking_dB": 7.14},
+            {"g_dc_dB": 8, "H_1MHz_dB": 0.0, "H_nyquist_dB": 7.71, "H_peak_dB": 8.10, "f_peak_GHz": 74.33, "peaking_dB": 8.10},
+            {"g_dc_dB": 9, "H_1MHz_dB": 0.0, "H_nyquist_dB": 8.64, "H_peak_dB": 9.06, "f_peak_GHz": 74.82, "peaking_dB": 9.06},
+            {"g_dc_dB": 10, "H_1MHz_dB": 0.0, "H_nyquist_dB": 9.59, "H_peak_dB": 10.04, "f_peak_GHz": 75.30, "peaking_dB": 10.04}
+          ]
+        },
+        "low_frequency_gain_figure": {
+          "g_dc_dB": 10,
+          "rows": [
+            {"g_dc2_dB": 0.0, "H_1MHz_dB": 0.0, "H_nyquist_dB": 9.59, "H_peak_dB": 10.04, "f_peak_GHz": 75.30, "peaking_dB": 10.04},
+            {"g_dc2_dB": 0.5, "H_1MHz_dB": 0.0, "H_nyquist_dB": 10.09, "H_peak_dB": 10.53, "f_peak_GHz": 75.55, "peaking_dB": 10.53},
+            {"g_dc2_dB": 1.0, "H_1MHz_dB": 0.0, "H_nyquist_dB": 10.59, "H_peak_dB": 11.03, "f_peak_GHz": 75.55, "peaking_dB": 11.03},
+            {"g_dc2_dB": 1.5, "H_1MHz_dB": 0.0, "H_nyquist_dB": 11.09, "H_peak_dB": 11.53, "f_peak_GHz": 75.55, "peaking_dB": 11.53},
+            {"g_dc2_dB": 2.0, "H_1MHz_dB": 0.0, "H_nyquist_dB": 11.59, "H_peak_dB": 12.03, "f_peak_GHz": 75.55, "peaking_dB": 12.03}
+          ]
+        }
+      }
+    }
+  ]
+}
