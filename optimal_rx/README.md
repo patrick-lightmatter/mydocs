@@ -395,6 +395,14 @@ The examination found no jitter signature: the LS residual is Gaussian and its s
 
 *Figure 9-1. `after_rxterm_examine.png`. Top: start of the record (signal arrives after about 178 UI) and a 24-UI zoom. Middle: the LS pulse response per unit PAM4 level with the baud-spaced samples (\(h[-1] = 0.33\), \(h[+1] = 0.22\), reflection near +9 … +11 UI), and the pulse spectrum against the channel-only estimate — a 60 GHz cliff, −15 dB at Nyquist. Bottom: the eye at the receiver input (closed) and the residual of the LS model (σ = 2.82 mV) over the sampled-amplitude histogram.*
 
+![Measured waveform against LS pulse reconstruction](figures/after_rxterm_ls_match.png)
+
+*Figure 9-1a. `after_rxterm_ls_match.png`. The \(-30 \ldots +200\) UI, 32-phase LS pulse response is convolved with impulses carrying the ideal transmitted PAM4 levels and overlaid on the measured waveform. Since the first pulse coefficient is 30 UI before its cursor, the convolution is advanced by \(30 \times 32 = 960\) samples (equivalently, the measured data is left-padded by 960 samples before comparison). The model reproduces both the signal arrival and a settled 40-UI segment. Its residual is 2.83 mV rms over every fully supported phase and 2.825 mV at the cursor phase, against 2.8245 mV in the original baud-phase check. The near-identical all-phase and cursor-phase residuals show that one linear time-invariant pulse explains the captured waveform to the measured noise floor; any nonlinearity is below that residual rather than visibly dominating the record.*
+
+![Estimated channel impulse, frequency, and group-delay responses](figures/after_rxterm_channel_estimate.png)
+
+*Figure 9-1b. `after_rxterm_channel_estimate.png`. Channel characterisation from the same \(-30 \ldots +200\) UI LS fit. Top: the estimated channel impulse response after removing the ideal transmitter's 1-UI rectangular pulse; the full fitted time span is retained so that weak long-delayed energy is not hidden. The boxcar has spectral nulls at integer multiples of the baud rate, so its inverse uses a small Tikhonov term, \(\lambda = 10^{-3}\max |B_\mathrm{1UI}(f)|^2\), rather than amplifying those unobservable frequencies into a baud-periodic artifact. Middle: \(|P(f)/B_\mathrm{1UI}(f)|\), the channel-only frequency response relative to DC, including the measured \(-14.9\) dB at the 53.125 GHz Nyquist frequency. Bottom: raw and 5 GHz-smoothed channel group delay relative to the impulse-response peak. Group delay is shown only while the channel estimate remains within 40 dB of DC; beyond that, phase is noise dominated.*
+
 ### 9.2 Golden receiver, DFE detector
 
 Both searches used the full 150,000 symbols (\(N_\mathrm{eval}\) = 59,819 held-out symbols), 32 phases, caps 16 / 40 growing to the 256 limit, `--length-tol 0.02`.
@@ -754,6 +762,8 @@ python -m pytest tests/test_rx/test_ctle.py tests/test_analysis/test_mlsd_bound.
 | `README.md` | this document | |
 | `oif_cei224_ctle.json` | `docs/oif_cei224_ctle.json` | CTLE parameters extracted from the four OIF drafts, both transfer functions, gain ranges, recommended settings, and magnitudes computed at 106.25 GBd |
 | `figures/after_rxterm_examine.png` | `runs/ranjit_colossus/after_rxterm_examine.png` | capture examination (Figure 9-1) |
+| `figures/after_rxterm_ls_match.png` | `runs/ranjit_colossus/after_rxterm_ls_match.png` | measured waveform against the convolved LS pulse model (Figure 9-1a) |
+| `figures/after_rxterm_channel_estimate.png` | `runs/ranjit_colossus/after_rxterm_channel_estimate.png` | estimated channel impulse, frequency, and group-delay responses (Figure 9-1b) |
 | `figures/ranjit_golden_rx_pk10_dashboard.png` | `runs/ranjit_colossus/golden_rx_pk10/golden_rx_dashboard.png` | golden receiver dashboard, peaking ≤ 10 dB (Figure 9-2) |
 | `figures/ranjit_golden_rx_pk10_eq_detail.png` | `runs/ranjit_colossus/golden_rx_pk10/golden_rx_eq_detail.png` | equaliser detail, peaking ≤ 10 dB (Figure 9-3) |
 | `figures/ranjit_golden_rx_uncapped_eq_detail.png` | `runs/ranjit_colossus/golden_rx/golden_rx_eq_detail.png` | equaliser detail, uncapped CTLE, 20 dB-peaking FFE tail (Figure 9-4) |
