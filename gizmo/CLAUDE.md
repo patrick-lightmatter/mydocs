@@ -14,6 +14,7 @@ done.
 | `DES-OCI-106G-TXD-001_TX_Driver_Design_Spec_Rev0p2.md` | TX Pre-Driver and Driver | 0.2 |
 | `DES-OCI-106G-ADP-001_Adaptation_Loops_Design_Spec_Rev0p2.md` | Receive Digital Adaptation Loops | 0.2 |
 | `DES-OCI-106G-CLK-001_Clocking_Design_Spec_Rev0p2.md` | Clock Generation, Distribution, Phase Interpolation | 0.2 |
+| `DES-OCI-106G-CDR-001_CDR_Design_Spec_Rev0p2.md` | Clock and Data Recovery | 0.2 |
 | `DES-OCI-106G-EYM-001_RX_Eye_Monitor_Design_Spec_Rev0p2.md` | RX Eye Monitor | 0.2 |
 | `DES-OCI-106G-SQL-001_TX_Squelch_Design_Spec_Rev0p2.md` | TX Squelch and Loss-of-Modulation | 0.2 |
 | `DES-OCI-106G-JIT-001_TP1_Jitter_Budget_Rev0p3.md` | TP1 Electrical Jitter Budget | 0.3 |
