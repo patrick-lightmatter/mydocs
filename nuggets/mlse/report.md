@@ -61,7 +61,7 @@ A Viterbi detector with a Euclidean branch metric is the maximum-likelihood (ML)
 
 | Symbol | Meaning |
 |---|---|
-| $a[k] \in \mathcal{A}$ | Transmitted symbol at time $k$; $\mathcal{A} = \{\pm 1\}$ for NRZ, $\{\pm 1, \pm \tfrac13\}$ for PAM4; $M = \lvert \mathcal{A} \rvert$ |
+| $a[k] \in \mathcal{A}$ | Transmitted symbol at time $k$; $\mathcal{A} = \lbrace \pm 1 \rbrace$ for NRZ, $\lbrace \pm 1, \pm \tfrac13 \rbrace$ for PAM4; $M = \lvert \mathcal{A} \rvert$ |
 | $\Delta$ | Level spacing: $2$ (NRZ), $\tfrac23$ (PAM4); $A_s = \Delta/2$ is the half-spacing |
 | $\sigma_a^2$ | Symbol variance: $1$ (NRZ), $5/9$ (PAM4) |
 | $h = [h_0 \dots h_{L_h}]$ | Baud-spaced channel pulse response (causal, length $L_h + 1$) |
@@ -73,7 +73,7 @@ A Viterbi detector with a Euclidean branch metric is the maximum-likelihood (ML)
 | $e[k]$, $R_e(\ell)$, $\rho_\ell = R_e(\ell)/R_e(0)$ | Detector-input error, its autocorrelation and normalised autocorrelation |
 | $P(z) = 1 - \sum_{i=1}^{p} c_i z^{-i}$ | Order-$p$ monic whitening / extension filter |
 | $\epsilon$, $u = \epsilon \star t$ | Error event (integer multiples of $\Delta$) and its response through the target |
-| $Q(x) = \frac{1}{\sqrt{2\pi}}\int_x^\infty e^{-s^2/2}\,ds = \tfrac12\,\mathrm{erfc}(x/\sqrt2)$ | Gaussian tail function |
+| $Q(x) = \frac{1}{\sqrt{2\pi}}\int_x^\infty e^{-s^2/2}ds = \tfrac12\mathrm{erfc}(x/\sqrt2)$ | Gaussian tail function |
 | $\mathrm{SNR}$ | Matched-filter-bound SNR at the FFE input, $\sigma_a^2 \lVert h \rVert^2 / \sigma_n^2$ (§2.1) |
 
 ---
@@ -85,7 +85,7 @@ A Viterbi detector with a Euclidean branch metric is the maximum-likelihood (ML)
 After the analogue front end and the sampler, a baud-rate receiver observes
 
 $$
-x[k] = \sum_{i=0}^{L_h} h_i\, a[k-i] + n[k], \qquad (1.1)
+x[k] = \sum_{i=0}^{L_h} h_i a[k-i] + n[k], \qquad (1.1)
 $$
 
 where $h$ is the sampled pulse response (one sample per UI at the chosen sampling phase), $a[k]$ are independent, equiprobable symbols from the alphabet $\mathcal{A}$ and $n[k]$ is noise. The taps other than the cursor $h_0$ are the ISI: the precursors come from the finite rise time of the pulse and the post-cursors from its decay. The channel is said to have memory $L_h$ because $x[k]$ depends on the current symbol and the $L_h$ previous ones.
@@ -97,7 +97,7 @@ A **slicer** compares $x[k]$ with the $M-1$ thresholds mid-way between the level
 A **linear equaliser** (LE) places an FFE $w$ in front of the slicer so that the combined response $g = h \star w$ approximates a delta. Inverting a channel with a deep loss at Nyquist boosts the noise there: the mean-square error of an infinitely long MMSE linear equaliser is
 
 $$
-\sigma^2_\text{LE} = \int_{-1/2}^{1/2} \frac{\sigma_a^2 \sigma_n^2}{\sigma_a^2 |H(f)|^2 + \sigma_n^2}\, df , \qquad (1.2)
+\sigma^2_\text{LE} = \int_{-1/2}^{1/2} \frac{\sigma_a^2 \sigma_n^2}{\sigma_a^2 |H(f)|^2 + \sigma_n^2} df , \qquad (1.2)
 $$
 
 which is dominated by the frequencies where $|H(f)|$ is small. This *noise enhancement* is the LE's fundamental penalty.
@@ -108,16 +108,16 @@ Both are symbol-by-symbol decisions: they throw away the information that the IS
 
 ### 1.3 The maximum-likelihood criterion
 
-For Gaussian noise with covariance matrix $C$ the likelihood of a block of observations $\mathbf x$ given a candidate symbol sequence $\mathbf a$ is $p(\mathbf x \mid \mathbf a) \propto \exp\!\big(-\tfrac12 (\mathbf x - \mathbf H \mathbf a)^{\mathsf T} C^{-1} (\mathbf x - \mathbf H \mathbf a)\big)$, where $\mathbf H$ is the convolution matrix of $h$. The ML detector therefore solves
+For Gaussian noise with covariance matrix $C$ the likelihood of a block of observations $\mathbf x$ given a candidate symbol sequence $\mathbf a$ is $p(\mathbf x \mid \mathbf a) \propto \exp\big(-\tfrac12 (\mathbf x - \mathbf H \mathbf a)^{\mathsf T} C^{-1} (\mathbf x - \mathbf H \mathbf a)\big)$, where $\mathbf H$ is the convolution matrix of $h$. The ML detector therefore solves
 
 $$
-\hat{\mathbf a} = \arg\min_{\mathbf a \in \mathcal A^N} \; (\mathbf x - \mathbf H \mathbf a)^{\mathsf T} C^{-1} (\mathbf x - \mathbf H \mathbf a). \qquad (1.3)
+\hat{\mathbf a} = \arg\min_{\mathbf a \in \mathcal A^N} (\mathbf x - \mathbf H \mathbf a)^{\mathsf T} C^{-1} (\mathbf x - \mathbf H \mathbf a). \qquad (1.3)
 $$
 
 When the noise is white, $C = \sigma_n^2 I$ and the metric separates into a sum of per-symbol terms,
 
 $$
-\hat{\mathbf a} = \arg\min_{\mathbf a} \sum_k \Big( x[k] - \sum_{i=0}^{L_h} h_i\, a[k-i] \Big)^2 , \qquad (1.4)
+\hat{\mathbf a} = \arg\min_{\mathbf a} \sum_k \Big( x[k] - \sum_{i=0}^{L_h} h_i a[k-i] \Big)^2 , \qquad (1.4)
 $$
 
 the **Euclidean metric**. The separability is what makes an efficient search possible; it is lost when $C$ is not diagonal, which is the subject of this report.
@@ -133,7 +133,7 @@ $$
 The **path metric** of the best path ending in state $s'$ obeys the add–compare–select recursion
 
 $$
-\Gamma_k(s') = \min_{s \,\to\, s'} \big[ \Gamma_{k-1}(s) + \lambda_k(s, a) \big], \qquad (1.6)
+\Gamma_k(s') = \min_{s \to s'} \big[ \Gamma_{k-1}(s) + \lambda_k(s, a) \big], \qquad (1.6)
 $$
 
 and the surviving predecessor of each state is stored. After the last sample, the state with the smallest $\Gamma$ is selected and the stored predecessors are followed backwards (**traceback**) to read out the decided symbols. The complexity is $M^{L_h+1}$ branch evaluations per symbol; the implementation in `mlse.py` vectorises all states and transitions, and `npml.viterbi_decode_chunked` decodes long records in overlapping blocks because survivors merge within a few times $L_h$ symbols, so an overlap of 128 symbols is indistinguishable from a single full-length traceback (verified in the tests). Practical limits in this code base are about $2^{10}$ states for NRZ and $4^{5}$ for PAM4.
@@ -143,19 +143,19 @@ and the surviving predecessor of each state is stored. After the last sample, th
 The detector errs when a wrong sequence $\mathbf a'$ has a smaller metric than the transmitted one. Writing the difference as an **error event** $\epsilon = (\mathbf a - \mathbf a')/\Delta$ — a finite integer sequence, entries in $[-(M-1), M-1]$ — and its response $u = \epsilon \star h$, the pairwise error probability in white noise is
 
 $$
-P(\epsilon) = Q\!\left( \frac{\Delta\, \lVert u \rVert}{2\sigma_n} \right). \qquad (1.7)
+P(\epsilon) = Q\left( \frac{\Delta \lVert u \rVert}{2\sigma_n} \right). \qquad (1.7)
 $$
 
 At high SNR the symbol error ratio is dominated by the events with the smallest $\lVert u \rVert$:
 
 $$
-P_s \;\approx\; K\; Q\!\left( \frac{\Delta\, d_\text{min}}{2\sigma_n} \right), \qquad d_\text{min} = \min_{\epsilon \ne 0} \lVert \epsilon \star h \rVert, \qquad (1.8)
+P_s \approx K Q\left( \frac{\Delta d_\text{min}}{2\sigma_n} \right), \qquad d_\text{min} = \min_{\epsilon \ne 0} \lVert \epsilon \star h \rVert, \qquad (1.8)
 $$
 
 with $K$ the average number of nearest-neighbour events. The single-symbol event $\epsilon = [1]$ gives $\lVert u \rVert = \lVert h \rVert$, so $d_\text{min} \le \lVert h \rVert$ and
 
 $$
-P_\text{MFB} = \frac{2(M-1)}{M}\; Q\!\left( \frac{\Delta\, \lVert h \rVert}{2\sigma_n} \right) \qquad (1.9)
+P_\text{MFB} = \frac{2(M-1)}{M} Q\left( \frac{\Delta \lVert h \rVert}{2\sigma_n} \right) \qquad (1.9)
 $$
 
 is the **matched-filter bound**: the performance of an isolated pulse with all its energy collected, i.e. the ISI-free limit. For NRZ with the SNR definition of §2.1 it is simply $Q(\sqrt{\mathrm{SNR}})$. The *MLSE gain* is the SNR difference between the sequence detector and a symbol-by-symbol receiver at the same error ratio; it is small when the eye is open and grows as the LE's noise enhancement (1.2) grows. It is bounded above by the distance from the symbol-by-symbol receiver to the MFB.
@@ -165,16 +165,16 @@ is the **matched-filter bound**: the performance of an isolated pulse with all i
 A long channel makes the trellis intractable, so practical receivers let an FFE shorten the channel to a **target** $t = [1, t_1, \dots, t_L]$ of small memory $L$ and run the Viterbi on the target. The detector input is then
 
 $$
-y[k] = \sum_{j=0}^{L} t_j\, a[k-j] + e[k], \qquad e = (w \star n) + \text{unmodelled ISI}, \qquad (1.10)
+y[k] = \sum_{j=0}^{L} t_j a[k-j] + e[k], \qquad e = (w \star n) + \text{unmodelled ISI}, \qquad (1.10)
 $$
 
 where the unmodelled ISI is the part of $g = h \star w$ outside the window $[D, D+L]$. Three ways of choosing $t$ were studied:
 
-- **GPR target.** Minimise the error variance $\mathbb E[e^2]$ jointly over $w$ and the monic $t$. With $R = \mathbb E[u u^{\mathsf T}]$ (the Toeplitz autocorrelation matrix of the FFE input), $\mathbf P_{ij} = \mathbb E[u_i\, a[k-D-j]] = \sigma_a^2 h_{D+j-(n_\text{tap}-1)+i}$ and $\mathbf M = \sigma_a^2 I - \mathbf P^{\mathsf T} R^{-1} \mathbf P$,
+- **GPR target.** Minimise the error variance $\mathbb E[e^2]$ jointly over $w$ and the monic $t$. With $R = \mathbb E[u u^{\mathsf T}]$ (the Toeplitz autocorrelation matrix of the FFE input), $\mathbf P_{ij} = \mathbb E[u_i a[k-D-j]] = \sigma_a^2 h_{D+j-(n_\text{tap}-1)+i}$ and $\mathbf M = \sigma_a^2 I - \mathbf P^{\mathsf T} R^{-1} \mathbf P$,
 
 $$
 t = \frac{\mathbf M^{-1} e_0}{e_0^{\mathsf T} \mathbf M^{-1} e_0}, \qquad
-w = R^{-1} \mathbf P\, t, \qquad
+w = R^{-1} \mathbf P t, \qquad
 \mathbb E[e^2] = \frac{1}{e_0^{\mathsf T} \mathbf M^{-1} e_0}, \qquad (1.11)
 $$
 
@@ -189,8 +189,8 @@ For a known channel the detector taps are the actual window $g[D \dots D+L]$ (no
 The error process in (1.10) has autocorrelation
 
 $$
-R_e(\ell) = \underbrace{\sum_{i}\sum_{j} w_i w_j\, r_n(\ell + j - i)}_{R_{wn}(\ell):\ \text{FFE-filtered noise}}
-\;+\; \sigma_a^2 \sum_{d} g_\text{res}[d]\, g_\text{res}[d+\ell], \qquad (1.12)
+R_e(\ell) = \underbrace{\sum_{i}\sum_{j} w_i w_j r_n(\ell + j - i)}_{R_{wn}(\ell):\ \text{FFE-filtered noise}}
++ \sigma_a^2 \sum_{d} g_\text{res}[d] g_\text{res}[d+\ell], \qquad (1.12)
 $$
 
 where $g_\text{res}$ is $g$ with the modelled window zeroed and $r_n$ the input-noise autocorrelation ($r_n(\ell) = \sigma_n^2 \delta_\ell$ for AWGN). The first term is coloured whenever $w$ is not a delta — a full-equalisation FFE for a low-pass channel is strongly high-pass, giving $\rho_1 \approx -0.5$ to $-0.7$; a GPR target keeps the FFE flatter (the target absorbs the low-pass character of the channel) and $\rho_1$ small. The second term is coloured by construction. On a real receiver $r_n$ itself is coloured (the ADC-input noise is band-limited by the TIA and the termination).
@@ -198,7 +198,7 @@ where $g_\text{res}$ is $g$ with the modelled window zeroed and $r_n$ the input-
 The ML metric for coloured Gaussian error is the quadratic form (1.3) with $C = \mathrm{Toeplitz}(R_e)$. It does not separate into per-symbol branch metrics, so a finite-state trellis cannot implement it exactly. A Euclidean Viterbi applied regardless is a *mismatched* detector. Its pairwise error probability is still exact to compute: with $V = R_e / R_e(0)$ the normalised covariance and $\sigma = \sqrt{R_e(0)}$,
 
 $$
-P(\epsilon) = Q\!\left( \frac{A_s}{\sigma}\, \frac{u^{\mathsf T} u}{\sqrt{u^{\mathsf T} V u}} \right), \qquad u = \epsilon \star t,\quad A_s = \Delta/2 . \qquad (1.13)
+P(\epsilon) = Q\left( \frac{A_s}{\sigma} \frac{u^{\mathsf T} u}{\sqrt{u^{\mathsf T} V u}} \right), \qquad u = \epsilon \star t,\quad A_s = \Delta/2 . \qquad (1.13)
 $$
 
 This is the argument of Equation (178A-40) of IEEE P802.3dj once the sequence-noise distribution is normalised to unit variance. The quantity $d_\text{eff} = u^{\mathsf T} u / \sqrt{u^{\mathsf T} V u}$ is the *effective distance*; it equals $\lVert u \rVert$ when $V = I$ and is smaller when the error-event response $u$ is aligned with the dominant eigenvectors of $V$ (which, for high-pass error, are the alternating events). `mlsd_bound` enumerates every integer error sequence up to length $L + 4$, finds $\min d_\text{eff}$ and reports the nearest-neighbour Gaussian estimate (1.8) with that distance; the 802.3dj draft only enumerates the alternating events of a 1-tap residual. The *slicer / genie-DFE* reference is $d_\text{eff} = 1$, so $20 \log_{10} d_\text{eff,min}$ is the detector's advantage in dB over a symbol-by-symbol decision on the same FFE output, and $20 \log_{10}(A_s d_\text{eff,min} / \sigma)$ — the **margin** used in §3 — is the Q-argument in dB.
@@ -208,7 +208,7 @@ This is the argument of Equation (178A-40) of IEEE P802.3dj once the sequence-no
 If a monic filter $P(z)$ makes $P \star e$ white, then applying $P$ to $y$ gives
 
 $$
-(P \star y)[k] = \sum_{j=0}^{L+p} (t \star P)_j\, a[k-j] + (P \star e)[k], \qquad (1.14)
+(P \star y)[k] = \sum_{j=0}^{L+p} (t \star P)_j a[k-j] + (P \star e)[k], \qquad (1.14)
 $$
 
 i.e. a new target $t \star P$ of memory $L + p$ with (approximately) white error, on which the Euclidean Viterbi is again (approximately) ML. This is the noise-predictive maximum-likelihood (NPML) detector of Chevillat, Eleftheriou and Hirt; the price is a trellis of $M^{L+p}$ states. In the limit of an infinitely long FFE and $p \to \infty$ the cascade FFE $\star P$ becomes Forney's whitened matched filter and the detector is exactly ML for the original channel.
@@ -216,7 +216,7 @@ i.e. a new target $t \star P$ of memory $L + p$ with (approximately) white error
 The classical choice of $P$ is the **linear-prediction-error filter** of $e$: with $c$ the solution of the normal equations
 
 $$
-\mathrm{Toeplitz}\big(R_e(0), \dots, R_e(p-1)\big)\, c = \big[R_e(1), \dots, R_e(p)\big]^{\mathsf T},
+\mathrm{Toeplitz}\big(R_e(0), \dots, R_e(p-1)\big) c = \big[R_e(1), \dots, R_e(p)\big]^{\mathsf T},
 \qquad
 P = [1, -c_1, \dots, -c_p], \qquad
 \sigma_p^2 = R_e(0) - c^{\mathsf T} [R_e(1) \dots R_e(p)]^{\mathsf T}, \qquad (1.15)
@@ -227,13 +227,13 @@ and the **prediction gain** $G_p = 10\log_{10}\big(R_e(0)/\sigma_p^2\big)$ measu
 **Which error should be whitened?** Three candidates were compared (§2.5): the total error $e$ of (1.10); the filtered noise $R_{wn}$ alone; and the error the *extended* detector will actually see. The last is the principled one. After $P$, the detector models the window $(g \star P)[D \dots D+L+p]$ and everything else is error,
 
 $$
-e'[k] = (P \star n_\text{ffe})[k] + \sum_{d \notin \text{window}} (g \star P)[d]\; a[k-d], \qquad (1.16)
+e'[k] = (P \star n_\text{ffe})[k] + \sum_{d \notin \text{window}} (g \star P)[d] a[k-d], \qquad (1.16)
 $$
 
 both terms of which are linear in $P$. Hence $\mathrm{Var}(e') = P^{\mathsf T} A P$ with
 
 $$
-A = \mathrm{Toeplitz}\big(R_{wn}(0 \dots p)\big) + \sigma_a^2\, G_m^{\mathsf T} G_m , \qquad (1.17)
+A = \mathrm{Toeplitz}\big(R_{wn}(0 \dots p)\big) + \sigma_a^2 G_m^{\mathsf T} G_m , \qquad (1.17)
 $$
 
 where $G_m$ is the convolution matrix of $g$ with the window rows removed, and the monic minimiser is
@@ -249,7 +249,7 @@ With no residual ISI, (1.18) reduces exactly to the prediction-error filter of t
 All receivers are compared on the same channel, the same FFE length and the same noise realisation. Two measures are used:
 
 - **Required SNR at a target SER** (synthetic study): the SNR at which the measured SER curve crosses $10^{-4}$ (log-linear interpolation), quoted as the penalty relative to the MFB SNR at the same SER. Differences between receivers are the quantity of interest; the Monte Carlo uncertainty is about $\pm 0.05$–$0.1$ dB.
-- **Margin** $= 20 \log_{10}\big(A_s\, d_\text{eff,min}/\sigma\big)$ in dB (capture study): the Q-argument of the bound (1.13) evaluated on the measured detector-input error; a 1 dB margin difference is a 1 dB SNR difference at the same SER in the Gaussian-tail regime.
+- **Margin** $= 20 \log_{10}\big(A_s d_\text{eff,min}/\sigma\big)$ in dB (capture study): the Q-argument of the bound (1.13) evaluated on the measured detector-input error; a 1 dB margin difference is a 1 dB SNR difference at the same SER in the Gaussian-tail regime.
 
 ---
 
@@ -257,9 +257,9 @@ All receivers are compared on the same channel, the same FFE length and the same
 
 ### 2.1 Set-up
 
-**Channel.** A rectangular (ZOH) symbol pulse is passed through a 4th-order Bessel low-pass filter with $f_{3\,\text{dB}} = \text{bw} \cdot f_\text{baud}$ (magnitude-normalised, 32× oversampled), sampled at baud rate at the phase that maximises the cursor, truncated to taps above 1 % of the peak and normalised to unit DC gain. Three bandwidths were used:
+**Channel.** A rectangular (ZOH) symbol pulse is passed through a 4th-order Bessel low-pass filter with $f_{3\text{dB}} = \text{bw} \cdot f_\text{baud}$ (magnitude-normalised, 32× oversampled), sampled at baud rate at the phase that maximises the cursor, truncated to taps above 1 % of the peak and normalised to unit DC gain. Three bandwidths were used:
 
-| $f_{3\,\text{dB}}/f_\text{baud}$ | taps | $h$ (cursor-aligned) | $\lvert H \rvert$ at Nyquist |
+| $f_{3\text{dB}}/f_\text{baud}$ | taps | $h$ (cursor-aligned) | $\lvert H \rvert$ at Nyquist |
 |---|---|---|---|
 | 0.25 (mild) | 3 | $[0.140,\ 0.632,\ 0.228]$ | $-11.6$ dB |
 | 0.20 (moderate) | 5 | $[0.179,\ 0.528,\ 0.270,\ 0.031,\ -0.008]$ | $-18.6$ dB |
@@ -285,7 +285,7 @@ so that the MFB (1.9) depends on nothing but the SNR and the alphabet: $Q(\sqrt{
 | DFE (3 tap) | joint MMSE FFE + 3 feedback taps, real decisions (error propagation included) | — |
 | full ML | Euclidean Viterbi directly on the raw channel $h$ (the true ML receiver; feasible for NRZ and for the two shorter PAM4 channels) | $L_h$ |
 | GPR L=1 | GPR target (1.11) of memory 1, Euclidean Viterbi | 1 |
-| GPR L=1 + W($p$) | same, with the min-error extension filter (1.18) of order $p \in \{1, 2, 4\}$ (NRZ), $\{1, 2, 3\}$ (PAM4) | $1 + p$ |
+| GPR L=1 + W($p$) | same, with the min-error extension filter (1.18) of order $p \in \lbrace 1, 2, 4 \rbrace$ (NRZ), $\lbrace 1, 2, 3 \rbrace$ (PAM4) | $1 + p$ |
 | GPR L=2, 3, 5 (NRZ) / 2, 3, 4 (PAM4) | longer GPR targets, Euclidean | $L$ |
 | fixed $1+0.5D$ (+W($p$)) | fixed target, MMSE FFE; optionally extended | $1 (+p)$ |
 | LE + MLSE(res L=2) | full-equalisation FFE, Viterbi on the residual window $g[D \dots D+2]$ | 2 |
@@ -298,10 +298,10 @@ so that the MFB (1.9) depends on nothing but the SNR and the alphabet: $Q(\sqrt{
 ### 2.2 How coloured is the detector-input error?
 
 ![Noise colour at the MLSE input, severe channel](figures/fig_synth_noise_colour_bw0p15.png)
-*Figure 2.1 — Severe channel ($f_{3\,\text{dB}} = 0.15\,f_\text{baud}$, NRZ, SNR 18 dB). Top: pulse response; magnitude responses of the channel and of the three FFEs; detector-input error PSD before (solid) and after (dotted) the order-4 extension filter. Bottom: error autocorrelation $\rho(\ell)$; prediction gain versus order; the memory-1 GPR target, its whitened extensions and the longer GPR targets. The full-equalisation FFE (violet) boosts Nyquist by 17 dB and produces an error with $\rho_1 = -0.53$; the GPR FFE (orange) rolls off above $0.35\,f_\text{baud}$ because its $1 + 0.77D$ target absorbs the channel's low-pass character, leaving $\rho_1 = -0.37$.*
+*Figure 2.1 — Severe channel ($f_{3\text{dB}} = 0.15f_\text{baud}$, NRZ, SNR 18 dB). Top: pulse response; magnitude responses of the channel and of the three FFEs; detector-input error PSD before (solid) and after (dotted) the order-4 extension filter. Bottom: error autocorrelation $\rho(\ell)$; prediction gain versus order; the memory-1 GPR target, its whitened extensions and the longer GPR targets. The full-equalisation FFE (violet) boosts Nyquist by 17 dB and produces an error with $\rho_1 = -0.53$; the GPR FFE (orange) rolls off above $0.35f_\text{baud}$ because its $1 + 0.77D$ target absorbs the channel's low-pass character, leaving $\rho_1 = -0.37$.*
 
 ![Noise colour at the MLSE input, moderate channel](figures/fig_synth_noise_colour_bw0p2.png)
-*Figure 2.2 — Same for the moderate channel ($0.2\,f_\text{baud}$, SNR 16 dB). The GPR error is already nearly white ($\rho_1 = -0.16$, prediction gain 0.3 dB); the full-equalisation error is not ($\rho_1 = -0.64$, 2.3 dB).*
+*Figure 2.2 — Same for the moderate channel ($0.2f_\text{baud}$, SNR 16 dB). The GPR error is already nearly white ($\rho_1 = -0.16$, prediction gain 0.3 dB); the full-equalisation error is not ($\rho_1 = -0.64$, 2.3 dB).*
 
 | channel | $\rho_1$: GPR L=1 / fixed / full-EQ | prediction gain (dB), order 4: GPR / fixed / full-EQ |
 |---|---|---|
@@ -416,12 +416,12 @@ The transmitted waveform is taken to be ideal (the ZOH symbol stream), so no TX 
 
 ### 3.2 Processing pipeline (per sampling phase, no CDR)
 
-For each phase $\varphi \in \{0, \dots, 31\}$:
+For each phase $\varphi \in \lbrace 0, \dots, 31 \rbrace$:
 
 1. **Baud samples** $x_\varphi[k] = w[32k + \varphi]$, aligned to the symbol stream by the cross-correlation lag.
-2. **Channel estimate** by least squares on the first 50,000 symbols, $x[k] = \sum_{j=0}^{32} h_j\, a_c[k-j] + n[k]$ with 8 precursor and 24 post-cursor taps ($a_c$ is the symbol stream shifted so that the first tap of $h$ coincides with $x$).
+2. **Channel estimate** by least squares on the first 50,000 symbols, $x[k] = \sum_{j=0}^{32} h_j a_c[k-j] + n[k]$ with 8 precursor and 24 post-cursor taps ($a_c$ is the symbol stream shifted so that the first tap of $h$ coincides with $x$).
 3. **Noise statistics** from the LS residual $r = x - \hat h \star a_c$: $\sigma_n^2 = \overline{r^2}$ and the biased autocorrelation $r_n(\ell)$ up to lag 50. The residual contains everything the 33-tap linear model does not explain (noise, nonlinearity, longer tails), which is exactly what a receiver designed from this estimate will see.
-4. **Receiver design** from $(\hat h, r_n)$: all FFEs are Wiener solutions with the coloured-noise autocorrelation matrix $R = \sigma_a^2\, \mathrm{Toeplitz}(r_{hh}) + \mathrm{Toeplitz}(r_n)$, $r_{hh}(\ell) = \sum_m h_m h_{m-\ell}$; GPR targets by (1.11), the fixed target by $w = R^{-1}\mathbf P t$, the DFE by the joint MMSE equations with the same $R$, and the extension filters by (1.17)–(1.18) with $R_{wn}(\ell) = \sum_i\sum_j w_i w_j r_n(\ell + j - i)$. The receivers are those of Table 2.1 except full ML (a 30-tap PAM4 trellis is out of reach), with whitening orders $\{1, 2, 3\}$ and GPR memories $\{2, 3, 4\}$ ($\le 256$ states).
+4. **Receiver design** from $(\hat h, r_n)$: all FFEs are Wiener solutions with the coloured-noise autocorrelation matrix $R = \sigma_a^2 \mathrm{Toeplitz}(r_{hh}) + \mathrm{Toeplitz}(r_n)$, $r_{hh}(\ell) = \sum_m h_m h_{m-\ell}$; GPR targets by (1.11), the fixed target by $w = R^{-1}\mathbf P t$, the DFE by the joint MMSE equations with the same $R$, and the extension filters by (1.17)–(1.18) with $R_{wn}(\ell) = \sum_i\sum_j w_i w_j r_n(\ell + j - i)$. The receivers are those of Table 2.1 except full ML (a 30-tap PAM4 trellis is out of reach), with whitening orders $\lbrace 1, 2, 3 \rbrace$ and GPR memories $\lbrace 2, 3, 4 \rbrace$ ($\le 256$ states).
 5. **Detection** on the remaining 99,795 symbols (hold-out): counted SER, and the bound (1.13) on the measured detector-input error (Gaussian SER estimate and margin).
 
 **Noise loading.** The capture is clean enough that no receiver makes an error (§3.4), so the comparison is made under added noise. Rather than white noise, the loaded noise is shaped like the LS residual: an order-16 AR synthesis whose autocorrelation matches $r_n(0 \dots 16)$ (coefficients from the Levinson solution (1.15) of the residual's autocorrelation), scaled to $m$ times the native residual rms. Adding noise with the receiver's own noise spectrum is equivalent to lowering the OMA with the RX noise unchanged, and it degrades the MFB SNR by $10\log_{10}(1 + m^2)$: 3.0, 7.0, 10.0, 12.3, 14.1, 15.7 and 18.1 dB for $m = 1 \dots 8$. White loading is available (`--noise-shape white`) but was not used for the results below. The channel is re-estimated with the loaded noise present, as a receiver operating at that SNR would.
@@ -445,7 +445,7 @@ For each phase $\varphi \in \{0, \dots, 31\}$:
 
 *Table 3.1 — Channel and noise estimates. The optimum sampling phase sits late on the pulse: a large precursor (which an FFE removes without noise enhancement because the pulse energy is still collected) and a negligible post-cursor.*
 
-The channel is comparable to the *mild* synthetic case ($-12$ dB at Nyquist, cf. $-11.6$ dB for $0.25\,f_\text{baud}$) at the best phase, and to the moderate case at the worst phase, where the post-cursor is 72 % of the cursor.
+The channel is comparable to the *mild* synthetic case ($-12$ dB at Nyquist, cf. $-11.6$ dB for $0.25f_\text{baud}$) at the best phase, and to the moderate case at the worst phase, where the post-cursor is 72 % of the cursor.
 
 ### 3.4 Native results
 
@@ -525,14 +525,14 @@ With a CDR that locks near the MMSE sampling phase, this link does not need a wh
 python examples/mlse_whitening_study.py --n-symbols 2000000 --tag nrz_main
 python examples/mlse_whitening_study.py --modulation pam4 --bw 0.15 0.2 0.25 --snr-range 14 32 2 \
     --n-symbols 1000000 --whiten-orders 1 2 3 --gpr-memories 2 3 4 --tag pam4_main
-python examples/mlse_whitening_study.py --tag nrz_main --replot          # figures from results.json
+python examples/mlse_whitening_study.py --tag nrz_main --replot # figures from results.json
 
 # capture study (≈80 s)
 python examples/mlse_whitening_capture.py --symbols "temp/food/ranjit_colossus/tx_symbols (1).csv" \
-    --wave temp/food/ranjit_colossus/after_rxterm_wave.npy --tag ranjit_colossus          # ×3 phase sweep
+    --wave temp/food/ranjit_colossus/after_rxterm_wave.npy --tag ranjit_colossus # ×3 phase sweep
 python examples/mlse_whitening_capture.py --symbols "temp/food/ranjit_colossus/tx_symbols (1).csv" \
     --wave temp/food/ranjit_colossus/after_rxterm_wave.npy --phase-noise 2.0 \
-    --extra-noise 1.5 2.0 2.5 --tag ranjit_colossus_x2                                     # ×2 phase sweep
+    --extra-noise 1.5 2.0 2.5 --tag ranjit_colossus_x2 # ×2 phase sweep
 
 python -m pytest tests/test_rx/test_npml.py tests/test_optical/test_mlse.py tests/test_analysis/test_mlsd_bound.py
 ```
