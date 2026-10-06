@@ -47,9 +47,9 @@ The optical specification binds transmitter quality only through TDEC at TP2 and
 
 | **Req ID** | **Rev 0.7 obligation (abridged)** | **This document** | **Section** |
 | --- | --- | --- | --- |
-| **ELE-002** | JRMS ≤ 0.023 UI rms (216 fs), 802.3dj method. | Adopted limit and applicability notes; internal analog σ_RJ sits 52 % inside it. | 2.3, 6 |
-| **ELE-003** | EOJ ≤ 0.025 UI pp (235 fs). | Adopted; the derived DCD lands exactly on it. | 2.3, 5.2 |
-| **ELE-004** | J4u ≤ 0.118 UI pp (1.11 ps). | Adopted; it is the ceiling that sizes σ_RJ through the tougher-spec rule. | 2.3, 5.1, 6 |
+| **ELE-002** | JRMS ≤ 0.023 UI rms (216 fs), 802.3dj method. | Adopted limit and applicability notes; internal analog σ_RJ sits 52 % inside it. | 2.2, 6 |
+| **ELE-003** | EOJ ≤ 0.025 UI pp (235 fs). | Adopted; the derived DCD lands exactly on it. | 2.2, 5.2 |
+| **ELE-004** | J4u ≤ 0.118 UI pp (1.11 ps). | Adopted; it is the ceiling that sizes σ_RJ through the tougher-spec rule. | 2.2, 5.1, 6 |
 | **ELE-005** | Dual-Dirac budget at 1e-12: σ_RJ, DCD, ISI, BUJ, DDJ, DJ-dd, TJ; additive bounded, RSS Gaussian at Q = 7.034. | Defined normatively in Table 4-1; every term derived in Section 5. | 4, 5 |
 | **ELE-006** | TP1 edge ≤ 0.35 UI typical, 4.0 ps hard max; rise/fall mismatch ≤ 0.35 ps. | Inputs to the DCD (mismatch) and ISI (edge corners) derivations. | 5.2, 5.3 |
 | **ELE-008** | Inter-tap matching ≤ 2.6 % UI. | Contributor to the FIR slice-DCD adder (Open item 3). | 5.2, 5.5 |
@@ -58,7 +58,7 @@ The optical specification binds transmitter quality only through TDEC at TP2 and
 | **EMC-003** | Aggregate crosstalk within BUJ ≤ 0.036 UI (339 fs). | Coupling bound ≤ 2.5 % at the worst-case slew corner. | 5.4 |
 | **EMC-004** | Spur limits from the ELE-004 ceiling. | Supply-coupled periodic jitter is carried inside BUJ, not budgeted separately. | 5.4 |
 | **LOG-002** | 2.4E-4 compliance point; RS-only host FEC. | Q table; the 1e-12 point is the internal design margin above it. | 3.3 |
-| **CMP-007** | TP1 jitter met in UI in both modes; 200G absolutes 433 fs / 471 fs / 2.22 ps. | 200G columns; hardware-fixed terms re-expressed in 200G UI. | 2.3, 4.2 |
+| **CMP-007** | TP1 jitter met in UI in both modes; 200G absolutes 433 fs / 471 fs / 2.22 ps. | 200G columns; hardware-fixed terms re-expressed in 200G UI. | 2.2, 4.2 |
 
 # 2. Reference Points and Adopted Standard Limits
 
@@ -72,13 +72,9 @@ The optical specification binds transmitter quality only through TDEC at TP2 and
 | **TP2** | Optical output at the fiber reference plane | Optical | OCI Table 2-2 TX optical: TDEC, OMA, ER, transition time (TXO family) | Bench-accessible compliance point | Rev 0.7 §4.1 |
 | **TP3** | Optical input at the fiber reference plane (receiver counterpart) | Optical | Sensitivity, SRS, JTOL (RXO, DRX-006) | Bench-accessible | Rev 0.7 §4.2 |
 
-## 2.2 Test-point location diagram
+The chain and the physical place of TP1 are drawn in DES-OCI-106G-TXD-001 Figure 2-1. This budget binds only at the TP1 row; TP2 and TP3 are outside it.
 
-**Figure 2-1. TP1 test-point location diagram**
-
-*\[FIGURE PLACEHOLDER — insert test-point location diagram here. Suggested content: a simplified single-channel version of DES-OCI-106G-TXD-001 Figure 2-1, drawn to show where the TP1 budget binds, with the Location, Domain and Access columns of Table 2-1 as annotations on each test point. Chain, left to right: TX PLL and serializer (host-derived line clock from the reference, LC-PLL and distribution chain of DES-OCI-106G-CLK-001) → pre-driver (0 / 1 / 2 UI branch phases) → TX driver (3-tap analog FIR, hard clip, series peaking) → TP1 → TX microbump and pad (EIC → PIC boundary) → micro-ring modulator → bus waveguide → Band-Mux → fiber → TP2; optionally the far-end fiber input as TP3. Mark TP1 as a buried, in-package electrical reference plane at the differential input of the MRM after the microbump pad, extracted load ≈ 150 fF (DES-OCI-106G-TXD-001 Table 2-3), with the note “no physical access — verified by simulation, on-die instrumentation (edge monitor, eye / jitter monitor, static-level readback) and the driver test vehicle with probe-able replica pad” (Section 7); mark TP2 as the bench-accessible optical compliance point at the fiber reference plane (OCI Table 2-2 TX optical limits; TXO family, outside this budget), bound to TP1 through the MRM electro-optic model (ELE-001). Annotate the jitter contributors of Table 4-1 at the stage where each arises and show them all summing at TP1: clock chain (reference + LC-PLL + distribution + serializer) → random jitter σ_RJ ≤ 104 fs rms (Section 5.1) and the DCC-residual part of DCD; serializer / pre-driver / driver edge asymmetry → duty-cycle distortion DCD ≤ 235 fs pp (Section 5.2) plus the FIR slice-DCD adder (0.05 UI, Section 5.5); driver edge rate and settling into the TP1 load → ISI jitter ≤ 113 fs pp (Section 5.3); crosstalk from the other three WDM lanes and supply-coupled spurs entering the driver and pad → bounded uncorrelated jitter BUJ ≤ 339 fs pp (Section 5.4); the dual-Dirac assembly DJ_δδ and TJ at 1e-12 stated at TP1 (Section 5.5) and the 802.3dj clock-jitter limits adopted there (Section 2.3, Table 2-2). Everything to the right of TP1 is optical (TDEC, ER, transition time) and belongs to the TXO family, not to this budget. Electrical path solid, optical path drawn as a waveguide / fiber line, jitter-contributor call-outs as dashed arrows onto TP1.\]*
-
-## 2.3 802.3dj clock-jitter limits adopted at TP1
+## 2.2 802.3dj clock-jitter limits adopted at TP1
 
 **Table 2-2. Adopted limits (802.3dj 179.9.4.6 via Annex 176C/176D at 106.25 ± 50 ppm GBd)**
 

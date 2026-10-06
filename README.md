@@ -41,3 +41,4 @@ mydocs/
 ### Nuggets
 
 - [Confidence BER](nuggets/confidence_ber/README.md) — method and derivation
+- [MLSE on Coloured Noise](nuggets/mlse/report.md) — Euclidean vs noise-whitened sequence detection: primer, synthetic Bessel-channel study, 212.5 Gb/s PAM4 capture
